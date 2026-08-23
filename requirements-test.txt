@@ -1,0 +1,4 @@
+# Stufe 2: Home-Assistant-Integrationstests. Laeuft nur unter Linux/CI.
+# Die Version muss zur Ziel-Home-Assistant-Version passen (aktuell 2026.8.x).
+-r requirements-dev.txt
+pytest-homeassistant-custom-component

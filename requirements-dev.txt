@@ -1,0 +1,5 @@
+# Stufe 1: reine Domaenentests, laufen ueberall (auch nativ unter Windows).
+pytest>=8.3
+pytest-asyncio>=0.24
+freezegun>=1.5
+ruff>=0.8

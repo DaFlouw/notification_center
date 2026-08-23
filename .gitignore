@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+htmlcov/
+.venv/
+venv/
+
+# Lokale Testdaten
+*.db
+*.db-wal
+*.db-shm
+
+# Editor / OS
+.vscode/
+.idea/
+Thumbs.db
+desktop.ini
+~$*
