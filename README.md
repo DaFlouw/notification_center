@@ -12,12 +12,12 @@ keine externen Datenquellen, keine Cloud, keine externe Datenbank.
 
 ## Status
 
-In Entwicklung. Aktuelle Version: `0.1.0` (Phase 1).
+In Entwicklung. Aktuelle Version: `0.1.0`.
 
 | Phase | Inhalt | Status |
 |-------|--------|--------|
-| 1 | Integration, Storage, Datenmodelle | in Arbeit |
-| 2 | Entity-Registrierung, State-Listener, Rule Engine | offen |
+| 1 | Integration, Storage, Datenmodelle | abgeschlossen |
+| 2 | Entity-Registrierung, State-Listener, Rule Engine | als naechstes |
 | 3 | Notification-Lebenszyklus, Event Store, Counter | offen |
 | 4 | Automations-API (create/update/dismiss) | offen |
 | 5 | Discovery Engine, Vorschlaege, Confidence | offen |
@@ -63,11 +63,22 @@ einfache Snapshot-Objekte und sind damit ohne HA-Runtime testbar
 
 ## Entwicklung
 
+Die Domaenentests laufen ohne Home Assistant und damit auch unter Windows:
+
 ```bash
-pip install -r requirements-dev.txt
-pytest tests/unit
+python -m venv .venv
+.venv/Scripts/python.exe -m pip install -r requirements-dev.txt
+.venv/Scripts/python.exe -m pytest tests/unit
 ```
+
+Die Home-Assistant-Tests unter `tests/integration` benoetigen Python 3.14 und
+`pytest-homeassistant-custom-component`; sie laufen in der GitHub-Actions-CI
+unter Linux.
+
+Ein Architekturtest prueft, dass die Domaenenmodule keine
+Home-Assistant-Importe enthalten. Die Trennung ist damit nicht nur
+Konvention, sondern abgesichert.
 
 ## Lizenz
 
-Noch festzulegen.
+MIT, siehe [LICENSE](LICENSE).

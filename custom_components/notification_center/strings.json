@@ -1,0 +1,13 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Notification Center",
+        "description": "Das Notification Center wird als einzelne, globale Instanz eingerichtet. Die Auswahl der zu ueberwachenden Entities erfolgt anschliessend im Notification-Center-Panel."
+      }
+    },
+    "abort": {
+      "single_instance_allowed": "Es ist bereits eine Instanz des Notification Centers eingerichtet."
+    }
+  }
+}

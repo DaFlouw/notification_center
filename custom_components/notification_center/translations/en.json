@@ -1,0 +1,13 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Notification Center",
+        "description": "The Notification Center is set up as a single, global instance. Entities to monitor are selected afterwards in the Notification Center panel."
+      }
+    },
+    "abort": {
+      "single_instance_allowed": "A Notification Center instance is already configured."
+    }
+  }
+}
