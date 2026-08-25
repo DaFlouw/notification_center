@@ -12,6 +12,7 @@ from dataclasses import dataclass, field
 
 from homeassistant.core import HomeAssistant
 
+from .discovery.engine import DiscoveryEngine
 from .notifications.engine import NotificationEngine
 from .notifications.models import CloseReason
 from .rules.engine import RuleEngine
@@ -32,6 +33,7 @@ class NotificationCenterRuntime:
     event_store: AsyncEventStore
     rule_engine: RuleEngine = field(init=False)
     notification_engine: NotificationEngine = field(init=False)
+    discovery: DiscoveryEngine = field(init=False)
 
     def __post_init__(self) -> None:
         self.notification_engine = NotificationEngine(
@@ -42,6 +44,7 @@ class NotificationCenterRuntime:
             self.config_store,
             self._async_handle_intents,
         )
+        self.discovery = DiscoveryEngine(self.hass, self.config_store)
 
     @classmethod
     def create(cls, hass: HomeAssistant) -> NotificationCenterRuntime:

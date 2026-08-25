@@ -25,6 +25,8 @@ PURE_MODULES = (
     "rules/intents.py",
     "storage/event_store.py",
     "storage/config_models.py",
+    "discovery/analyzer.py",
+    "discovery/suggestions.py",
 )
 
 
