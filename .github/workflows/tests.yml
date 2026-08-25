@@ -57,3 +57,6 @@ jobs:
       - uses: hacs/action@main
         with:
           category: integration
+          # Die Marken-Pruefung verlangt einen Eintrag in home-assistant/brands,
+          # den es fuer eine neue eigene Integration nicht gibt.
+          ignore: brands
