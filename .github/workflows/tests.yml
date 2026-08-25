@@ -59,6 +59,30 @@ jobs:
             exit 1
           fi
 
+  frontend:
+    name: Frontend-Syntax
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      # Das Panel ist buildfrei; geprueft wird deshalb nur, ob die
+      # ausgelieferten Module ueberhaupt parsen.
+      - name: ES-Module pruefen
+        run: |
+          mkdir -p /tmp/jscheck
+          fehler=0
+          while IFS= read -r datei; do
+            ziel="/tmp/jscheck/$(basename "${datei%.js}").mjs"
+            cp "$datei" "$ziel"
+            if ! node --check "$ziel"; then
+              echo "::error file=$datei::Syntaxfehler"
+              fehler=1
+            fi
+          done < <(find custom_components/notification_center/frontend -name '*.js')
+          exit $fehler
+
   hassfest:
     name: Hassfest
     runs-on: ubuntu-latest

@@ -17,7 +17,8 @@ from .notifications.engine import NotificationEngine
 from .notifications.models import CloseReason
 from .rules.engine import RuleEngine
 from .rules.intents import NotificationIntent
-from .storage.config_models import ConfigDocument
+from .rules.models import Rule, RuleGroup
+from .storage.config_models import ConfigDocument, WatchedEntity
 from .storage.config_store import ConfigStore
 from .storage.event_store_async import AsyncEventStore
 
@@ -98,6 +99,58 @@ class NotificationCenterRuntime:
         await self.notification_engine.async_close_rules(
             entfernte_regeln, CloseReason.ENTITY_REMOVED
         )
+        await self.async_config_changed()
+
+    async def async_replace_entity(self, old_entity_id: str, new_entity_id: str) -> None:
+        """Ersetzt eine ueberwachte Entity (Spezifikation 66).
+
+        Die Regeln wandern mit und behalten ihre IDs. Laufende Notifications
+        der alten Entity werden abgeschlossen, ihre Historie bleibt der alten
+        Entity zugeordnet.
+        """
+        metadata = self.discovery.metadata_for(new_entity_id)
+        neu = WatchedEntity(
+            entity_id=new_entity_id,
+            device_id=metadata.device_id if metadata else None,
+            area_id=metadata.area_id if metadata else None,
+        )
+
+        umgehaengt = self.config.replace_entity(old_entity_id, neu)
+        await self.notification_engine.async_close_rules(umgehaengt, CloseReason.ENTITY_REPLACED)
+        await self.async_config_changed()
+
+    async def async_save_rule(self, rule: Rule) -> None:
+        """Legt eine Regel an oder ersetzt sie.
+
+        Beim Ersetzen wird eine laufende Notification beendet: sie beruht auf
+        der alten Bedingung und waere sonst nicht mehr nachvollziehbar.
+        """
+        bestand = self.config.rules.get(rule.rule_id)
+        self.config.add_rule(rule)
+
+        if bestand is not None:
+            await self.notification_engine.async_close_rules(
+                [rule.rule_id], CloseReason.RULE_DISABLED
+            )
+
+        await self.async_config_changed()
+
+    async def async_delete_rule(self, rule_id: str) -> None:
+        """Entfernt eine Regel und beendet ihre Notification."""
+        self.config.remove_rule(rule_id)
+        await self.notification_engine.async_close_rules([rule_id], CloseReason.RULE_DISABLED)
+        await self.async_config_changed()
+
+    async def async_save_group(self, group: RuleGroup) -> None:
+        """Legt eine Eskalationsgruppe an oder ersetzt sie."""
+        vorher = self.config.groups.get(group.group_id)
+        if vorher is not None:
+            await self.notification_engine.async_close_rules(
+                [regel.rule_id for regel in vorher.rules], CloseReason.RULE_DISABLED
+            )
+            self.rule_engine.async_forget_group(group.group_id)
+
+        self.config.add_group(group)
         await self.async_config_changed()
 
     async def async_disable_rule(self, rule_id: str) -> None:
