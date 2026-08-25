@@ -2,7 +2,9 @@ name: Tests
 
 on:
   push:
-    branches: [main]
+    # Auch Arbeitszweige pruefen: sonst laeuft die CI erst, wenn der
+    # Pull Request schon offen ist, und Fehler fallen zu spaet auf.
+    branches: [main, "fix/**", "feat/**"]
   pull_request:
   workflow_dispatch:
 
