@@ -49,8 +49,7 @@ jobs:
           else
             cat pytest.log
             tail -n 25 pytest.log | while IFS= read -r zeile; do
-              printf '::error::%s
-' "$zeile"
+              echo "::error::$zeile"
             done
             exit 1
           fi
