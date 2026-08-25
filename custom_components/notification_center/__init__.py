@@ -9,6 +9,7 @@ from __future__ import annotations
 import logging
 
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryNotReady
 
@@ -17,8 +18,7 @@ from .coordinator import NotificationCenterRuntime
 
 _LOGGER = logging.getLogger(__name__)
 
-#: Plattformen kommen ab Phase 3 dazu (Zaehler-Entities).
-PLATFORMS: list[str] = []
+PLATFORMS: list[Platform] = [Platform.SENSOR]
 
 type NotificationCenterEntry = ConfigEntry[NotificationCenterRuntime]
 
@@ -36,8 +36,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: NotificationCenterEntry)
     entry.runtime_data = runtime
     entry.async_on_unload(entry.add_update_listener(_async_update_listener))
 
-    if PLATFORMS:
-        await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
     _LOGGER.debug("Notification Center gestartet")
     return True
@@ -45,9 +44,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: NotificationCenterEntry)
 
 async def async_unload_entry(hass: HomeAssistant, entry: NotificationCenterEntry) -> bool:
     """Beendet die Instanz und schliesst die Ereignisdatenbank."""
-    unloaded = True
-    if PLATFORMS:
-        unloaded = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    unloaded = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
 
     if unloaded:
         await entry.runtime_data.async_stop()

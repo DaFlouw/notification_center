@@ -9,5 +9,24 @@
     "abort": {
       "single_instance_allowed": "Es ist bereits eine Instanz des Notification Centers eingerichtet."
     }
+  },
+  "entity": {
+    "sensor": {
+      "info_count": {
+        "name": "Infos"
+      },
+      "warning_count": {
+        "name": "Warnungen"
+      },
+      "alarm_count": {
+        "name": "Alarme"
+      },
+      "active_count": {
+        "name": "Aktive Meldungen"
+      },
+      "events_today": {
+        "name": "Ereignisse heute"
+      }
+    }
   }
 }

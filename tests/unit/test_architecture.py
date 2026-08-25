@@ -19,6 +19,7 @@ _PACKAGE = Path(__file__).resolve().parents[2] / "custom_components" / "notifica
 PURE_MODULES = (
     "const.py",
     "notifications/models.py",
+    "notifications/lifecycle.py",
     "rules/models.py",
     "rules/evaluator.py",
     "rules/intents.py",
