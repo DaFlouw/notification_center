@@ -71,9 +71,15 @@ python -m venv .venv
 .venv/Scripts/python.exe -m pytest tests/unit
 ```
 
-Die Home-Assistant-Tests unter `tests/integration` benoetigen Python 3.14 und
-`pytest-homeassistant-custom-component`; sie laufen in der GitHub-Actions-CI
-unter Linux.
+Die Home-Assistant-Tests unter `tests/integration` laufen ausschliesslich in
+der GitHub-Actions-CI unter Linux: Home Assistant importiert `fcntl` und
+startet damit unter Windows grundsaetzlich nicht. Sie benoetigen Python 3.14,
+`pytest-homeassistant-custom-component` und das Paket
+`home-assistant-frontend`, weil die Integration ein eigenes Panel bereitstellt.
+
+Schlaegt ein Testlauf in der CI fehl, meldet der Testschritt die letzten
+Ausgabezeilen zusaetzlich als Annotationen. Job-Logs sind ueber die
+GitHub-API nur mit Admin-Rechten abrufbar, Annotationen dagegen frei lesbar.
 
 Ein Architekturtest prueft, dass die Domaenenmodule keine
 Home-Assistant-Importe enthalten. Die Trennung ist damit nicht nur
