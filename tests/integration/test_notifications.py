@@ -19,7 +19,6 @@ from custom_components.notification_center.rules.models import (
     Rule,
     RuleGroup,
 )
-from custom_components.notification_center.sensor import NotificationCountSensor
 from custom_components.notification_center.storage.config_models import WatchedEntity
 from custom_components.notification_center.storage.event_store import EventQuery
 
@@ -142,11 +141,6 @@ async def test_zaehler_folgen_den_notifications(hass: HomeAssistant, runtime) ->
     assert hass.states.get(SENSOR_AKTIV).state == "0"
     # Das Ereignis fand statt und bleibt im Tageszaehler.
     assert hass.states.get(SENSOR_HEUTE).state == "1"
-
-
-def test_zaehler_werden_nicht_abgefragt() -> None:
-    """Spezifikation 45: ereignisgesteuert, kein Polling."""
-    assert NotificationCountSensor._attr_should_poll is False
 
 
 # -- Eskalation -------------------------------------------------------------

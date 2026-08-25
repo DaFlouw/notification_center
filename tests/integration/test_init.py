@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import pytest
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant
 from pytest_homeassistant_custom_component.common import MockConfigEntry
@@ -27,6 +28,7 @@ async def test_einrichtung_und_entladen(hass: HomeAssistant, config_entry: MockC
     assert config_entry.state is ConfigEntryState.NOT_LOADED
 
 
+@pytest.mark.echter_datenbankpfad
 async def test_datenbank_liegt_im_konfigurationsverzeichnis(hass: HomeAssistant) -> None:
     """Die Datei muss unter config liegen, damit das HA-Backup sie mitnimmt."""
     pfad = default_database_path(hass)

@@ -12,6 +12,7 @@ asyncio_mode = "auto"
 addopts = "-ra --strict-markers"
 markers = [
   "hass: Test benoetigt die Home-Assistant-Testumgebung (laeuft nur unter Linux/CI)",
+  "echter_datenbankpfad: Test prueft den echten Pfad der Ereignisdatenbank",
 ]
 
 [tool.ruff]
