@@ -214,6 +214,7 @@ async def ws_discover(hass, connection, msg, runtime) -> None:
         vol.Required("type"): f"{WS_PREFIX}/get_suggestions",
         vol.Required("entity_id"): str,
         vol.Optional("analysis_days"): vol.All(int, vol.Range(min=1, max=90)),
+        vol.Optional("include_uncertain"): bool,
     }
 )
 @websocket_api.async_response
@@ -221,7 +222,9 @@ async def ws_discover(hass, connection, msg, runtime) -> None:
 async def ws_get_suggestions(hass, connection, msg, runtime) -> None:
     """Vorschlaege samt Historienanalyse. Laeuft nur auf Anforderung."""
     vorschlaege = await runtime.discovery.async_get_entity_suggestions(
-        msg["entity_id"], analysis_days=msg.get("analysis_days")
+        msg["entity_id"],
+        analysis_days=msg.get("analysis_days"),
+        include_uncertain=msg.get("include_uncertain", False),
     )
     connection.send_result(
         msg["id"],
@@ -229,7 +232,7 @@ async def ws_get_suggestions(hass, connection, msg, runtime) -> None:
             {
                 "entity_id": msg["entity_id"],
                 "suggestions": [vorschlag.to_dict() for vorschlag in vorschlaege],
-                "states": runtime.discovery.available_states(msg["entity_id"]),
+                "states": await runtime.discovery.async_available_states(msg["entity_id"]),
                 "attributes": runtime.discovery.usable_attributes(msg["entity_id"]),
             }
         ),

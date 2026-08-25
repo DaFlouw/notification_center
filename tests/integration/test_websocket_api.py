@@ -15,6 +15,7 @@ from custom_components.notification_center.const import (
     PANEL_URL_PATH,
 )
 from custom_components.notification_center.coordinator import NotificationCenterRuntime
+from custom_components.notification_center.frontend.panel import card_resource
 from custom_components.notification_center.notifications.models import NotificationType
 from custom_components.notification_center.rules.models import ConditionKind
 from custom_components.notification_center.storage.config_models import WatchedEntity
@@ -484,3 +485,121 @@ async def test_ungueltige_gruppe_wird_abgelehnt(
 
     assert antwort["success"] is False
     assert antwort["error"]["code"] == "invalid_input"
+
+
+# -- Fehlertickets ----------------------------------------------------------
+
+
+async def test_abonnement_liefert_den_anfangszustand(
+    hass: HomeAssistant, runtime, hass_ws_client
+) -> None:
+    """Fehlerticket 7.
+
+    Das erste Ergebnis des Abonnements traegt bereits den vollstaendigen
+    Stand. Das Frontend holt ihn zusaetzlich ueber get_active, weil
+    subscribeMessage nur Folgeereignisse durchreicht; beide Wege muessen
+    dasselbe liefern.
+    """
+    await hass.services.async_call(
+        DOMAIN,
+        "create",
+        {"notification_id": "leck", "message": "Wasserleck", "type": "alarm"},
+        blocking=True,
+    )
+    await hass.async_block_till_done()
+
+    client = await hass_ws_client(hass)
+    abonnement = await sende(client, "subscribe_updates")
+    abruf = await sende(client, "get_active")
+
+    assert abonnement["result"]["counts"]["alarm"] == 1
+    assert len(abonnement["result"]["active"]) == 1
+    assert abruf["result"]["active"] == abonnement["result"]["active"]
+
+
+async def test_regel_mit_zustand_ist_nicht(hass: HomeAssistant, runtime, hass_ws_client) -> None:
+    """Fehlerticket 4 durchgehend ueber die API."""
+    client = await hass_ws_client(hass)
+    hass.states.async_set("sensor.waschmaschine", "idle", {"options": ["idle", "running"]})
+    await hass.async_block_till_done()
+
+    await sende(client, "add_entities", entity_ids=["sensor.waschmaschine"])
+    antwort = await sende(
+        client,
+        "save_rule",
+        rule={
+            "entity_id": "sensor.waschmaschine",
+            "kind": "state_is_not",
+            "type": "info",
+            "states": ["idle"],
+            "message_template": "{name} läuft",
+        },
+    )
+    assert antwort["success"] is True
+    assert runtime.notification_engine.counts.active == 0
+
+    hass.states.async_set("sensor.waschmaschine", "running", {"options": ["idle", "running"]})
+    await hass.async_block_till_done()
+    assert runtime.notification_engine.counts.info == 1
+
+    hass.states.async_set("sensor.waschmaschine", "idle", {"options": ["idle", "running"]})
+    await hass.async_block_till_done()
+    assert runtime.notification_engine.counts.active == 0
+
+
+async def test_zustandsauswahl_kommt_ueber_die_api(
+    hass: HomeAssistant, runtime, hass_ws_client
+) -> None:
+    """Fehlerticket 5: vollstaendig auch ohne Historie."""
+    client = await hass_ws_client(hass)
+    antwort = await sende(client, "get_suggestions", entity_id=FENSTER)
+    assert antwort["result"]["states"] == ["on", "off"]
+
+
+async def test_unsichere_vorschlaege_kommen_nicht_ueber_die_api(
+    hass: HomeAssistant, runtime, hass_ws_client
+) -> None:
+    """Fehlerticket 3."""
+    hass.states.async_set("binary_sensor.wasser_keller", "off", {"friendly_name": "Wasser Keller"})
+    await hass.async_block_till_done()
+
+    client = await hass_ws_client(hass)
+    ohne = await sende(client, "get_suggestions", entity_id="binary_sensor.wasser_keller")
+    assert ohne["result"]["suggestions"] == []
+
+    mit = await sende(
+        client,
+        "get_suggestions",
+        entity_id="binary_sensor.wasser_keller",
+        include_uncertain=True,
+    )
+    assert len(mit["result"]["suggestions"]) == 1
+
+
+async def test_card_ist_als_lovelace_ressource_eingetragen(hass: HomeAssistant, runtime) -> None:
+    """Fehlerticket 8.
+
+    Ueber die Ressourcenliste findet die Kartenauswahl das Modul zuverlaessig
+    wieder; als blosses Zusatzmodul war es nach einem Seitenwechsel weg.
+    """
+    eintrag = card_resource(hass)
+    assert eintrag is not None
+    assert eintrag["res_type"] == "module"
+    assert eintrag["url"].startswith("/notification_center_frontend/notification-center-card.js")
+
+
+async def test_card_ressource_wird_nicht_doppelt_eingetragen(
+    hass: HomeAssistant, runtime, config_entry: MockConfigEntry
+) -> None:
+    assert await hass.config_entries.async_unload(config_entry.entry_id)
+    await hass.async_block_till_done()
+    assert await hass.config_entries.async_setup(config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    resources = hass.data["lovelace"].resources
+    treffer = [
+        eintrag
+        for eintrag in resources.async_items()
+        if "notification-center-card.js" in str(eintrag.get("url", ""))
+    ]
+    assert len(treffer) == 1

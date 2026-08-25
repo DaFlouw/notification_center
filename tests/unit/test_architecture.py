@@ -26,6 +26,7 @@ PURE_MODULES = (
     "storage/event_store.py",
     "storage/config_models.py",
     "discovery/analyzer.py",
+    "discovery/states.py",
     "discovery/suggestions.py",
 )
 

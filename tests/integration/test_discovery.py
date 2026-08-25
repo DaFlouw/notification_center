@@ -109,10 +109,18 @@ async def test_ueberwachte_entities_stehen_oben(hass: HomeAssistant, runtime) ->
     assert treffer[0]["rule_count"] == 1
 
 
-async def test_nicht_ueberwachte_zeigen_eine_vorschlagszahl(hass: HomeAssistant, runtime) -> None:
+async def test_nicht_ueberwachte_melden_ob_vorschlaege_zu_erwarten_sind(
+    hass: HomeAssistant, runtime
+) -> None:
+    """Fehlerticket 2: keine Zahl, die spaeter nicht stimmt.
+
+    Die Trefferliste kennt nur Metadaten, die Vorschlagsliste zusaetzlich die
+    Historie. Eine hier gebildete Zahl waere regelmaessig zu niedrig.
+    """
     treffer = runtime.discovery.discover_entities(search="Fenster")
     assert treffer[0]["monitored"] is False
-    assert treffer[0]["suggestion_count"] == 1
+    assert treffer[0]["has_suggestions"] is True
+    assert "suggestion_count" not in treffer[0]
 
 
 # -- Metadaten --------------------------------------------------------------
@@ -246,3 +254,76 @@ async def test_vorschlaege_kommen_auch_ohne_historie(hass: HomeAssistant, runtim
 
 async def test_vorschlaege_einer_unbekannten_entity_sind_leer(hass: HomeAssistant, runtime) -> None:
     assert await runtime.discovery.async_get_entity_suggestions("sensor.gibtsnicht") == []
+
+
+# -- Unsichere Vorschlaege (Fehlerticket 3) --------------------------------
+
+
+async def test_unsichere_vorschlaege_werden_nicht_angeboten(
+    hass: HomeAssistant, config_entry: MockConfigEntry
+) -> None:
+    """Ein Vorschlag allein aus einem Wort im Namen kostet mehr Vertrauen,
+    als er einbringt."""
+    hass.states.async_set("binary_sensor.wasser_keller", "off", {"friendly_name": "Wasser Keller"})
+    config_entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(config_entry.entry_id)
+    await hass.async_block_till_done()
+    laufzeit = config_entry.runtime_data
+
+    assert (
+        await laufzeit.discovery.async_get_entity_suggestions("binary_sensor.wasser_keller") == []
+    )
+
+
+async def test_unsichere_vorschlaege_bleiben_erreichbar(
+    hass: HomeAssistant, config_entry: MockConfigEntry
+) -> None:
+    hass.states.async_set("binary_sensor.wasser_keller", "off", {"friendly_name": "Wasser Keller"})
+    config_entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(config_entry.entry_id)
+    await hass.async_block_till_done()
+    laufzeit = config_entry.runtime_data
+
+    vorschlaege = await laufzeit.discovery.async_get_entity_suggestions(
+        "binary_sensor.wasser_keller", include_uncertain=True
+    )
+    assert len(vorschlaege) == 1
+    assert vorschlaege[0].confidence.is_uncertain is True
+
+
+async def test_sichere_vorschlaege_bleiben(hass: HomeAssistant, runtime) -> None:
+    vorschlaege = await runtime.discovery.async_get_entity_suggestions(FENSTER)
+    assert len(vorschlaege) == 1
+
+
+# -- Zustandsauswahl (Fehlerticket 5) --------------------------------------
+
+
+async def test_zustandsauswahl_ohne_historie_ist_vollstaendig(hass: HomeAssistant, runtime) -> None:
+    """Auch kurz nach einem Neustart, ohne jede Beobachtung."""
+    assert runtime.discovery.available_states(FENSTER) == ["on", "off"]
+
+
+async def test_zustandsauswahl_nutzt_die_optionen_der_entity(hass: HomeAssistant, runtime) -> None:
+    assert runtime.discovery.available_states(WASCHMASCHINE) == [
+        "idle",
+        "running",
+        "paused",
+        "finished",
+    ]
+
+
+async def test_zustandsauswahl_kennt_seltene_zustaende_einer_domaene(
+    hass: HomeAssistant, runtime
+) -> None:
+    hass.states.async_set("lock.haustuer", "locked", {"friendly_name": "Haustür"})
+    await hass.async_block_till_done()
+
+    zustaende = runtime.discovery.available_states("lock.haustuer")
+    assert "jammed" in zustaende
+    assert "unlocked" in zustaende
+
+
+async def test_zustandsauswahl_ohne_recorder_bleibt_brauchbar(hass: HomeAssistant, runtime) -> None:
+    zustaende = await runtime.discovery.async_available_states(FENSTER)
+    assert zustaende == ["on", "off"]

@@ -73,9 +73,7 @@ function entityZeile(eintrag, vorschlaege) {
                        data-name="${escapeHtml(eintrag.name)}">Regeln</button>
                <button class="action secondary" data-action="remove-entity"
                        data-entity="${escapeHtml(eintrag.entity_id)}">Entfernen</button>`
-            : `<span class="badge">${eintrag.suggestion_count} ${
-                eintrag.suggestion_count === 1 ? "Vorschlag" : "Vorschläge"
-              }</span>
+            : `${eintrag.has_suggestions ? '<span class="badge">Vorschläge verfügbar</span>' : ""}
                <button class="action secondary" data-action="show-suggestions"
                        data-entity="${escapeHtml(eintrag.entity_id)}">Vorschläge</button>
                <button class="action" data-action="add-entity"
@@ -92,12 +90,16 @@ function entityZeile(eintrag, vorschlaege) {
 function vorschlagsBlock(entityId, vorschlaege) {
   if (!vorschlaege.length) {
     return `<div class="entity-meta" style="padding: 0 0 12px">
-      Keine belastbaren Vorschläge. Eine eigene Regel ist trotzdem möglich.
+      Keine belastbaren Vorschläge. Eine eigene Regel ist trotzdem möglich:
+      Entity übernehmen und dann unter Regeln anlegen.
     </div>`;
   }
 
   return `
     <div style="padding: 0 0 12px">
+      <div class="entity-meta">${vorschlaege.length} ${
+        vorschlaege.length === 1 ? "Vorschlag" : "Vorschläge"
+      }</div>
       ${vorschlaege.map((vorschlag) => vorschlagZeile(entityId, vorschlag)).join("")}
     </div>
   `;

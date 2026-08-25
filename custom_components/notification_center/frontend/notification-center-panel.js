@@ -14,15 +14,24 @@ import { adoptStyles } from "./styles.js";
 import { renderDashboard } from "./views/dashboard.js";
 import { LEERER_FILTER, buildQuery, renderHistory } from "./views/history.js";
 import { renderDiscovery } from "./views/discovery.js";
-import { entwurfZuRegel, leereRegel, renderRules } from "./views/rules.js";
+import {
+  entwurfZuRegel,
+  leereRegel,
+  renderRuleOverview,
+  renderRules,
+} from "./views/rules.js";
 
 const SEITEN = [
   { id: "dashboard", titel: "Dashboard" },
   { id: "history", titel: "Historie" },
+  { id: "rules", titel: "Regeln" },
   { id: "discovery", titel: "Discovery" },
 ];
 
 const SEITENGROESSE = 50;
+
+/** Wartezeit, bis eine Eingabe als fertig gilt. */
+const ENTPRELLUNG = 500;
 
 class NotificationCenterPanel extends HTMLElement {
   #hass = null;
@@ -34,6 +43,7 @@ class NotificationCenterPanel extends HTMLElement {
   #history = { events: [], total: 0, hasMore: false, filter: { ...LEERER_FILTER }, areas: [] };
   #discovery = { entities: [], domain: "", search: "", suggestions: {} };
   #rules = { entityId: null, entityName: "", rules: [], entwurf: null, states: [], attributes: [] };
+  #ruleOverview = { entities: [], rules: [], loading: false };
   #setupErledigt = true;
   #fehler = null;
 
@@ -78,7 +88,9 @@ class NotificationCenterPanel extends HTMLElement {
 
     if (this.#tick) clearInterval(this.#tick);
     if (this.#unsubscribe) {
-      this.#unsubscribe.then((ab) => ab()).catch(() => undefined);
+      Promise.resolve(this.#unsubscribe)
+        .then((ab) => ab())
+        .catch(() => undefined);
       this.#unsubscribe = null;
     }
   }
@@ -94,7 +106,7 @@ class NotificationCenterPanel extends HTMLElement {
       if (!this.#setupErledigt) this.#seite = "welcome";
 
       // Aenderungen werden zugestellt, nicht abgefragt (Spezifikation 45).
-      this.#unsubscribe = api.subscribeUpdates(this.#hass, (nachricht) => {
+      this.#unsubscribe = await api.subscribeUpdates(this.#hass, (nachricht) => {
         this.#dashboard = {
           active: nachricht.active || [],
           counts: nachricht.counts || {},
@@ -102,7 +114,7 @@ class NotificationCenterPanel extends HTMLElement {
         };
         if (this.#seite === "dashboard") this.#render();
       });
-      await this.#unsubscribe;
+      this.#render();
     } catch (fehler) {
       this.#fehler = fehler.message || String(fehler);
       this.#render();
@@ -154,6 +166,27 @@ class NotificationCenterPanel extends HTMLElement {
     }
   }
 
+  async #ladeRegeluebersicht() {
+    this.#ruleOverview.loading = true;
+    this.#render();
+
+    try {
+      const konfiguration = await api.getConfig(this.#hass);
+      this.#ruleOverview.rules = konfiguration.rules;
+      this.#ruleOverview.entities = konfiguration.entities.map((eintrag) => ({
+        entity_id: eintrag.entity_id,
+        name: this.#hass?.states?.[eintrag.entity_id]?.attributes?.friendly_name
+          || eintrag.entity_id,
+      }));
+      this.#fehler = null;
+    } catch (fehler) {
+      this.#fehler = fehler.message || String(fehler);
+    } finally {
+      this.#ruleOverview.loading = false;
+      this.#render();
+    }
+  }
+
   async #ladeRegeln(entityId, name) {
     try {
       const [konfiguration, optionen] = await Promise.all([
@@ -169,7 +202,7 @@ class NotificationCenterPanel extends HTMLElement {
         states: optionen.states || [],
         attributes: optionen.attributes || [],
       };
-      this.#seite = "rules";
+      this.#seite = "rule-editor";
       this.#fehler = null;
     } catch (fehler) {
       this.#fehler = fehler.message || String(fehler);
@@ -256,16 +289,12 @@ class NotificationCenterPanel extends HTMLElement {
       return;
     }
     if (feld.dataset.filter === "suche") {
-      this.#entprellt(() => {
-        this.#history.filter.search = feld.value;
-        this.#ladeHistorie();
-      });
+      this.#history.filter.search = feld.value;
+      this.#entprellt(() => this.#ladeHistorie());
     }
     if (feld.dataset.discovery === "search") {
-      this.#entprellt(() => {
-        this.#discovery.search = feld.value;
-        this.#ladeDiscovery();
-      });
+      this.#discovery.search = feld.value;
+      this.#entprellt(() => this.#ladeDiscovery());
     }
   };
 
@@ -273,7 +302,7 @@ class NotificationCenterPanel extends HTMLElement {
 
   #entprellt(fn) {
     if (this.#entprellTimer) clearTimeout(this.#entprellTimer);
-    this.#entprellTimer = setTimeout(fn, 300);
+    this.#entprellTimer = setTimeout(fn, ENTPRELLUNG);
   }
 
   #filterGeaendert(feld, wert) {
@@ -345,6 +374,13 @@ class NotificationCenterPanel extends HTMLElement {
       if (aktion === "save-rule") {
         await api.saveRule(this.#hass, entwurfZuRegel(this.#rules.entwurf));
         await this.#ladeRegeln(this.#rules.entityId);
+        return;
+      }
+
+      if (aktion === "back-to-rules") {
+        await this.#ladeRegeluebersicht();
+        this.#seite = "rules";
+        this.#render();
         return;
       }
 
@@ -458,8 +494,9 @@ class NotificationCenterPanel extends HTMLElement {
     this.#seite = seite;
     this.#fehler = null;
 
-    if (seite === "rules") return;
-    if (seite === "history") this.#ladeHistorie();
+    if (seite === "rule-editor") return;
+    if (seite === "rules") this.#ladeRegeluebersicht();
+    else if (seite === "history") this.#ladeHistorie();
     else if (seite === "discovery") this.#ladeDiscovery();
     else this.#render();
   }
@@ -468,6 +505,7 @@ class NotificationCenterPanel extends HTMLElement {
 
   #render() {
     const locale = this.#hass?.locale?.language || navigator.language;
+    const fokus = this.#merkeFokus();
 
     this.shadowRoot.innerHTML = `
       <header><h1>Notification Center</h1></header>
@@ -484,11 +522,52 @@ class NotificationCenterPanel extends HTMLElement {
         ${this.#inhalt(locale)}
       </main>
     `;
+
+    this.#stelleFokusHer(fokus);
+  }
+
+  /**
+   * Merkt sich das aktive Eingabefeld samt Schreibmarke.
+   *
+   * Das Panel zeichnet sich vollstaendig neu. Ohne diese Rettung verliert ein
+   * Suchfeld bei jedem Tastendruck den Fokus, und man kann kein Wort tippen.
+   */
+  #merkeFokus() {
+    const element = this.shadowRoot.activeElement;
+    if (!(element instanceof HTMLElement)) return null;
+
+    const kennung = element.dataset.filter
+      ? `[data-filter="${element.dataset.filter}"]`
+      : element.dataset.discovery
+        ? `[data-discovery="${element.dataset.discovery}"]`
+        : element.dataset.ruleField
+          ? `[data-rule-field="${element.dataset.ruleField}"]`
+          : null;
+
+    if (!kennung) return null;
+    return { kennung, position: element.selectionStart ?? null };
+  }
+
+  #stelleFokusHer(fokus) {
+    if (!fokus) return;
+
+    const element = this.shadowRoot.querySelector(fokus.kennung);
+    if (!(element instanceof HTMLElement)) return;
+
+    element.focus();
+    if (fokus.position !== null && typeof element.setSelectionRange === "function") {
+      try {
+        element.setSelectionRange(fokus.position, fokus.position);
+      } catch {
+        // Nicht jedes Eingabefeld erlaubt eine Schreibmarke.
+      }
+    }
   }
 
   #inhalt(locale) {
     if (this.#seite === "welcome") return this.#willkommen();
-    if (this.#seite === "rules") return renderRules(this.#rules);
+    if (this.#seite === "rules") return renderRuleOverview(this.#ruleOverview);
+    if (this.#seite === "rule-editor") return renderRules(this.#rules);
     if (this.#seite === "history") return renderHistory(this.#history, locale);
     if (this.#seite === "discovery") return renderDiscovery(this.#discovery);
     return renderDashboard(this.#dashboard, locale);

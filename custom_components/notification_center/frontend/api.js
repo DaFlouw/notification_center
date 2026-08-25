@@ -55,13 +55,23 @@ export const api = {
    *
    * Liefert eine Funktion zum Abbestellen. Das Panel fragt nichts periodisch
    * nach (Spezifikation 45).
+   *
+   * Wichtig: ``subscribeMessage`` reicht nur die *Folgeereignisse* durch, nicht
+   * die erste Antwort des Abonnements. Ohne den zusaetzlichen Abruf bliebe die
+   * Anzeige leer, bis sich zufaellig etwas aendert.
    */
-  subscribeUpdates: (hass, onUpdate) =>
-    hass.connection.subscribeMessage(
+  subscribeUpdates: async (hass, onUpdate) => {
+    // Erst abonnieren, dann den Anfangszustand holen: andersherum koennte
+    // eine Aenderung im Zeitraum dazwischen verlorengehen.
+    const abbestellen = await hass.connection.subscribeMessage(
       (message) => {
         checkVersion(message);
         onUpdate(message);
       },
       { type: `${PREFIX}/subscribe_updates` }
-    ),
+    );
+
+    onUpdate(await call(hass, "get_active"));
+    return abbestellen;
+  },
 };
