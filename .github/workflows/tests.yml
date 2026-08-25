@@ -40,7 +40,20 @@ jobs:
         with:
           python-version: "3.14"
       - run: pip install -r requirements-test.txt
-      - run: pytest tests/integration
+      # Die Ausgabe wird zusaetzlich als Annotation gemeldet: Job-Logs sind nur
+      # mit Admin-Rechten abrufbar, Annotationen dagegen oeffentlich lesbar.
+      - name: Integrationstests
+        run: |
+          if pytest tests/integration -q --tb=short > pytest.log 2>&1; then
+            cat pytest.log
+          else
+            cat pytest.log
+            tail -n 25 pytest.log | while IFS= read -r zeile; do
+              printf '::error::%s
+' "$zeile"
+            done
+            exit 1
+          fi
 
   hassfest:
     name: Hassfest
