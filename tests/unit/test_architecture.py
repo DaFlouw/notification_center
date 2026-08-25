@@ -20,6 +20,7 @@ PURE_MODULES = (
     "const.py",
     "notifications/models.py",
     "rules/models.py",
+    "rules/evaluator.py",
     "storage/event_store.py",
     "storage/config_models.py",
 )
