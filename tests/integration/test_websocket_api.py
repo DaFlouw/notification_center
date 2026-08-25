@@ -514,7 +514,12 @@ async def test_abonnement_liefert_den_anfangszustand(
 
     assert abonnement["result"]["counts"]["alarm"] == 1
     assert len(abonnement["result"]["active"]) == 1
-    assert abruf["result"]["active"] == abonnement["result"]["active"]
+    # Nicht die vollstaendigen Datensaetze vergleichen: die Dauer eines
+    # aktiven Ereignisses wird bei jedem Abruf neu berechnet.
+    assert [e["event_id"] for e in abruf["result"]["active"]] == [
+        e["event_id"] for e in abonnement["result"]["active"]
+    ]
+    assert abruf["result"]["counts"] == abonnement["result"]["counts"]
 
 
 async def test_regel_mit_zustand_ist_nicht(hass: HomeAssistant, runtime, hass_ws_client) -> None:
@@ -584,7 +589,8 @@ async def test_card_ist_als_lovelace_ressource_eingetragen(hass: HomeAssistant, 
     """
     eintrag = card_resource(hass)
     assert eintrag is not None
-    assert eintrag["res_type"] == "module"
+    # Home Assistant legt die Art je nach Version unter 'res_type' oder 'type' ab.
+    assert (eintrag.get("res_type") or eintrag.get("type")) == "module"
     assert eintrag["url"].startswith("/notification_center_frontend/notification-center-card.js")
 
 
