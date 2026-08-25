@@ -5,9 +5,16 @@ Deckt die Spezifikationsabschnitte 22, 31 bis 35, 37, 44, 45, 77 und 78 ab.
 
 from __future__ import annotations
 
+from datetime import timedelta
+
 import pytest
+from freezegun.api import FrozenDateTimeFactory
 from homeassistant.core import HomeAssistant
-from pytest_homeassistant_custom_component.common import MockConfigEntry
+from homeassistant.util import dt as dt_util
+from pytest_homeassistant_custom_component.common import (
+    MockConfigEntry,
+    async_fire_time_changed,
+)
 
 from custom_components.notification_center.const import EVENT_NOTIFICATION
 from custom_components.notification_center.notifications.models import (
@@ -265,3 +272,74 @@ async def test_aktive_notification_ueberlebt_einen_neustart(
     assert danach.notification_engine.counts.warning == 1
     assert hass.states.get(SENSOR_WARNUNGEN).state == "1"
     assert hass.states.get(SENSOR_HEUTE).state == "1"
+
+
+# -- Zeitbedingungen ueber einen Neustart (Testfall E) ---------------------
+
+
+async def test_zeitbedingung_ueberlebt_einen_neustart(
+    hass: HomeAssistant, config_entry: MockConfigEntry, freezer: FrozenDateTimeFactory
+) -> None:
+    """Testfall E und Spezifikation 37.
+
+    Ein seit 10:00 offenes Fenster mit einer 15-Minuten-Regel muss nach einem
+    Neustart um 10:10 weiterhin um 10:15 melden, nicht erst 15 Minuten nach
+    dem Neustart.
+    """
+    hass.states.async_set(FENSTER, "on")
+    await hass.async_block_till_done()
+    geoeffnet_seit = dt_util.utcnow()
+
+    config_entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    laufzeit = config_entry.runtime_data
+    laufzeit.config.add_entity(WatchedEntity(entity_id=FENSTER))
+    laufzeit.config.add_rule(fensterregel(duration_seconds=900))
+    laufzeit.rule_engine.async_refresh_tracking()
+
+    # Neustart nach zehn Minuten, waehrend das Fenster offen bleibt.
+    freezer.move_to(geoeffnet_seit + timedelta(minutes=10))
+    assert await hass.config_entries.async_unload(config_entry.entry_id)
+    await hass.async_block_till_done()
+    assert await hass.config_entries.async_setup(config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    danach = config_entry.runtime_data
+    assert danach.notification_engine.counts.active == 0
+
+    # Fuenf Minuten spaeter ist die Bedingung seit 15 Minuten erfuellt.
+    freezer.move_to(geoeffnet_seit + timedelta(minutes=15, seconds=30))
+    async_fire_time_changed(hass)
+    await hass.async_block_till_done()
+
+    assert danach.notification_engine.counts.active == 1
+
+
+async def test_laengst_faellige_zeitbedingung_meldet_sofort(
+    hass: HomeAssistant, config_entry: MockConfigEntry, freezer: FrozenDateTimeFactory
+) -> None:
+    """Spezifikation 37: startet HA erst um 10:20, ist die Regel schon erfuellt."""
+    hass.states.async_set(FENSTER, "on")
+    await hass.async_block_till_done()
+    geoeffnet_seit = dt_util.utcnow()
+
+    freezer.move_to(geoeffnet_seit + timedelta(minutes=20))
+
+    config_entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    laufzeit = config_entry.runtime_data
+    laufzeit.config.add_entity(WatchedEntity(entity_id=FENSTER))
+    laufzeit.config.add_rule(fensterregel(duration_seconds=900))
+    laufzeit.rule_engine.async_refresh_tracking()
+
+    # Ein Neustart mit bereits erfuellter Bedingung.
+    assert await hass.config_entries.async_unload(config_entry.entry_id)
+    await hass.async_block_till_done()
+    assert await hass.config_entries.async_setup(config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    assert config_entry.runtime_data.notification_engine.counts.active == 1

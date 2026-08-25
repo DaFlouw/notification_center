@@ -47,6 +47,12 @@ _LOGGER = logging.getLogger(__name__)
 #: Signal, auf das die Zaehler-Entities hoeren.
 SIGNAL_COUNTS_UPDATED = f"{DOMAIN}_counts_updated"
 
+#: Nach so vielen neuen Ereignissen wird zwischendurch aufgeraeumt.
+#:
+#: Der Cleanup laeuft sonst nur beim Start und um Mitternacht. Ein
+#: Ereignissturm koennte die Mengengrenze bis dahin deutlich ueberschreiten.
+CLEANUP_AFTER_EVENTS = 500
+
 
 class NotificationEngine:
     """Erzeugt, aktualisiert und beendet Notifications."""
@@ -63,6 +69,7 @@ class NotificationEngine:
         self._active = ActiveNotifications()
         self._unsub_midnight: CALLBACK_TYPE | None = None
         self._expiry_timers: dict[str, CALLBACK_TYPE] = {}
+        self._seit_cleanup = 0
 
     @property
     def _config(self) -> ConfigDocument:
@@ -172,6 +179,7 @@ class NotificationEngine:
         self._active.put(ereignis)
         await self._store.async_add(ereignis)
         self._fire(ereignis, "started")
+        await self._async_maybe_cleanup()
         return True
 
     async def _async_stop(self, intent: NotificationIntent, now: datetime) -> bool:
@@ -273,6 +281,7 @@ class NotificationEngine:
         self._fire(ereignis, "started")
         self._schedule_expiry(key, ereignis.start_time, duration)
         self._notify_change()
+        await self._async_maybe_cleanup()
         return ereignis.event_id
 
     async def async_update_automation(
@@ -354,6 +363,22 @@ class NotificationEngine:
         unsub = self._expiry_timers.pop(key, None)
         if unsub is not None:
             unsub()
+
+    # -- Aufraeumen ------------------------------------------------------
+
+    async def _async_maybe_cleanup(self) -> None:
+        """Raeumt zwischendurch auf, ohne bei jedem Ereignis zu arbeiten."""
+        self._seit_cleanup += 1
+        if self._seit_cleanup < CLEANUP_AFTER_EVENTS:
+            return
+
+        self._seit_cleanup = 0
+        entfernt = await self._store.async_cleanup(
+            retention_days=self._config.settings.retention_days,
+            max_events=self._config.settings.max_events,
+        )
+        if entfernt:
+            _LOGGER.debug("Zwischendurch %s Ereignisse entfernt", entfernt)
 
     # -- Tageswechsel ----------------------------------------------------
 

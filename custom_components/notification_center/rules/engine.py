@@ -28,7 +28,14 @@ from homeassistant.util import dt as dt_util
 from ..notifications.models import CloseReason
 from ..storage.config_models import ConfigDocument
 from ..storage.config_store import ConfigStore
-from .evaluator import GroupState, RuleState, evaluate_group, evaluate_rule
+from .evaluator import (
+    GroupState,
+    Phase,
+    RuleState,
+    evaluate_group,
+    evaluate_rule,
+    hold_met,
+)
 from .intents import IntentKind, NotificationIntent, intents_for_group, intents_for_rule
 from .models import EntitySnapshot, Rule, RuleGroup
 
@@ -71,6 +78,7 @@ class RuleEngine:
 
     async def async_start(self) -> None:
         self.async_refresh_tracking()
+        self.async_restore_timing()
         await self.async_evaluate_all()
 
     async def async_stop(self) -> None:
@@ -108,6 +116,48 @@ class RuleEngine:
         for key in list(self._timers):
             if key not in self._config.rules and key not in self._config.groups:
                 self._cancel_timer(key)
+
+    @callback
+    def async_restore_timing(self) -> None:
+        """Setzt Zeitbedingungen nach einem Neustart auf den echten Beginn.
+
+        Ohne das begaenne jede Wartezeit beim Start von vorn: ein seit 10:00
+        offenes Fenster mit einer 15-Minuten-Regel wuerde nach einem Neustart
+        um 10:10 erst um 10:25 melden statt um 10:15.
+
+        Grundlage ist ``last_changed`` der Entity. Liegt die Bedingung schon
+        laenger an als die Wartezeit, entsteht die Notification sofort
+        (Spezifikation 37).
+        """
+        for entity_id in self._config.monitored_entity_ids:
+            snapshot = self._snapshot(entity_id)
+            if snapshot is None:
+                continue
+
+            for rule in self._all_rules_for(entity_id):
+                if not rule.enabled or not rule.duration_seconds:
+                    continue
+                if not hold_met(rule, snapshot):
+                    continue
+
+                zustand = self._state_for(rule)
+                if zustand.condition_since is None:
+                    zustand.condition_since = snapshot.last_changed
+                    zustand.last_state = snapshot.state
+                    zustand.phase = Phase.PENDING
+
+    def _all_rules_for(self, entity_id: str) -> list[Rule]:
+        """Alle Regeln einer Entity, auch die aus Gruppen."""
+        return [rule for rule in self._config.rules.values() if rule.entity_id == entity_id]
+
+    def _state_for(self, rule: Rule) -> RuleState:
+        """Der mitgefuehrte Zustand einer Regel, egal ob einzeln oder in Gruppe."""
+        if rule.group_id is not None:
+            gruppe = self._group_states.setdefault(
+                rule.group_id, GroupState(group_id=rule.group_id)
+            )
+            return gruppe.rule_states.setdefault(rule.rule_id, RuleState(rule_id=rule.rule_id))
+        return self._rule_states.setdefault(rule.rule_id, RuleState(rule_id=rule.rule_id))
 
     # -- Ereignisse ------------------------------------------------------
 
@@ -192,10 +242,7 @@ class RuleEngine:
 
         for rule in self._single_rules_for(entity_id):
             try:
-                zustand = self._rule_states.setdefault(
-                    rule.rule_id, RuleState(rule_id=rule.rule_id)
-                )
-                ergebnis = evaluate_rule(rule, snapshot, zustand, now)
+                ergebnis = evaluate_rule(rule, snapshot, self._state_for(rule), now)
                 absichten.extend(intents_for_rule(rule, snapshot, ergebnis))
                 self._schedule(rule.rule_id, entity_id, ergebnis.fire_at)
             except Exception:
