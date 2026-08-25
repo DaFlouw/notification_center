@@ -54,7 +54,10 @@ Filtern nach Typ, Quelle, Zeitraum und Bereich sowie die Volltextsuche laufen
 im Backend; geladen werden 50 Eintraege, weitere auf Anforderung.
 
 **Discovery** findet Entities nach Typ, Name oder Entity-ID, zeigt zu jeder
-Regelvorschlaege samt Begruendung und uebernimmt sie in die Ueberwachung.
+Regelvorschlaege samt Begruendung und uebernimmt sie in die Ueberwachung. Zu
+einer ueberwachten Entity fuehrt *Regeln* in den Regel-Editor: dort lassen
+sich Regeln von Hand anlegen, bearbeiten und loeschen, und die Entity laesst
+sich durch eine andere ersetzen.
 
 ### Regeln
 

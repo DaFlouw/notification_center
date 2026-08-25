@@ -14,6 +14,7 @@ import { adoptStyles } from "./styles.js";
 import { renderDashboard } from "./views/dashboard.js";
 import { LEERER_FILTER, buildQuery, renderHistory } from "./views/history.js";
 import { renderDiscovery } from "./views/discovery.js";
+import { entwurfZuRegel, leereRegel, renderRules } from "./views/rules.js";
 
 const SEITEN = [
   { id: "dashboard", titel: "Dashboard" },
@@ -32,6 +33,7 @@ class NotificationCenterPanel extends HTMLElement {
   #dashboard = { active: [], counts: {}, paused: false };
   #history = { events: [], total: 0, hasMore: false, filter: { ...LEERER_FILTER }, areas: [] };
   #discovery = { entities: [], domain: "", search: "", suggestions: {} };
+  #rules = { entityId: null, entityName: "", rules: [], entwurf: null, states: [], attributes: [] };
   #setupErledigt = true;
   #fehler = null;
 
@@ -152,6 +154,29 @@ class NotificationCenterPanel extends HTMLElement {
     }
   }
 
+  async #ladeRegeln(entityId, name) {
+    try {
+      const [konfiguration, optionen] = await Promise.all([
+        api.getConfig(this.#hass),
+        api.getSuggestions(this.#hass, entityId),
+      ]);
+
+      this.#rules = {
+        entityId,
+        entityName: name || this.#rules.entityName,
+        rules: konfiguration.rules.filter((regel) => regel.entity_id === entityId),
+        entwurf: null,
+        states: optionen.states || [],
+        attributes: optionen.attributes || [],
+      };
+      this.#seite = "rules";
+      this.#fehler = null;
+    } catch (fehler) {
+      this.#fehler = fehler.message || String(fehler);
+    }
+    this.#render();
+  }
+
   #bereiche() {
     const registry = this.#hass?.areas || {};
     return Object.values(registry)
@@ -207,6 +232,10 @@ class NotificationCenterPanel extends HTMLElement {
     const feld = ereignis.target;
     if (!(feld instanceof HTMLElement)) return;
 
+    if (feld.dataset.ruleField) {
+      this.#entwurfGeaendert(feld.dataset.ruleField, feld);
+      return;
+    }
     if (feld.dataset.filter) {
       this.#filterGeaendert(feld.dataset.filter, feld.value);
       return;
@@ -221,6 +250,11 @@ class NotificationCenterPanel extends HTMLElement {
     const feld = ereignis.target;
     if (!(feld instanceof HTMLElement)) return;
 
+    if (feld.dataset.ruleField) {
+      // Ohne erneutes Zeichnen: der Fokus soll im Feld bleiben.
+      this.#entwurfGeaendert(feld.dataset.ruleField, feld, { neuZeichnen: false });
+      return;
+    }
     if (feld.dataset.filter === "suche") {
       this.#entprellt(() => {
         this.#history.filter.search = feld.value;
@@ -251,8 +285,84 @@ class NotificationCenterPanel extends HTMLElement {
     this.#ladeHistorie();
   }
 
+  #entwurfGeaendert(feld, element, { neuZeichnen = true } = {}) {
+    const entwurf = this.#rules.entwurf;
+    if (!entwurf) return;
+
+    if (feld === "kind") entwurf.kind = element.value;
+    else if (feld === "type") entwurf.type = element.value;
+    else if (feld === "operator") entwurf.operator = element.value;
+    else if (feld === "threshold") entwurf.threshold = element.value;
+    else if (feld === "release") entwurf.release_threshold = element.value;
+    else if (feld === "message") entwurf.message_template = element.value;
+    else if (feld === "duration") {
+      const minuten = Number(element.value);
+      entwurf.duration_seconds = minuten > 0 ? minuten * 60 : null;
+    } else if (feld === "source") {
+      entwurf.value_source = element.value
+        ? { kind: "attribute", attribute: element.value }
+        : { kind: "state", attribute: null };
+    } else if (feld === "states") {
+      entwurf.states = element.multiple
+        ? Array.from(element.selectedOptions).map((option) => option.value)
+        : element.value
+            .split(",")
+            .map((wert) => wert.trim())
+            .filter(Boolean);
+    }
+
+    if (neuZeichnen) this.#render();
+  }
+
   async #aktion(aktion, daten) {
     try {
+      if (aktion === "show-rules") {
+        await this.#ladeRegeln(daten.entity, daten.name);
+        return;
+      }
+
+      if (aktion === "new-rule") {
+        this.#rules.entwurf = leereRegel(this.#rules.entityId);
+        this.#render();
+        return;
+      }
+
+      if (aktion === "edit-rule") {
+        const regel = this.#rules.rules.find((eintrag) => eintrag.rule_id === daten.rule);
+        if (regel) {
+          this.#rules.entwurf = { ...regel };
+          this.#render();
+        }
+        return;
+      }
+
+      if (aktion === "cancel-rule") {
+        this.#rules.entwurf = null;
+        this.#render();
+        return;
+      }
+
+      if (aktion === "save-rule") {
+        await api.saveRule(this.#hass, entwurfZuRegel(this.#rules.entwurf));
+        await this.#ladeRegeln(this.#rules.entityId);
+        return;
+      }
+
+      if (aktion === "delete-rule") {
+        if (!confirm("Regel löschen? Eine laufende Meldung dazu endet sofort.")) return;
+        await api.deleteRule(this.#hass, daten.rule);
+        await this.#ladeRegeln(this.#rules.entityId);
+        return;
+      }
+
+      if (aktion === "replace-entity") {
+        const neu = prompt("Entity-ID der neuen Entity:");
+        if (!neu) return;
+        await api.replaceEntity(this.#hass, daten.entity, neu.trim());
+        await this.#ladeRegeln(neu.trim());
+        return;
+      }
+
       if (aktion === "start-setup" || aktion === "skip-setup") {
         await api.setSettings(this.#hass, { setup_completed: true });
         this.#setupErledigt = true;
@@ -348,6 +458,7 @@ class NotificationCenterPanel extends HTMLElement {
     this.#seite = seite;
     this.#fehler = null;
 
+    if (seite === "rules") return;
     if (seite === "history") this.#ladeHistorie();
     else if (seite === "discovery") this.#ladeDiscovery();
     else this.#render();
@@ -377,6 +488,7 @@ class NotificationCenterPanel extends HTMLElement {
 
   #inhalt(locale) {
     if (this.#seite === "welcome") return this.#willkommen();
+    if (this.#seite === "rules") return renderRules(this.#rules);
     if (this.#seite === "history") return renderHistory(this.#history, locale);
     if (this.#seite === "discovery") return renderDiscovery(this.#discovery);
     return renderDashboard(this.#dashboard, locale);

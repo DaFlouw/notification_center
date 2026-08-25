@@ -68,6 +68,9 @@ function entityZeile(eintrag, vorschlaege) {
             ? `<span class="badge monitored">überwacht · ${eintrag.rule_count} ${
                 eintrag.rule_count === 1 ? "Regel" : "Regeln"
               }</span>
+               <button class="action secondary" data-action="show-rules"
+                       data-entity="${escapeHtml(eintrag.entity_id)}"
+                       data-name="${escapeHtml(eintrag.name)}">Regeln</button>
                <button class="action secondary" data-action="remove-entity"
                        data-entity="${escapeHtml(eintrag.entity_id)}">Entfernen</button>`
             : `<span class="badge">${eintrag.suggestion_count} ${
@@ -76,7 +79,8 @@ function entityZeile(eintrag, vorschlaege) {
                <button class="action secondary" data-action="show-suggestions"
                        data-entity="${escapeHtml(eintrag.entity_id)}">Vorschläge</button>
                <button class="action" data-action="add-entity"
-                       data-entity="${escapeHtml(eintrag.entity_id)}">Übernehmen</button>`
+                       data-entity="${escapeHtml(eintrag.entity_id)}"
+                       data-name="${escapeHtml(eintrag.name)}">Übernehmen</button>`
         }
       </div>
 
