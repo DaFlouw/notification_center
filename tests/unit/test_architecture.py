@@ -21,6 +21,7 @@ PURE_MODULES = (
     "notifications/models.py",
     "rules/models.py",
     "rules/evaluator.py",
+    "rules/intents.py",
     "storage/event_store.py",
     "storage/config_models.py",
 )

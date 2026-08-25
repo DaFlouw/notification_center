@@ -26,7 +26,6 @@ from custom_components.notification_center.rules.models import RuleGroup
 from .conftest import T0
 from .test_evaluator import fenster, numeric, snap
 
-
 # -- Einzelne Regeln --------------------------------------------------------
 
 
