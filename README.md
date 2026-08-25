@@ -12,15 +12,15 @@ keine externen Datenquellen, keine Cloud, keine externe Datenbank.
 
 ## Status
 
-In Entwicklung. Aktuelle Version: `0.3.0`.
+In Entwicklung. Aktuelle Version: `0.4.0`.
 
 | Phase | Inhalt | Status |
 |-------|--------|--------|
 | 1 | Integration, Storage, Datenmodelle | abgeschlossen |
 | 2 | Entity-Registrierung, State-Listener, Rule Engine | abgeschlossen |
 | 3 | Notification-Lebenszyklus, Event Store, Counter | abgeschlossen |
-| 4 | Automations-API (create/update/dismiss) | als naechstes |
-| 5 | Discovery Engine, Vorschlaege, Confidence | offen |
+| 4 | Automations-API (create/update/dismiss) | abgeschlossen |
+| 5 | Discovery Engine, Vorschlaege, Confidence | als naechstes |
 | 6 | Config Flow, Ersteinrichtung | offen |
 | 7 | Lovelace-Panel (Dashboard, Historie, Discovery) | offen |
 | 8 | Kompakte Lovelace-Card | offen |
