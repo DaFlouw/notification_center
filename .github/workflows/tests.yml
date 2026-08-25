@@ -44,11 +44,16 @@ jobs:
       # mit Admin-Rechten abrufbar, Annotationen dagegen oeffentlich lesbar.
       - name: Integrationstests
         run: |
-          if pytest tests/integration -q --tb=short > pytest.log 2>&1; then
+          if pytest tests/integration -q --tb=line -rf > pytest.log 2>&1; then
             cat pytest.log
           else
             cat pytest.log
-            tail -n 25 pytest.log | while IFS= read -r zeile; do
+            # Gezielt die Zusammenfassung melden; der rohe Mitschnitt besteht
+            # groesstenteils aus Home-Assistant-Logzeilen.
+            {
+              grep -E '^E  ' pytest.log | sort -u | head -n 15
+              sed -n '/short test summary info/,$p' pytest.log
+            } | head -n 40 | while IFS= read -r zeile; do
               echo "::error::$zeile"
             done
             exit 1
