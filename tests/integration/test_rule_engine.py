@@ -8,8 +8,10 @@ Deckt die Spezifikationsabschnitte 6 (ereignisbasierte Ueberwachung),
 from __future__ import annotations
 
 from datetime import timedelta
+from unittest.mock import patch
 
 import pytest
+from freezegun.api import FrozenDateTimeFactory
 from homeassistant.core import HomeAssistant
 from homeassistant.util import dt as dt_util
 from pytest_homeassistant_custom_component.common import (
@@ -17,12 +19,9 @@ from pytest_homeassistant_custom_component.common import (
     async_fire_time_changed,
 )
 
+from custom_components.notification_center.rules import engine
 from custom_components.notification_center.rules.intents import IntentKind
-from custom_components.notification_center.rules.models import (
-    ConditionKind,
-    NumericOperator,
-    Rule,
-)
+from custom_components.notification_center.rules.models import ConditionKind, Rule
 from custom_components.notification_center.storage.config_models import WatchedEntity
 
 FENSTER = "binary_sensor.fenster_wz"
@@ -100,7 +99,7 @@ async def test_unveraenderte_bedingung_erzeugt_keine_arbeit(hass: HomeAssistant,
 
 
 async def test_zeitbedingung_wird_ueber_einen_timer_ausgeloest(
-    hass: HomeAssistant, config_entry: MockConfigEntry
+    hass: HomeAssistant, config_entry: MockConfigEntry, freezer: FrozenDateTimeFactory
 ) -> None:
     """Spezifikation 17: der Alarm entsteht erst nach Ablauf der Wartezeit."""
     hass.states.async_set(FENSTER, "off")
@@ -118,14 +117,17 @@ async def test_zeitbedingung_wird_ueber_einen_timer_ausgeloest(
     await hass.async_block_till_done()
     assert laufzeit.pending_intents == []
 
-    async_fire_time_changed(hass, dt_util.utcnow() + timedelta(minutes=16))
+    # Die Uhr muss tatsaechlich weiterlaufen: der Timer-Callback fragt
+    # dt_util.utcnow() erneut ab und vergleicht mit dem Beginn der Bedingung.
+    freezer.move_to(dt_util.utcnow() + timedelta(minutes=16))
+    async_fire_time_changed(hass)
     await hass.async_block_till_done()
 
     assert [a.kind for a in laufzeit.pending_intents] == [IntentKind.START]
 
 
 async def test_zeitbedingung_verfaellt_bei_vorzeitigem_ende(
-    hass: HomeAssistant, config_entry: MockConfigEntry
+    hass: HomeAssistant, config_entry: MockConfigEntry, freezer: FrozenDateTimeFactory
 ) -> None:
     hass.states.async_set(FENSTER, "off")
     config_entry.add_to_hass(hass)
@@ -143,7 +145,10 @@ async def test_zeitbedingung_verfaellt_bei_vorzeitigem_ende(
     await hass.async_block_till_done()
     laufzeit.pending_intents.clear()
 
-    async_fire_time_changed(hass, dt_util.utcnow() + timedelta(minutes=16))
+    # Die Uhr muss tatsaechlich weiterlaufen: der Timer-Callback fragt
+    # dt_util.utcnow() erneut ab und vergleicht mit dem Beginn der Bedingung.
+    freezer.move_to(dt_util.utcnow() + timedelta(minutes=16))
+    async_fire_time_changed(hass)
     await hass.async_block_till_done()
 
     assert laufzeit.pending_intents == []
@@ -195,25 +200,27 @@ async def test_entity_ohne_zustand_wird_uebersprungen(
 async def test_fehlerhafte_regel_stoppt_die_uebrigen_nicht(
     hass: HomeAssistant, runtime, caplog: pytest.LogCaptureFixture
 ) -> None:
-    """Spezifikation 82: Fehlerisolierung je Regel."""
-    kaputt = fensterregel(
-        rule_id="rule_kaputt",
-        kind=ConditionKind.NUMERIC,
-        states=(),
-        operator=NumericOperator.GT,
-        threshold=1.0,
-    )
-    # Nachtraeglich einen unmoeglichen Zustand erzeugen: eine numerische
-    # Regel ohne Operator kommt ueber die Validierung nicht herein, koennte
-    # aber aus beschaedigten gespeicherten Daten stammen.
-    kaputt.operator = None
-    runtime.config.rules["rule_kaputt"] = kaputt
+    """Spezifikation 82: Fehlerisolierung je Regel.
 
-    hass.states.async_set(FENSTER, "on")
-    await hass.async_block_till_done()
+    Der Fehler wird in der Auswertung selbst ausgeloest. Ihn ueber
+    beschaedigte Regeldaten zu erzwingen waere unzuverlaessig, weil die
+    Auswertung solche Faelle meist schon als 'nicht erfuellt' abfaengt.
+    """
+    runtime.config.add_rule(fensterregel(rule_id="rule_kaputt"))
+    echte_auswertung = engine.evaluate_rule
+
+    def _auswerten(rule, snapshot, state, now):
+        if rule.rule_id == "rule_kaputt":
+            raise RuntimeError("absichtlicher Fehler")
+        return echte_auswertung(rule, snapshot, state, now)
+
+    with patch.object(engine, "evaluate_rule", _auswerten):
+        hass.states.async_set(FENSTER, "on")
+        await hass.async_block_till_done()
 
     assert [a.rule_id for a in runtime.pending_intents] == ["rule_fenster"]
     assert "rule_kaputt" in caplog.text
+    assert "absichtlicher Fehler" in caplog.text
 
 
 async def test_ueberwachung_folgt_der_konfiguration(hass: HomeAssistant, runtime) -> None:
