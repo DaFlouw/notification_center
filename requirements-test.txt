@@ -1,4 +1,9 @@
-# Stufe 2: Home-Assistant-Integrationstests. Laeuft nur unter Linux/CI.
+# Stufe 2: Home-Assistant-Integrationstests. Laeuft nur unter Linux/CI,
+# weil Home Assistant fcntl importiert und damit nicht unter Windows startet.
 # Die Version muss zur Ziel-Home-Assistant-Version passen (aktuell 2026.8.x).
 -r requirements-dev.txt
 pytest-homeassistant-custom-component
+
+# Die Integration haengt von der frontend-Komponente ab (eigenes Panel).
+# Deren Setup importiert hass_frontend; das Testpaket bringt es nicht mit.
+home-assistant-frontend
