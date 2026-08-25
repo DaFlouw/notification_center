@@ -28,5 +28,85 @@
         "name": "Ereignisse heute"
       }
     }
+  },
+  "services": {
+    "create": {
+      "name": "Notification erzeugen",
+      "description": "Erzeugt eine Notification. Ein erneuter Aufruf mit derselben Kombination aus Owner und ID überschreibt die bestehende Notification, statt eine zweite anzulegen.",
+      "fields": {
+        "message": {
+          "name": "Meldung",
+          "description": "Der angezeigte Text. Pflichtfeld."
+        },
+        "notification_id": {
+          "name": "ID",
+          "description": "Kennung der Notification innerhalb des Owners. Zusammen mit dem Owner eindeutig."
+        },
+        "type": {
+          "name": "Typ",
+          "description": "Info, Warnung oder Alarm."
+        },
+        "title": {
+          "name": "Titel",
+          "description": "Optionale Überschrift."
+        },
+        "entity_id": {
+          "name": "Entity",
+          "description": "Optional. Ist sie gesetzt, öffnet ein Klick auf die Notification die Detailansicht dieser Entity."
+        },
+        "duration": {
+          "name": "Dauer",
+          "description": "Optional. Nach Ablauf endet die Notification von selbst."
+        },
+        "owner": {
+          "name": "Owner",
+          "description": "Optional. Ohne Angabe wird die aufrufende Automation ermittelt; gelingt das nicht, gilt 'manual'."
+        }
+      }
+    },
+    "update": {
+      "name": "Notification aktualisieren",
+      "description": "Ändert eine laufende Notification. Zwischenaktualisierungen erzeugen keinen eigenen Eintrag in der Historie.",
+      "fields": {
+        "notification_id": {
+          "name": "ID",
+          "description": "Kennung der zu ändernden Notification."
+        },
+        "type": {
+          "name": "Typ",
+          "description": "Neuer Typ."
+        },
+        "message": {
+          "name": "Meldung",
+          "description": "Neuer Text."
+        },
+        "title": {
+          "name": "Titel",
+          "description": "Neue Überschrift."
+        },
+        "entity_id": {
+          "name": "Entity",
+          "description": "Neue verknüpfte Entity."
+        },
+        "owner": {
+          "name": "Owner",
+          "description": "Optional, siehe 'Notification erzeugen'."
+        }
+      }
+    },
+    "dismiss": {
+      "name": "Notification beenden",
+      "description": "Beendet eine laufende Notification. Nur Automations-Notifications lassen sich so beenden; entity-basierte enden über ihren Zustand.",
+      "fields": {
+        "notification_id": {
+          "name": "ID",
+          "description": "Kennung der zu beendenden Notification."
+        },
+        "owner": {
+          "name": "Owner",
+          "description": "Optional, siehe 'Notification erzeugen'."
+        }
+      }
+    }
   }
 }

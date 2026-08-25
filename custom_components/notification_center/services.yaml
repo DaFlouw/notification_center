@@ -1,0 +1,72 @@
+create:
+  fields:
+    message:
+      required: true
+      example: Wasserleck im Keller erkannt
+      selector:
+        text:
+    notification_id:
+      example: wasserleck
+      selector:
+        text:
+    type:
+      default: info
+      selector:
+        select:
+          options:
+            - info
+            - warning
+            - alarm
+    title:
+      example: Keller
+      selector:
+        text:
+    entity_id:
+      example: binary_sensor.leckmelder_keller
+      selector:
+        entity:
+    duration:
+      example: "00:15:00"
+      selector:
+        duration:
+    owner:
+      example: automation.keller_wasserleck
+      selector:
+        text:
+
+update:
+  fields:
+    notification_id:
+      example: wasserleck
+      selector:
+        text:
+    type:
+      selector:
+        select:
+          options:
+            - info
+            - warning
+            - alarm
+    message:
+      example: Wasserleck bestaetigt
+      selector:
+        text:
+    title:
+      selector:
+        text:
+    entity_id:
+      selector:
+        entity:
+    owner:
+      selector:
+        text:
+
+dismiss:
+  fields:
+    notification_id:
+      example: wasserleck
+      selector:
+        text:
+    owner:
+      selector:
+        text:

@@ -14,11 +14,14 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Iterable
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
 from homeassistant.helpers.dispatcher import async_dispatcher_send
-from homeassistant.helpers.event import async_track_time_change
+from homeassistant.helpers.event import (
+    async_track_point_in_utc_time,
+    async_track_time_change,
+)
 from homeassistant.util import dt as dt_util
 
 from ..const import DOMAIN, EVENT_NOTIFICATION
@@ -26,11 +29,17 @@ from ..rules.intents import IntentKind, NotificationIntent
 from ..storage.config_models import ConfigDocument
 from ..storage.config_store import ConfigStore
 from ..storage.event_store_async import AsyncEventStore
-from .lifecycle import ActiveNotifications, Counts, rule_key
+from .lifecycle import (
+    ActiveNotifications,
+    Counts,
+    automation_notification_key,
+    rule_key,
+)
 from .models import (
     CloseReason,
     NotificationEvent,
     NotificationSource,
+    NotificationType,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -53,6 +62,7 @@ class NotificationEngine:
         self._config_store = config_store
         self._active = ActiveNotifications()
         self._unsub_midnight: CALLBACK_TYPE | None = None
+        self._expiry_timers: dict[str, CALLBACK_TYPE] = {}
 
     @property
     def _config(self) -> ConfigDocument:
@@ -85,6 +95,8 @@ class NotificationEngine:
         if self._unsub_midnight is not None:
             self._unsub_midnight()
             self._unsub_midnight = None
+        for key in list(self._expiry_timers):
+            self._cancel_expiry(key)
 
     async def async_restore(self) -> None:
         """Baut aktive Notifications und Zaehler nach einem Neustart auf.
@@ -202,6 +214,146 @@ class NotificationEngine:
         if beendet:
             self._notify_change()
         return beendet
+
+    # -- Automations-API (Spezifikation 23 bis 30) -----------------------
+
+    async def async_create_automation(
+        self,
+        *,
+        owner: str,
+        notification_id: str,
+        type: NotificationType,
+        message: str,
+        title: str | None = None,
+        entity_id: str | None = None,
+        duration: timedelta | None = None,
+    ) -> str | None:
+        """Erzeugt oder ueberschreibt eine Automations-Notification.
+
+        Der Aufruf ist idempotent: dieselbe Kombination aus Owner und ID
+        ueberschreibt die bestehende Notification, auch mit geaendertem Typ,
+        und erzeugt keinen zweiten Log-Eintrag (Spezifikation 26, 75).
+
+        Waehrend einer Pause entsteht nichts und es wird nichts protokolliert
+        (Spezifikation 42). Solche Aufrufe werden spaeter nicht nachgeholt
+        (Spezifikation 43).
+        """
+        if self._config.settings.paused:
+            _LOGGER.debug("Notification %s/%s waehrend der Pause verworfen", owner, notification_id)
+            return None
+
+        key = automation_notification_key(owner, notification_id)
+        jetzt = dt_util.utcnow()
+        bestehend = self._active.get(key)
+
+        if bestehend is not None:
+            bestehend.type = type
+            bestehend.message = message
+            bestehend.title = title
+            bestehend.entity_id = entity_id
+            self._active.put(bestehend)
+            await self._store.async_update(bestehend)
+            self._fire(bestehend, "updated")
+            self._schedule_expiry(key, bestehend.start_time, duration)
+            self._notify_change()
+            return bestehend.event_id
+
+        ereignis = NotificationEvent(
+            message=message,
+            type=type,
+            source=NotificationSource.AUTOMATION,
+            start_time=jetzt,
+            title=title,
+            entity_id=entity_id,
+            owner=owner,
+            notification_id=notification_id,
+        )
+        self._active.put(ereignis)
+        await self._store.async_add(ereignis)
+        self._fire(ereignis, "started")
+        self._schedule_expiry(key, ereignis.start_time, duration)
+        self._notify_change()
+        return ereignis.event_id
+
+    async def async_update_automation(
+        self,
+        *,
+        owner: str,
+        notification_id: str,
+        type: NotificationType | None = None,
+        message: str | None = None,
+        title: str | None = None,
+        entity_id: str | None = None,
+        clear_title: bool = False,
+        clear_entity_id: bool = False,
+    ) -> bool:
+        """Aendert eine laufende Automations-Notification (Spezifikation 27).
+
+        Zwischenaktualisierungen erzeugen keinen eigenen Log-Eintrag; der
+        Datensatz behaelt seinen Beginn und traegt am Ende den letzten Stand
+        (Spezifikation 75).
+        """
+        key = automation_notification_key(owner, notification_id)
+        ereignis = self._active.get(key)
+        if ereignis is None:
+            _LOGGER.warning(
+                "Keine aktive Notification %s/%s zum Aktualisieren", owner, notification_id
+            )
+            return False
+
+        if type is not None:
+            ereignis.type = type
+        if message is not None:
+            ereignis.message = message
+        if title is not None or clear_title:
+            ereignis.title = title
+        if entity_id is not None or clear_entity_id:
+            ereignis.entity_id = entity_id
+
+        self._active.put(ereignis)
+        await self._store.async_update(ereignis)
+        self._fire(ereignis, "updated")
+        self._notify_change()
+        return True
+
+    async def async_dismiss_automation(self, *, owner: str, notification_id: str) -> bool:
+        """Beendet eine Automations-Notification (Spezifikation 28).
+
+        Das ist die einzige Notification-Art, die sich von aussen beenden
+        laesst; entity-basierte Notifications enden ueber ihren Zustand.
+        """
+        key = automation_notification_key(owner, notification_id)
+        self._cancel_expiry(key)
+        beendet = await self.async_close_key(key, CloseReason.DISMISSED, notify=True)
+        if not beendet:
+            _LOGGER.debug("Keine aktive Notification %s/%s zum Beenden", owner, notification_id)
+        return beendet
+
+    # -- Ablaufende Notifications (Spezifikation 29) ---------------------
+
+    @callback
+    def _schedule_expiry(self, key: str, start_time: datetime, duration: timedelta | None) -> None:
+        """Setzt oder loescht den Ablauftimer einer Automations-Notification."""
+        self._cancel_expiry(key)
+        if duration is None:
+            return
+
+        ablauf = start_time + duration
+
+        @callback
+        def _abgelaufen(_now: datetime) -> None:
+            self._expiry_timers.pop(key, None)
+            self._hass.async_create_task(
+                self.async_close_key(key, CloseReason.EXPIRED, notify=True)
+            )
+
+        self._expiry_timers[key] = async_track_point_in_utc_time(self._hass, _abgelaufen, ablauf)
+
+    @callback
+    def _cancel_expiry(self, key: str) -> None:
+        unsub = self._expiry_timers.pop(key, None)
+        if unsub is not None:
+            unsub()
 
     # -- Tageswechsel ----------------------------------------------------
 

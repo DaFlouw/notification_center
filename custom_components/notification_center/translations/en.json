@@ -28,5 +28,85 @@
         "name": "Events today"
       }
     }
+  },
+  "services": {
+    "create": {
+      "name": "Create notification",
+      "description": "Creates a notification. Calling again with the same owner and ID overwrites the existing notification instead of adding a second one.",
+      "fields": {
+        "message": {
+          "name": "Message",
+          "description": "The text shown. Required."
+        },
+        "notification_id": {
+          "name": "ID",
+          "description": "Identifier within the owner."
+        },
+        "type": {
+          "name": "Type",
+          "description": "Info, warning or alarm."
+        },
+        "title": {
+          "name": "Title",
+          "description": "Optional heading."
+        },
+        "entity_id": {
+          "name": "Entity",
+          "description": "Optional entity to open on click."
+        },
+        "duration": {
+          "name": "Duration",
+          "description": "Optional. The notification ends by itself."
+        },
+        "owner": {
+          "name": "Owner",
+          "description": "Optional. Defaults to the calling automation."
+        }
+      }
+    },
+    "update": {
+      "name": "Update notification",
+      "description": "Changes a running notification without adding a history entry.",
+      "fields": {
+        "notification_id": {
+          "name": "ID",
+          "description": "Identifier of the notification."
+        },
+        "type": {
+          "name": "Type",
+          "description": "New type."
+        },
+        "message": {
+          "name": "Message",
+          "description": "New text."
+        },
+        "title": {
+          "name": "Title",
+          "description": "New heading."
+        },
+        "entity_id": {
+          "name": "Entity",
+          "description": "New linked entity."
+        },
+        "owner": {
+          "name": "Owner",
+          "description": "Optional."
+        }
+      }
+    },
+    "dismiss": {
+      "name": "Dismiss notification",
+      "description": "Ends a running automation notification.",
+      "fields": {
+        "notification_id": {
+          "name": "ID",
+          "description": "Identifier of the notification."
+        },
+        "owner": {
+          "name": "Owner",
+          "description": "Optional."
+        }
+      }
+    }
   }
 }

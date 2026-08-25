@@ -13,6 +13,7 @@ from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryNotReady
 
+from .api.services import async_register_services, async_unregister_services
 from .const import CONFIG_ENTRY_VERSION, DOMAIN
 from .coordinator import NotificationCenterRuntime
 
@@ -36,6 +37,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: NotificationCenterEntry)
     entry.runtime_data = runtime
     entry.async_on_unload(entry.add_update_listener(_async_update_listener))
 
+    async_register_services(hass, runtime)
+
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
     _LOGGER.debug("Notification Center gestartet")
@@ -47,6 +50,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: NotificationCenterEntry
     unloaded = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
 
     if unloaded:
+        async_unregister_services(hass)
         await entry.runtime_data.async_stop()
 
     return unloaded
