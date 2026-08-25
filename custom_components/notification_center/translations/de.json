@@ -108,5 +108,25 @@
         }
       }
     }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Einstellungen",
+        "description": "Diese Einstellungen gelten für das gesamte Notification Center.",
+        "data": {
+          "retention_days": "Aufbewahrung der Historie",
+          "max_events": "Maximale Anzahl Ereignisse",
+          "analysis_days": "Analysezeitraum für Vorschläge (Tage)",
+          "paused": "Pausiert"
+        },
+        "data_description": {
+          "retention_days": "Ältere Ereignisse werden entfernt. Beide Grenzen gelten gleichzeitig.",
+          "max_events": "Bei Überschreitung werden die ältesten abgeschlossenen Ereignisse entfernt.",
+          "analysis_days": "Wie weit die Historienanalyse für Regelvorschläge zurückblickt.",
+          "paused": "Während der Pause entstehen keine neuen Notifications. Laufende bleiben bestehen."
+        }
+      }
+    }
   }
 }

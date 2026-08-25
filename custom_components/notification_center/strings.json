@@ -108,5 +108,25 @@
         }
       }
     }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Settings",
+        "description": "These settings apply to the whole Notification Center.",
+        "data": {
+          "retention_days": "History retention",
+          "max_events": "Maximum number of events",
+          "analysis_days": "Analysis window for suggestions (days)",
+          "paused": "Paused"
+        },
+        "data_description": {
+          "retention_days": "Older events are removed. Both limits apply at the same time.",
+          "max_events": "When exceeded, the oldest finished events are removed.",
+          "analysis_days": "How far back history analysis looks for rule suggestions.",
+          "paused": "While paused no new notifications are created. Running ones remain."
+        }
+      }
+    }
   }
 }
