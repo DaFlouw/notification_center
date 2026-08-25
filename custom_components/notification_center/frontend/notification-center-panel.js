@@ -32,6 +32,7 @@ class NotificationCenterPanel extends HTMLElement {
   #dashboard = { active: [], counts: {}, paused: false };
   #history = { events: [], total: 0, hasMore: false, filter: { ...LEERER_FILTER }, areas: [] };
   #discovery = { entities: [], domain: "", search: "", suggestions: {} };
+  #setupErledigt = true;
   #fehler = null;
 
   constructor() {
@@ -84,6 +85,12 @@ class NotificationCenterPanel extends HTMLElement {
 
   async #verbinden() {
     try {
+      // Der Einrichtungsassistent ist uebersprungbar und erscheint nur
+      // einmal (Spezifikation 67).
+      const konfiguration = await api.getConfig(this.#hass);
+      this.#setupErledigt = Boolean(konfiguration.settings.setup_completed);
+      if (!this.#setupErledigt) this.#seite = "welcome";
+
       // Aenderungen werden zugestellt, nicht abgefragt (Spezifikation 45).
       this.#unsubscribe = api.subscribeUpdates(this.#hass, (nachricht) => {
         this.#dashboard = {
@@ -246,6 +253,15 @@ class NotificationCenterPanel extends HTMLElement {
 
   async #aktion(aktion, daten) {
     try {
+      if (aktion === "start-setup" || aktion === "skip-setup") {
+        await api.setSettings(this.#hass, { setup_completed: true });
+        this.#setupErledigt = true;
+        this.#seite = aktion === "start-setup" ? "discovery" : "dashboard";
+        if (this.#seite === "discovery") await this.#ladeDiscovery();
+        else this.#render();
+        return;
+      }
+
       if (aktion === "load-more") {
         await this.#ladeHistorie({ anhaengen: true });
         return;
@@ -344,7 +360,7 @@ class NotificationCenterPanel extends HTMLElement {
 
     this.shadowRoot.innerHTML = `
       <header><h1>Notification Center</h1></header>
-      <nav>
+      <nav ${this.#seite === "welcome" ? 'hidden=""' : ""}>
         ${SEITEN.map(
           (seite) =>
             `<button data-page="${seite.id}" ${
@@ -360,9 +376,26 @@ class NotificationCenterPanel extends HTMLElement {
   }
 
   #inhalt(locale) {
+    if (this.#seite === "welcome") return this.#willkommen();
     if (this.#seite === "history") return renderHistory(this.#history, locale);
     if (this.#seite === "discovery") return renderDiscovery(this.#discovery);
     return renderDashboard(this.#dashboard, locale);
+  }
+
+  #willkommen() {
+    return `
+      <div class="empty">
+        <strong>Willkommen im Notification Center</strong>
+        <span>
+          Wähle aus, welche Entities überwacht werden sollen. Vorschläge für
+          Regeln entstehen dabei automatisch.
+        </span>
+        <div style="margin-top: 24px; display: flex; gap: 8px; justify-content: center">
+          <button class="action" data-action="start-setup">Einrichtung starten</button>
+          <button class="action secondary" data-action="skip-setup">Überspringen</button>
+        </div>
+      </div>
+    `;
   }
 }
 

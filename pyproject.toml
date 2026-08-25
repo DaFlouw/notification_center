@@ -1,6 +1,6 @@
 [project]
 name = "notification-center"
-version = "0.5.0"
+version = "1.0.0"
 description = "Zentrales, lokales Benachrichtigungs- und Ereignissystem fuer Home Assistant"
 requires-python = ">=3.13"
 

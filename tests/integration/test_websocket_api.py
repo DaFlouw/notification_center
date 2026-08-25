@@ -371,3 +371,116 @@ async def test_entity_ersetzen_nimmt_regeln_mit(
     assert antwort["success"] is True
     assert runtime.config.rules[rule_id].entity_id == "binary_sensor.fenster_neu"
     assert FENSTER not in runtime.config.entities
+
+
+# -- Einrichtungsassistent (Spezifikation 67) ------------------------------
+
+
+async def test_einrichtung_ist_zunaechst_offen(
+    hass: HomeAssistant, runtime, hass_ws_client
+) -> None:
+    client = await hass_ws_client(hass)
+    antwort = await sende(client, "get_config")
+    assert antwort["result"]["settings"]["setup_completed"] is False
+
+
+async def test_einrichtung_laesst_sich_abschliessen(
+    hass: HomeAssistant, runtime, hass_ws_client
+) -> None:
+    """Der Assistent muss uebersprungen werden koennen."""
+    client = await hass_ws_client(hass)
+    await sende(client, "set_settings", setup_completed=True)
+
+    antwort = await sende(client, "get_config")
+    assert antwort["result"]["settings"]["setup_completed"] is True
+
+
+# -- Eskalationsgruppen ueber die API --------------------------------------
+
+
+async def test_gruppe_speichern_und_eskalieren(
+    hass: HomeAssistant, runtime, hass_ws_client
+) -> None:
+    """Spezifikation 19 und 20 durchgehend ueber die API."""
+    client = await hass_ws_client(hass)
+    await sende(client, "add_entities", entity_ids=[TEMPERATUR])
+
+    stufen = [
+        {
+            "rule_id": f"rule_stufe_{level}",
+            "entity_id": TEMPERATUR,
+            "kind": "numeric",
+            "operator": "gt",
+            "threshold": schwelle,
+            "type": typ,
+            "group_id": "group_temp",
+            "level": level,
+            "message_template": "{name} {value}",
+        }
+        for level, schwelle, typ in ((1, 25.0, "info"), (2, 28.0, "warning"))
+    ]
+
+    antwort = await sende(
+        client,
+        "save_group",
+        group={
+            "group_id": "group_temp",
+            "entity_id": TEMPERATUR,
+            "name": "Temperatur",
+            "rules": stufen,
+        },
+    )
+    assert antwort["success"] is True
+
+    hass.states.async_set(TEMPERATUR, "26", {"unit_of_measurement": "°C"})
+    await hass.async_block_till_done()
+    assert runtime.notification_engine.counts.info == 1
+
+    hass.states.async_set(TEMPERATUR, "29", {"unit_of_measurement": "°C"})
+    await hass.async_block_till_done()
+    assert runtime.notification_engine.counts.info == 0
+    assert runtime.notification_engine.counts.warning == 1
+
+    verlauf = await sende(client, "get_history")
+    assert verlauf["result"]["total"] == 2
+
+
+async def test_ungueltige_gruppe_wird_abgelehnt(
+    hass: HomeAssistant, runtime, hass_ws_client
+) -> None:
+    """Nicht monotone Schwellen haetten keine wohldefinierte Reihenfolge."""
+    client = await hass_ws_client(hass)
+    await sende(client, "add_entities", entity_ids=[TEMPERATUR])
+
+    antwort = await sende(
+        client,
+        "save_group",
+        group={
+            "group_id": "group_temp",
+            "entity_id": TEMPERATUR,
+            "name": "Temperatur",
+            "rules": [
+                {
+                    "rule_id": "rule_1",
+                    "entity_id": TEMPERATUR,
+                    "kind": "numeric",
+                    "operator": "gt",
+                    "threshold": 30.0,
+                    "group_id": "group_temp",
+                    "level": 1,
+                },
+                {
+                    "rule_id": "rule_2",
+                    "entity_id": TEMPERATUR,
+                    "kind": "numeric",
+                    "operator": "gt",
+                    "threshold": 25.0,
+                    "group_id": "group_temp",
+                    "level": 2,
+                },
+            ],
+        },
+    )
+
+    assert antwort["success"] is False
+    assert antwort["error"]["code"] == "invalid_input"
