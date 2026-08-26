@@ -1,3 +1,5 @@
+<img src="icon.png" alt="" width="96" align="right">
+
 # Notification Center
 
 Zentrales, lokales Benachrichtigungs- und Ereignissystem fuer Home Assistant.
@@ -12,7 +14,7 @@ keine externen Datenquellen, keine Cloud, keine externe Datenbank.
 
 ## Status
 
-Aktuelle Version: `1.0.0`. Alle zehn Entwicklungsphasen sind abgeschlossen.
+Aktuelle Version: `1.0.1`. Alle zehn Entwicklungsphasen sind abgeschlossen.
 
 | Phase | Inhalt | Status |
 |-------|--------|--------|
@@ -42,7 +44,7 @@ Notification Center auswaehlen. Es gibt genau eine Instanz pro Installation.
 
 ## Bedienung
 
-Das Panel erscheint in der Seitenleiste und hat drei Bereiche:
+Das Panel erscheint in der Seitenleiste und hat vier Bereiche:
 
 **Dashboard** zeigt ausschliesslich aktive Notifications, gruppiert nach
 Alarmen, Warnungen und Infos, jeweils mit Meldung und Zeitpunkt. Eine
@@ -53,11 +55,14 @@ Detailansicht.
 Filtern nach Typ, Quelle, Zeitraum und Bereich sowie die Volltextsuche laufen
 im Backend; geladen werden 50 Eintraege, weitere auf Anforderung.
 
+**Regeln** zeigt den gesamten Regelbestand, nach Entity gruppiert, und fuehrt
+in den Regel-Editor: dort lassen sich Regeln von Hand anlegen, bearbeiten und
+loeschen, und eine Entity laesst sich durch eine andere ersetzen.
+
 **Discovery** findet Entities nach Typ, Name oder Entity-ID, zeigt zu jeder
-Regelvorschlaege samt Begruendung und uebernimmt sie in die Ueberwachung. Zu
-einer ueberwachten Entity fuehrt *Regeln* in den Regel-Editor: dort lassen
-sich Regeln von Hand anlegen, bearbeiten und loeschen, und die Entity laesst
-sich durch eine andere ersetzen.
+Regelvorschlaege samt Begruendung und uebernimmt sie in die Ueberwachung.
+Vorschlaege, die bloss auf einem Wort im Namen beruhen, werden nicht
+angeboten: sie kosten mehr Vertrauen, als sie einbringen.
 
 ### Regeln
 
@@ -65,6 +70,7 @@ Eine Regel gehoert immer zu genau einer Entity. Vier Faelle stehen zur
 Verfuegung:
 
 * **Zustand ist** – gilt, solange der Zustand anliegt.
+* **Zustand ist nicht** – gilt, solange der Zustand keiner der angegebenen ist.
 * **Zustand aendert sich zu** – loest beim Wechsel in den Zielzustand aus und
   bleibt bestehen, solange dieser anliegt.
 * **Wert ueber- oder unterschreitet** – numerischer Vergleich, optional mit
@@ -145,8 +151,10 @@ title: Meldungen # optional
 max: 5           # nur bei mode: list
 ```
 
-Die Card kommt mit der Integration; ein Eintrag in der Ressourcenliste ist
-nicht noetig.
+Die Card kommt mit der Integration. Sie traegt sich selbst in die
+Lovelace-Ressourcen ein und bleibt dort auch, wenn die Integration neu
+geladen wird: ein Entfernen wuerde jede bereits eingerichtete Karte auf den
+Dashboards zerstoeren.
 
 ## Einstellungen
 
@@ -237,6 +245,21 @@ GitHub-API nur mit Admin-Rechten abrufbar, Annotationen dagegen frei lesbar.
 
 Das Frontend ist buildfrei; die CI prueft lediglich, ob die ausgelieferten
 ES-Module parsen.
+
+## Icon
+
+Das Logo liegt als `icon.png` im Wurzelverzeichnis und wird oben in dieser
+Datei angezeigt.
+
+In der Home-Assistant-Oberflaeche erscheint es damit **nicht**: das Logo einer
+Integration laedt das Frontend von `brands.home-assistant.io`. Eine Datei im
+Integrationsordner wird dafuer nicht ausgewertet. Wer das Logo dort sehen
+will, reicht es per Pull Request bei
+[home-assistant/brands](https://github.com/home-assistant/brands) ein.
+
+Was innerhalb von Home Assistant wirkt, sind mdi-Icons: das Symbol in der
+Seitenleiste (`mdi:bell-ring-outline`) sowie die Icons der Zaehler-Entities
+und Services aus `icons.json`.
 
 ## Lizenz
 

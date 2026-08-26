@@ -60,7 +60,9 @@ class NotificationCenterCard extends HTMLElement {
 
   disconnectedCallback() {
     if (this.#unsubscribe) {
-      this.#unsubscribe.then((ab) => ab()).catch(() => undefined);
+      Promise.resolve(this.#unsubscribe)
+        .then((ab) => ab())
+        .catch(() => undefined);
       this.#unsubscribe = null;
       this.#verbunden = false;
     }
@@ -68,7 +70,7 @@ class NotificationCenterCard extends HTMLElement {
 
   async #verbinden() {
     try {
-      this.#unsubscribe = api.subscribeUpdates(this.#hass, (nachricht) => {
+      this.#unsubscribe = await api.subscribeUpdates(this.#hass, (nachricht) => {
         this.#state = {
           counts: nachricht.counts || {},
           active: nachricht.active || [],
@@ -76,7 +78,6 @@ class NotificationCenterCard extends HTMLElement {
         };
         this.#render();
       });
-      await this.#unsubscribe;
     } catch (fehler) {
       this.#fehler = fehler.message || String(fehler);
       this.#render();
@@ -180,11 +181,21 @@ class NotificationCenterCard extends HTMLElement {
   }
 }
 
-customElements.define("notification-center-card", NotificationCenterCard);
+// Das Modul kann mehr als einmal geladen werden, etwa wenn es sowohl als
+// Lovelace-Ressource als auch als zusaetzliches Frontend-Modul eingebunden
+// ist. Ein zweiter define() wuerde werfen und die Registrierung in
+// customCards nie erreichen: die Karte verschwaende dann aus der Auswahl.
+if (!customElements.get("notification-center-card")) {
+  customElements.define("notification-center-card", NotificationCenterCard);
+}
 
 window.customCards = window.customCards || [];
-window.customCards.push({
-  type: "notification-center-card",
-  name: "Notification Center",
-  description: "Aktive Meldungen des Notification Centers in Kurzform.",
-});
+if (!window.customCards.some((karte) => karte.type === "notification-center-card")) {
+  window.customCards.push({
+    type: "notification-center-card",
+    name: "Notification Center",
+    description: "Aktive Meldungen des Notification Centers in Kurzform.",
+    preview: true,
+    documentationURL: "https://github.com/DaFlouw/notification_center#lovelace-card",
+  });
+}

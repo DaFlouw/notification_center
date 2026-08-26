@@ -34,7 +34,8 @@ from .analyzer import (
     analyze_numeric,
     analyze_states,
 )
-from .suggestions import EntityMetadata, Suggestion, build_suggestions
+from .states import available_states
+from .suggestions import Confidence, EntityMetadata, Suggestion, build_suggestions
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -77,6 +78,11 @@ _UNUSABLE_ATTRIBUTES = frozenset(
 #: Wie viele Werte eine Enum-artige Zeichenkette hoechstens tragen darf, damit
 #: sie noch als Auswahlfeld taugt.
 _MAX_ENUM_LENGTH = 32
+
+#: Rueckblick fuer zusaetzlich beobachtete Zustaende. Grosszuegiger als der
+#: Analysezeitraum: hier geht es nur um die Frage, welche Werte ueberhaupt
+#: vorkommen, nicht um eine statistische Aussage.
+STATE_LOOKBACK_DAYS = 30
 
 
 class DiscoveryEngine:
@@ -144,12 +150,16 @@ class DiscoveryEngine:
             "rule_count": regeln,
         }
 
-        if not ueberwacht and metadata is not None:
-            # Nur Metadaten, keine Historie: der Zaehler ist eine Andeutung,
-            # kein Versprechen.
-            eintrag["suggestion_count"] = len(build_suggestions(metadata))
-        else:
-            eintrag["suggestion_count"] = 0
+        # Bewusst *keine* Vorschlagszahl: sie liesse sich hier nur aus
+        # Metadaten bilden, waehrend die tatsaechliche Liste zusaetzlich aus
+        # der Historie entsteht. Eine Null neben zwei sichtbaren Vorschlaegen
+        # ist schlechter als gar keine Angabe. Gemeldet wird nur, ob
+        # ueberhaupt etwas zu erwarten ist.
+        eintrag["has_suggestions"] = bool(
+            not ueberwacht
+            and metadata is not None
+            and _ohne_unsichere(build_suggestions(metadata), False)
+        )
 
         return eintrag
 
@@ -208,22 +218,45 @@ class DiscoveryEngine:
     def available_states(self, entity_id: str) -> list[str]:
         """Auswaehlbare Zustandswerte einer Entity (Spezifikation 14).
 
-        Der Regel-Editor bietet ein Auswahlfeld statt eines Textfelds; die
-        Werte stammen aus den Optionen der Entity, sonst aus dem aktuellen
-        Zustand.
+        Der Regel-Editor bietet ein Auswahlfeld statt eines Textfelds. Die
+        Werte stammen aus den Faehigkeiten der Entity und dem Katalog ihrer
+        Domaene; beides ist unabhaengig davon, was die Entity bisher gezeigt
+        hat. Beobachtetes ergaenzt die Liste nur.
         """
         state = self._hass.states.get(entity_id)
         if state is None:
             return []
 
-        optionen = state.attributes.get("options")
-        if isinstance(optionen, list | tuple):
-            return [str(wert) for wert in optionen]
+        return available_states(
+            domain=state.domain,
+            current_state=state.state,
+            attributes=state.attributes,
+        )
 
-        if state.domain == "binary_sensor":
-            return ["on", "off"]
+    async def async_available_states(
+        self, entity_id: str, *, days: int = STATE_LOOKBACK_DAYS
+    ) -> list[str]:
+        """Wie :meth:`available_states`, ergaenzt um beobachtete Werte.
 
-        return [state.state] if state.state else []
+        Die Historie wird nur zusaetzlich befragt. Liefert sie nichts, weil
+        Home Assistant gerade erst gestartet ist, bleibt die Liste trotzdem
+        vollstaendig.
+        """
+        state = self._hass.states.get(entity_id)
+        if state is None:
+            return []
+
+        beobachtet: list[str] = []
+        if "recorder" in self._hass.config.components:
+            ende = dt_util.utcnow()
+            beobachtet = await self._async_raw_states(entity_id, ende - timedelta(days=days), ende)
+
+        return available_states(
+            domain=state.domain,
+            current_state=state.state,
+            attributes=state.attributes,
+            observed=beobachtet,
+        )
 
     # -- Geraete ---------------------------------------------------------
 
@@ -252,19 +285,26 @@ class DiscoveryEngine:
             "area_id": geraet.area_id if geraet else None,
             "area_name": self._area_name(geraet.area_id if geraet else None),
             "entities": eintraege,
-            "suggestion_count": sum(e["suggestion_count"] for e in eintraege),
         }
 
     # -- Vorschlaege -----------------------------------------------------
 
     async def async_get_entity_suggestions(
-        self, entity_id: str, *, analysis_days: int | None = None
+        self,
+        entity_id: str,
+        *,
+        analysis_days: int | None = None,
+        include_uncertain: bool = False,
     ) -> list[Suggestion]:
         """Vorschlaege einer Entity, einschliesslich Historienanalyse.
 
         Wird beim Hinzufuegen einmal aufgerufen und spaeter nur auf
         ausdrueckliche Anforderung. Es gibt keine laufende
         Hintergrundanalyse (Spezifikation 11).
+
+        Vorschlaege geringer Sicherheit bleiben aussen vor: ein Vorschlag, der
+        bloss auf einem Wort im Namen beruht, kostet mehr Vertrauen als er
+        einbringt. Ueber ``include_uncertain`` sind sie weiterhin erreichbar.
         """
         metadata = self.metadata_for(entity_id)
         if metadata is None:
@@ -273,12 +313,13 @@ class DiscoveryEngine:
         tage = analysis_days or self._config.settings.analysis_days or DEFAULT_ANALYSIS_DAYS
         numerisch, zustaende = await self.async_analyze_history(entity_id, days=tage)
 
-        return build_suggestions(
+        vorschlaege = build_suggestions(
             metadata,
             numeric_profile=numerisch,
             state_profile=zustaende,
             analysis_days=tage,
         )
+        return _ohne_unsichere(vorschlaege, include_uncertain)
 
     async def async_analyze_history(
         self, entity_id: str, *, days: int = DEFAULT_ANALYSIS_DAYS
@@ -385,6 +426,12 @@ class DiscoveryEngine:
             return None
         bereich = ar.async_get(self._hass).async_get_area(area_id)
         return bereich.name if bereich else None
+
+
+def _ohne_unsichere(suggestions: list[Suggestion], include_uncertain: bool) -> list[Suggestion]:
+    if include_uncertain:
+        return suggestions
+    return [vorschlag for vorschlag in suggestions if vorschlag.confidence is not Confidence.LOW]
 
 
 def _attribute_kind(value: Any) -> str | None:

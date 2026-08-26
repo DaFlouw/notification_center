@@ -10,6 +10,7 @@ import { escapeHtml } from "../format.js";
 
 const BEDINGUNGEN = [
   { wert: "state_is", text: "Zustand ist" },
+  { wert: "state_is_not", text: "Zustand ist nicht" },
   { wert: "state_changed_to", text: "Zustand ändert sich zu" },
   { wert: "numeric", text: "Wert überschreitet oder unterschreitet" },
 ];
@@ -43,12 +44,66 @@ export function leereRegel(entityId) {
   };
 }
 
+/**
+ * Uebersicht aller Regeln, nach Entity gruppiert.
+ *
+ * Regeln waren zuvor nur ueber die Discovery erreichbar und dort schwer
+ * wiederzufinden. Diese Seite zeigt den gesamten Bestand auf einen Blick.
+ */
+export function renderRuleOverview(state) {
+  const { entities = [], rules = [], loading } = state;
+
+  if (loading) return '<div class="loading">Wird geladen …</div>';
+
+  if (!rules.length) {
+    return `
+      <div class="empty">
+        <strong>Noch keine Regeln</strong>
+        <span>
+          Unter <button class="link" data-nav="discovery">Discovery</button>
+          eine Entity übernehmen und ihr eine Regel geben.
+        </span>
+      </div>
+    `;
+  }
+
+  const nachEntity = new Map();
+  for (const regel of rules) {
+    if (!nachEntity.has(regel.entity_id)) nachEntity.set(regel.entity_id, []);
+    nachEntity.get(regel.entity_id).push(regel);
+  }
+
+  const namen = new Map(entities.map((eintrag) => [eintrag.entity_id, eintrag.name]));
+
+  const abschnitte = [...nachEntity.entries()]
+    .sort((a, b) => (namen.get(a[0]) || a[0]).localeCompare(namen.get(b[0]) || b[0]))
+    .map(
+      ([entityId, eintraege]) => `
+        <h2>${escapeHtml(namen.get(entityId) || entityId)}</h2>
+        <ul>${eintraege.map(regelZeile).join("")}</ul>
+        <div class="footer-link" style="margin-top: 8px">
+          <button class="link" data-action="show-rules"
+                  data-entity="${escapeHtml(entityId)}"
+                  data-name="${escapeHtml(namen.get(entityId) || entityId)}">Bearbeiten →</button>
+        </div>
+      `
+    );
+
+  return `
+    <div class="entity-meta" style="margin-bottom: 12px">
+      ${rules.length} ${rules.length === 1 ? "Regel" : "Regeln"} auf
+      ${nachEntity.size} ${nachEntity.size === 1 ? "Entity" : "Entities"}
+    </div>
+    ${abschnitte.join("")}
+  `;
+}
+
 export function renderRules(state) {
   const { entityId, entityName, rules = [], entwurf, states = [], attributes = [] } = state;
 
   return `
     <div class="filters">
-      <button class="link" data-nav="discovery">← Zurück zur Discovery</button>
+      <button class="link" data-action="back-to-rules">← Alle Regeln</button>
     </div>
 
     <h2>Regeln für ${escapeHtml(entityName || entityId)}</h2>
@@ -96,7 +151,12 @@ export function beschreibung(regel) {
   }
 
   const zustaende = (regel.states || []).join(" oder ");
-  const einleitung = regel.kind === "state_changed_to" ? "wechselt zu" : "ist";
+  const einleitung =
+    regel.kind === "state_changed_to"
+      ? "wechselt zu"
+      : regel.kind === "state_is_not"
+        ? "ist nicht"
+        : "ist";
   return `${quelle} ${einleitung} ${zustaende}${dauerText(regel)}`;
 }
 

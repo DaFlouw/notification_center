@@ -483,3 +483,61 @@ def test_gruppe_mit_zeitbedingung_je_stufe() -> None:
     spaeter = evaluate_group(gruppe, snap("30", minutes=10), state, T0 + timedelta(minutes=10))
     assert spaeter.active_level == 2
     assert spaeter.escalated is True
+
+
+# -- Zustand ist nicht (Fehlerticket 4) ------------------------------------
+
+
+def test_zustand_ist_nicht_greift_ausserhalb_der_liste() -> None:
+    rule = Rule(
+        entity_id="sensor.waschmaschine",
+        kind=ConditionKind.STATE_IS_NOT,
+        states=("idle",),
+    )
+    state = RuleState(rule_id=rule.rule_id)
+
+    ruhig = evaluate_rule(rule, snap("idle"), state, T0)
+    assert ruhig.phase is Phase.IDLE
+
+    laeuft = evaluate_rule(rule, snap("running", minutes=1), state, T0 + timedelta(minutes=1))
+    assert laeuft.became_satisfied is True
+
+
+def test_zustand_ist_nicht_endet_bei_rueckkehr() -> None:
+    rule = Rule(
+        entity_id="sensor.waschmaschine",
+        kind=ConditionKind.STATE_IS_NOT,
+        states=("idle",),
+    )
+    state = RuleState(rule_id=rule.rule_id)
+
+    evaluate_rule(rule, snap("running"), state, T0)
+    zurueck = evaluate_rule(rule, snap("idle", minutes=1), state, T0 + timedelta(minutes=1))
+
+    assert zurueck.became_unsatisfied is True
+
+
+def test_zustand_ist_nicht_greift_nicht_bei_unbekanntem_zustand() -> None:
+    """Eine stille Entity ist kein abweichender Zustand."""
+    rule = Rule(
+        entity_id="sensor.waschmaschine",
+        kind=ConditionKind.STATE_IS_NOT,
+        states=("idle",),
+    )
+    state = RuleState(rule_id=rule.rule_id)
+
+    assert evaluate_rule(rule, snap("unavailable"), state, T0).phase is Phase.IDLE
+
+
+def test_zustand_ist_nicht_mit_zeitbedingung() -> None:
+    rule = Rule(
+        entity_id="sensor.waschmaschine",
+        kind=ConditionKind.STATE_IS_NOT,
+        states=("idle", "finished"),
+        duration_seconds=600,
+    )
+    state = RuleState(rule_id=rule.rule_id)
+
+    assert evaluate_rule(rule, snap("running"), state, T0).phase is Phase.PENDING
+    spaet = evaluate_rule(rule, snap("running", minutes=11), state, T0 + timedelta(minutes=11))
+    assert spaet.became_satisfied is True

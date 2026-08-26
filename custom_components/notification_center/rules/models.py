@@ -112,6 +112,8 @@ class ConditionKind(StrEnum):
 
     #: Zustand ist einer der angegebenen Werte, solange er anliegt.
     STATE_IS = "state_is"
+    #: Zustand ist keiner der angegebenen Werte.
+    STATE_IS_NOT = "state_is_not"
     #: Zustand wechselt in einen der angegebenen Werte.
     STATE_CHANGED_TO = "state_changed_to"
     #: Numerischer Vergleich gegen eine Schwelle.
@@ -449,6 +451,8 @@ def suggest_message(rule: Rule, snapshot: EntitySnapshot) -> str:
         return f"{name} {_OPERATOR_TEXT[rule.operator]} {_format_number(rule.threshold)}".strip()
 
     zustaende = " oder ".join(rule.states)
+    if rule.kind is ConditionKind.STATE_IS_NOT:
+        return f"{name}: nicht {zustaende}"
     return f"{name}: {zustaende}"
 
 

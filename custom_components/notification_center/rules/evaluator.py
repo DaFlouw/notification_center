@@ -157,6 +157,8 @@ def trigger_met(rule: Rule, snapshot: EntitySnapshot, previous_state: str | None
     im_zielzustand = str(raw) in rule.states
     if rule.kind is ConditionKind.STATE_IS:
         return im_zielzustand
+    if rule.kind is ConditionKind.STATE_IS_NOT:
+        return not im_zielzustand
 
     # STATE_CHANGED_TO: nur der Wechsel *in* den Zielzustand loest aus. Lag der
     # Zustand schon vorher an, ist das kein neues Ereignis.
@@ -184,6 +186,9 @@ def hold_met(rule: Rule, snapshot: EntitySnapshot) -> bool:
 
     if raw is None or str(raw).lower() in UNAVAILABLE_STATES:
         return False
+
+    if rule.kind is ConditionKind.STATE_IS_NOT:
+        return str(raw) not in rule.states
 
     # Auch "Zustand aendert sich zu" bleibt bestehen, solange der Zielzustand
     # anliegt, und endet beim Verlassen.
