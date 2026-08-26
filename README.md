@@ -248,18 +248,21 @@ ES-Module parsen.
 
 ## Icon
 
-Das Logo liegt als `icon.png` im Wurzelverzeichnis und wird oben in dieser
-Datei angezeigt.
+Das Logo liegt in `custom_components/notification_center/brand/` und wird von
+Home Assistant direkt von dort ausgeliefert: die Brands-Komponente sucht bei
+eigenen Integrationen zuerst lokal und greift erst danach auf
+`brands.home-assistant.io` zu. Erkannt wird das allein daran, dass ein
+Verzeichnis `brand` auf oberster Ebene der Integration liegt. Ein Pull Request
+bei [home-assistant/brands](https://github.com/home-assistant/brands) ist
+dafuer nicht noetig.
 
-In der Home-Assistant-Oberflaeche erscheint es damit **nicht**: das Logo einer
-Integration laedt das Frontend von `brands.home-assistant.io`. Eine Datei im
-Integrationsordner wird dafuer nicht ausgewertet. Wer das Logo dort sehen
-will, reicht es per Pull Request bei
-[home-assistant/brands](https://github.com/home-assistant/brands) ein.
+`icon.png` mit 256 Pixeln genuegt: ueber die Rueckfallkette von Home Assistant
+deckt es auch `logo.png`, `icon@2x.png` und die dunklen Varianten ab.
+Zusaetzlich liegt `icon@2x.png` mit 512 Pixeln bei.
 
-Was innerhalb von Home Assistant wirkt, sind mdi-Icons: das Symbol in der
-Seitenleiste (`mdi:bell-ring-outline`) sowie die Icons der Zaehler-Entities
-und Services aus `icons.json`.
+Davon unabhaengig beschreibt `icons.json` die mdi-Icons der Zaehler-Entities
+und der Services; das Symbol in der Seitenleiste ist
+`mdi:bell-ring-outline`.
 
 ## Lizenz
 
