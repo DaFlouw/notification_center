@@ -80,6 +80,13 @@ sheet.replaceSync(`
 
   h2:first-of-type { margin-top: 0; }
 
+  h3 {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--primary-text-color);
+    margin: 12px 0 6px;
+  }
+
   ul { list-style: none; margin: 0; padding: 0; }
 
   .row {

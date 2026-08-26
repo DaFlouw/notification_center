@@ -23,6 +23,7 @@ from homeassistant.core import HomeAssistant, State
 from homeassistant.helpers import area_registry as ar
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers import floor_registry as fr
 from homeassistant.util import dt as dt_util
 
 from ..const import DEFAULT_ANALYSIS_DAYS
@@ -426,6 +427,36 @@ class DiscoveryEngine:
             return None
         bereich = ar.async_get(self._hass).async_get_area(area_id)
         return bereich.name if bereich else None
+
+    def _floor(self, area_id: str | None) -> tuple[str | None, str | None]:
+        """Geschoss eines Bereichs, sofern eines zugeordnet ist."""
+        if area_id is None:
+            return (None, None)
+        bereich = ar.async_get(self._hass).async_get_area(area_id)
+        if bereich is None or bereich.floor_id is None:
+            return (None, None)
+        geschoss = fr.async_get(self._hass).async_get_floor(bereich.floor_id)
+        return (bereich.floor_id, geschoss.name if geschoss else None)
+
+    def entity_placement(self, entity_id: str) -> dict[str, Any]:
+        """Name, Bereich und Geschoss einer Entity fuer die Gruppierung.
+
+        Die Regeluebersicht ordnet danach; ohne Geschoss und Bereich waere sie
+        bei vielen Regeln nur eine lange Liste.
+        """
+        state = self._hass.states.get(entity_id)
+        metadata = self.metadata_for(entity_id)
+        area_id = metadata.area_id if metadata else None
+        floor_id, floor_name = self._floor(area_id)
+
+        return {
+            "entity_id": entity_id,
+            "name": state.name if state else entity_id,
+            "area_id": area_id,
+            "area_name": self._area_name(area_id),
+            "floor_id": floor_id,
+            "floor_name": floor_name,
+        }
 
 
 def _ohne_unsichere(suggestions: list[Suggestion], include_uncertain: bool) -> list[Suggestion]:

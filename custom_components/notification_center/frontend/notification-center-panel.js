@@ -9,7 +9,7 @@
  * faellt im Backend (Spezifikation 50).
  */
 
-import { api } from "./api.js";
+import { FRONTEND_VERSION, api, versionsKonflikt } from "./api.js";
 import { adoptStyles } from "./styles.js";
 import { renderDashboard } from "./views/dashboard.js";
 import { LEERER_FILTER, buildQuery, renderHistory } from "./views/history.js";
@@ -102,7 +102,9 @@ class NotificationCenterPanel extends HTMLElement {
       // Der Einrichtungsassistent ist uebersprungbar und erscheint nur
       // einmal (Spezifikation 67).
       const konfiguration = await api.getConfig(this.#hass);
-      this.#setupErledigt = Boolean(konfiguration.settings.setup_completed);
+      this.#setupErledigt =
+        Boolean(konfiguration.settings.setup_completed) ||
+        (konfiguration.entities || []).length > 0;
       if (!this.#setupErledigt) this.#seite = "welcome";
 
       // Aenderungen werden zugestellt, nicht abgefragt (Spezifikation 45).
@@ -441,6 +443,12 @@ class NotificationCenterPanel extends HTMLElement {
       }
 
       if (aktion === "show-suggestions") {
+        // Derselbe Knopf klappt wieder ein.
+        if (this.#discovery.suggestions[daten.entity]) {
+          delete this.#discovery.suggestions[daten.entity];
+          this.#render();
+          return;
+        }
         const antwort = await api.getSuggestions(this.#hass, daten.entity);
         this.#discovery.suggestions[daten.entity] = antwort.suggestions;
         this.#render();
@@ -518,6 +526,13 @@ class NotificationCenterPanel extends HTMLElement {
         ).join("")}
       </nav>
       <main>
+        ${
+          versionsKonflikt.erkannt
+            ? `<div class="error">Diese Seite stammt aus Version
+                 ${FRONTEND_VERSION}, das Notification Center läuft in Version
+                 ${versionsKonflikt.backend}. Bitte die Seite neu laden.</div>`
+            : ""
+        }
         ${this.#fehler ? `<div class="error">${this.#fehler}</div>` : ""}
         ${this.#inhalt(locale)}
       </main>

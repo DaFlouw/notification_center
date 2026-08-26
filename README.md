@@ -14,7 +14,7 @@ keine externen Datenquellen, keine Cloud, keine externe Datenbank.
 
 ## Status
 
-Aktuelle Version: `1.0.4`. Alle zehn Entwicklungsphasen sind abgeschlossen.
+Aktuelle Version: `1.0.5`. Alle zehn Entwicklungsphasen sind abgeschlossen.
 
 | Phase | Inhalt | Status |
 |-------|--------|--------|
@@ -56,7 +56,8 @@ Detailansicht.
 Filtern nach Typ, Quelle, Zeitraum und Bereich sowie die Volltextsuche laufen
 im Backend; geladen werden 50 Eintraege, weitere auf Anforderung.
 
-**Regeln** zeigt den gesamten Regelbestand, nach Entity gruppiert, und fuehrt
+**Regeln** zeigt den gesamten Regelbestand, nach Geschoss und Raum gruppiert,
+und fuehrt
 in den Regel-Editor: dort lassen sich Regeln von Hand anlegen, bearbeiten und
 loeschen, und eine Entity laesst sich durch eine andere ersetzen.
 
@@ -147,7 +148,7 @@ aktualisiert.
 
 ```yaml
 type: custom:notification-center-card
-mode: counts     # counts | list
+mode: list       # list | counts
 title: Meldungen # optional
 max: 5           # nur bei mode: list
 ```

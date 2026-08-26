@@ -11,6 +11,21 @@ const PREFIX = "notification_center";
 /** Version der API, gegen die dieses Frontend gebaut ist. */
 export const EXPECTED_API_VERSION = 1;
 
+/**
+ * Die Version dieses Frontends, abgelesen am eigenen Pfad.
+ *
+ * Die Dateien werden unter `/notification_center_frontend/<version>/`
+ * ausgeliefert. Damit kennt jedes Modul seine Version, ohne dass sie im Code
+ * gepflegt werden muss und dort veralten koennte.
+ */
+export const FRONTEND_VERSION = (() => {
+  const treffer = /notification_center_frontend\/([^/]+)\//.exec(import.meta.url);
+  return treffer ? treffer[1] : null;
+})();
+
+/** Wird gesetzt, sobald Backend und Frontend auseinanderlaufen. */
+export const versionsKonflikt = { erkannt: false, backend: null };
+
 /** Ruft ein Kommando auf und prueft dabei die API-Version. */
 async function call(hass, type, payload = {}) {
   const result = await hass.connection.sendMessagePromise({
@@ -22,12 +37,21 @@ async function call(hass, type, payload = {}) {
 }
 
 function checkVersion(result) {
-  if (result && result.api_version && result.api_version > EXPECTED_API_VERSION) {
+  if (!result) return;
+
+  if (result.api_version && result.api_version > EXPECTED_API_VERSION) {
     // Kein Abbruch: die Felder, die dieses Frontend kennt, bleiben gueltig.
     console.warn(
       `[notification-center] Backend spricht API-Version ${result.api_version}, ` +
         `dieses Frontend kennt ${EXPECTED_API_VERSION}. Bitte die Seite neu laden.`
     );
+  }
+
+  // Ein aus dem Zwischenspeicher geladenes Frontend wuerde sonst still
+  // Falsches anzeigen. Sichtbar melden ist besser als leer bleiben.
+  if (result.version && FRONTEND_VERSION && result.version !== FRONTEND_VERSION) {
+    versionsKonflikt.erkannt = true;
+    versionsKonflikt.backend = result.version;
   }
 }
 

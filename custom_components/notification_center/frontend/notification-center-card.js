@@ -8,7 +8,7 @@
  * Konfiguration:
  *
  *   type: custom:notification-center-card
- *   mode: counts | list      (Vorgabe: counts)
+ *   mode: list | counts      (Vorgabe: list)
  *   max: 5                   (nur bei mode: list)
  *   title: Meldungen         (optional)
  */
@@ -24,20 +24,22 @@ const KATEGORIEN = [
 
 class NotificationCenterCard extends HTMLElement {
   #hass = null;
-  #config = { mode: "counts", max: 5 };
+  #config = { mode: "list", max: 5 };
   #state = { counts: {}, active: [], paused: false };
   #unsubscribe = null;
   #verbunden = false;
 
   static getStubConfig() {
-    return { type: "custom:notification-center-card", mode: "counts" };
+    return { type: "custom:notification-center-card", mode: "list" };
   }
 
   setConfig(config) {
     if (config.mode && !["counts", "list"].includes(config.mode)) {
       throw new Error("mode muss 'counts' oder 'list' sein");
     }
-    this.#config = { mode: "counts", max: 5, ...config };
+    // Vorgabe ist die Liste: eine Meldungskarte, die nur Zahlen zeigt,
+    // beantwortet die naheliegendste Frage nicht.
+    this.#config = { mode: "list", max: 5, ...config };
     this.#render();
   }
 

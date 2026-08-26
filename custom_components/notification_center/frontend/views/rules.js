@@ -67,35 +67,80 @@ export function renderRuleOverview(state) {
     `;
   }
 
-  const nachEntity = new Map();
-  for (const regel of rules) {
-    if (!nachEntity.has(regel.entity_id)) nachEntity.set(regel.entity_id, []);
-    nachEntity.get(regel.entity_id).push(regel);
-  }
+  const platzierung = new Map(entities.map((eintrag) => [eintrag.entity_id, eintrag]));
+  const baum = gruppiere(rules, platzierung);
 
-  const namen = new Map(entities.map((eintrag) => [eintrag.entity_id, eintrag.name]));
+  const abschnitte = [...baum.entries()]
+    .sort(nachNamen)
+    .map(([geschoss, raeume]) => {
+      const inhalt = [...raeume.entries()]
+        .sort(nachNamen)
+        .map(
+          ([raum, eintraege]) => `
+            <h3>${escapeHtml(raum)}</h3>
+            ${eintraege.map((paar) => entityBlock(paar, platzierung)).join("")}
+          `
+        )
+        .join("");
 
-  const abschnitte = [...nachEntity.entries()]
-    .sort((a, b) => (namen.get(a[0]) || a[0]).localeCompare(namen.get(b[0]) || b[0]))
-    .map(
-      ([entityId, eintraege]) => `
-        <h2>${escapeHtml(namen.get(entityId) || entityId)}</h2>
-        <ul>${eintraege.map(regelZeile).join("")}</ul>
-        <div class="footer-link" style="margin-top: 8px">
-          <button class="link" data-action="show-rules"
-                  data-entity="${escapeHtml(entityId)}"
-                  data-name="${escapeHtml(namen.get(entityId) || entityId)}">Bearbeiten →</button>
-        </div>
-      `
-    );
+      return `<h2>${escapeHtml(geschoss)}</h2>${inhalt}`;
+    });
 
   return `
     <div class="entity-meta" style="margin-bottom: 12px">
-      ${rules.length} ${rules.length === 1 ? "Regel" : "Regeln"} auf
-      ${nachEntity.size} ${nachEntity.size === 1 ? "Entity" : "Entities"}
+      ${rules.length} ${rules.length === 1 ? "Regel" : "Regeln"}
     </div>
     ${abschnitte.join("")}
   `;
+}
+
+/** Ordnet die Regeln nach Geschoss, darin nach Raum, darin nach Entity. */
+function gruppiere(rules, platzierung) {
+  const baum = new Map();
+
+  for (const regel of rules) {
+    const ort = platzierung.get(regel.entity_id) || {};
+    const geschoss = ort.floor_name || "Ohne Geschoss";
+    const raum = ort.area_name || "Ohne Raum";
+
+    if (!baum.has(geschoss)) baum.set(geschoss, new Map());
+    const raeume = baum.get(geschoss);
+
+    if (!raeume.has(raum)) raeume.set(raum, new Map());
+    const entities = raeume.get(raum);
+
+    if (!entities.has(regel.entity_id)) entities.set(regel.entity_id, []);
+    entities.get(regel.entity_id).push(regel);
+  }
+
+  // Aus der inneren Map je Raum eine sortierte Liste machen.
+  for (const raeume of baum.values()) {
+    for (const [raum, entities] of raeume.entries()) {
+      raeume.set(raum, [...entities.entries()]);
+    }
+  }
+
+  return baum;
+}
+
+function entityBlock([entityId, eintraege], platzierung) {
+  const name = platzierung.get(entityId)?.name || entityId;
+
+  return `
+    <div style="margin-bottom: 12px">
+      <div class="entity-meta">${escapeHtml(name)}</div>
+      <ul>${eintraege.map(regelZeile).join("")}</ul>
+      <button class="link" data-action="show-rules"
+              data-entity="${escapeHtml(entityId)}"
+              data-name="${escapeHtml(name)}">Bearbeiten →</button>
+    </div>
+  `;
+}
+
+/** Unsortierte Sammelgruppen ans Ende, sonst alphabetisch. */
+function nachNamen([a], [b]) {
+  const sammel = (wert) => (wert.startsWith("Ohne ") ? 1 : 0);
+  return sammel(a) - sammel(b) || a.localeCompare(b);
 }
 
 export function renderRules(state) {

@@ -12,6 +12,7 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 from custom_components.notification_center.const import (
     API_VERSION,
     DOMAIN,
+    INTEGRATION_VERSION,
     PANEL_URL_PATH,
 )
 from custom_components.notification_center.coordinator import NotificationCenterRuntime
@@ -591,7 +592,8 @@ async def test_card_ist_als_lovelace_ressource_eingetragen(hass: HomeAssistant, 
     assert eintrag is not None
     # Home Assistant legt die Art je nach Version unter 'res_type' oder 'type' ab.
     assert (eintrag.get("res_type") or eintrag.get("type")) == "module"
-    assert eintrag["url"].startswith("/notification_center_frontend/notification-center-card.js")
+    assert eintrag["url"].endswith("/notification-center-card.js")
+    assert INTEGRATION_VERSION in eintrag["url"]
 
 
 async def test_card_ressource_wird_nicht_doppelt_eingetragen(
@@ -609,3 +611,108 @@ async def test_card_ressource_wird_nicht_doppelt_eingetragen(
         if "notification-center-card.js" in str(eintrag.get("url", ""))
     ]
     assert len(treffer) == 1
+
+
+# -- Versionierte Auslieferung (Fehlerticket 11) ---------------------------
+
+
+async def test_frontend_liegt_unter_einem_versionierten_pfad(hass: HomeAssistant, runtime) -> None:
+    """Fehlerticket 11.
+
+    Steckt die Version nur in einer Abfragezeichenkette an der Einstiegsdatei,
+    holt der Browser zwar diese neu, laedt ihre relativen Importe aber weiter
+    aus dem Zwischenspeicher: neues Panel, alte Bausteine. Genau so blieb das
+    Dashboard leer. Ueber einen versionierten Pfad erben alle Importe die
+    Version.
+    """
+    from custom_components.notification_center.frontend.panel import (
+        CARD_URL,
+        PANEL_MODULE_URL,
+        VERSIONED_BASE,
+    )
+
+    assert VERSIONED_BASE.endswith(f"/{INTEGRATION_VERSION}")
+    assert PANEL_MODULE_URL.startswith(VERSIONED_BASE)
+    assert CARD_URL.startswith(VERSIONED_BASE)
+    assert "?" not in PANEL_MODULE_URL
+    assert "?" not in CARD_URL
+
+
+async def test_antworten_tragen_die_integrationsversion(
+    hass: HomeAssistant, runtime, hass_ws_client
+) -> None:
+    """Damit ein zwischengespeichertes Frontend sich selbst erkennen kann."""
+    client = await hass_ws_client(hass)
+    antwort = await sende(client, "get_active")
+    assert antwort["result"]["version"] == INTEGRATION_VERSION
+
+
+# -- Einrichtungsassistent (Fehlerticket 9) --------------------------------
+
+
+async def test_assistent_gilt_als_erledigt_wenn_entities_ueberwacht_werden(
+    hass: HomeAssistant, runtime, hass_ws_client
+) -> None:
+    """Fehlerticket 9.
+
+    Wer bereits Entities ueberwacht, hat die Einrichtung hinter sich, auch
+    wenn der Assistent nie ausdruecklich bestaetigt wurde.
+    """
+    client = await hass_ws_client(hass)
+    assert runtime.config.settings.setup_completed is False
+
+    vorher = await sende(client, "get_config")
+    assert vorher["result"]["settings"]["setup_completed"] is False
+
+    await sende(client, "add_entities", entity_ids=[FENSTER])
+
+    nachher = await sende(client, "get_config")
+    assert nachher["result"]["settings"]["setup_completed"] is True
+
+
+# -- Gruppierung nach Geschoss und Raum (Fehlerticket 10) ------------------
+
+
+async def test_ueberwachte_entities_tragen_raum_und_geschoss(
+    hass: HomeAssistant, runtime, hass_ws_client
+) -> None:
+    """Fehlerticket 10: ohne Ort waere die Regeluebersicht nur eine Liste."""
+    from homeassistant.helpers import area_registry as ar
+    from homeassistant.helpers import entity_registry as er
+    from homeassistant.helpers import floor_registry as fr
+
+    geschoss = fr.async_get(hass).async_create("Erdgeschoss")
+    bereich = ar.async_get(hass).async_create("Wohnzimmer")
+    ar.async_get(hass).async_update(bereich.id, floor_id=geschoss.floor_id)
+
+    registry = er.async_get(hass)
+    eintrag = registry.async_get_or_create("binary_sensor", "demo", "fenster")
+    registry.async_update_entity(eintrag.entity_id, area_id=bereich.id)
+    hass.states.async_set(eintrag.entity_id, "off", {"friendly_name": "Fenster"})
+    await hass.async_block_till_done()
+
+    client = await hass_ws_client(hass)
+    await sende(client, "add_entities", entity_ids=[eintrag.entity_id])
+
+    antwort = await sende(client, "get_config")
+    platzierung = next(
+        e for e in antwort["result"]["entities"] if e["entity_id"] == eintrag.entity_id
+    )
+
+    assert platzierung["area_name"] == "Wohnzimmer"
+    assert platzierung["floor_name"] == "Erdgeschoss"
+    assert platzierung["name"] == "Fenster"
+
+
+async def test_entity_ohne_raum_bleibt_verwendbar(
+    hass: HomeAssistant, runtime, hass_ws_client
+) -> None:
+    client = await hass_ws_client(hass)
+    await sende(client, "add_entities", entity_ids=[FENSTER])
+
+    antwort = await sende(client, "get_config")
+    platzierung = antwort["result"]["entities"][0]
+
+    assert platzierung["area_name"] is None
+    assert platzierung["floor_name"] is None
+    assert platzierung["name"]

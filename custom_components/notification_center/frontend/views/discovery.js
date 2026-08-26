@@ -75,7 +75,9 @@ function entityZeile(eintrag, vorschlaege) {
                        data-entity="${escapeHtml(eintrag.entity_id)}">Entfernen</button>`
             : `${eintrag.has_suggestions ? '<span class="badge">Vorschläge verfügbar</span>' : ""}
                <button class="action secondary" data-action="show-suggestions"
-                       data-entity="${escapeHtml(eintrag.entity_id)}">Vorschläge</button>
+                       data-entity="${escapeHtml(eintrag.entity_id)}">${
+                         vorschlaege ? "Vorschläge ausblenden" : "Vorschläge"
+                       }</button>
                <button class="action" data-action="add-entity"
                        data-entity="${escapeHtml(eintrag.entity_id)}"
                        data-name="${escapeHtml(eintrag.name)}">Übernehmen</button>`

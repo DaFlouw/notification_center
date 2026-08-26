@@ -32,13 +32,22 @@ _LOGGER = logging.getLogger(__name__)
 PANEL_ELEMENT = "notification-center-panel"
 CARD_MODULE = "notification-center-card"
 
-#: Merker, dass der statische Pfad schon haengt. Home Assistant lehnt eine
-#: zweite Registrierung desselben Pfads ab; ohne diesen Merker wuerde ein
+#: Merker der bereits registrierten statischen Pfade. Home Assistant lehnt
+#: eine zweite Registrierung desselben Pfads ab; ohne diesen Merker wuerde ein
 #: Neuladen der Integration den Panel-Start abbrechen.
-_STATIC_PATH_REGISTERED = f"{DOMAIN}_static_path"
+_STATIC_PATHS = f"{DOMAIN}_static_paths"
 
-CARD_URL = f"{FRONTEND_URL_BASE}/{CARD_MODULE}.js"
-CARD_URL_VERSIONED = f"{CARD_URL}?v={INTEGRATION_VERSION}"
+#: Die Version steckt im *Pfad*, nicht in einer Abfragezeichenkette.
+#:
+#: Ein Modul und seine relativen Importe muessen gemeinsam altern. Haengt die
+#: Version nur an der Einstiegsdatei, holt der Browser zwar diese neu, laedt
+#: aber ``./api.js`` und die Ansichten weiter aus dem Zwischenspeicher: neues
+#: Panel, alte Bausteine. Ueber einen versionierten Pfad erben alle relativen
+#: Importe die Version automatisch.
+VERSIONED_BASE = f"{FRONTEND_URL_BASE}/{INTEGRATION_VERSION}"
+
+PANEL_MODULE_URL = f"{VERSIONED_BASE}/{PANEL_ELEMENT}.js"
+CARD_URL = f"{VERSIONED_BASE}/{CARD_MODULE}.js"
 
 
 async def async_register_panel(hass: HomeAssistant) -> None:
@@ -53,7 +62,7 @@ async def async_register_panel(hass: HomeAssistant) -> None:
         hass,
         frontend_url_path=PANEL_URL_PATH,
         webcomponent_name=PANEL_ELEMENT,
-        module_url=f"{FRONTEND_URL_BASE}/{PANEL_ELEMENT}.js?v={INTEGRATION_VERSION}",
+        module_url=PANEL_MODULE_URL,
         sidebar_title=PANEL_TITLE,
         sidebar_icon=PANEL_ICON,
         require_admin=False,
@@ -63,22 +72,26 @@ async def async_register_panel(hass: HomeAssistant) -> None:
 
 
 async def _async_register_static_path(hass: HomeAssistant) -> None:
-    if hass.data.get(_STATIC_PATH_REGISTERED):
+    """Liefert die Frontend-Dateien unter einem versionierten Pfad aus."""
+    registriert: set[str] = hass.data.setdefault(_STATIC_PATHS, set())
+    if VERSIONED_BASE in registriert:
         return
 
-    verzeichnis = Path(__file__).parent
-    await hass.http.async_register_static_paths(
-        [
-            StaticPathConfig(
-                FRONTEND_URL_BASE,
-                str(verzeichnis),
-                # Die Version steckt in der URL; ohne Cache-Header wuerde ein
-                # Browser die alte Datei weiterverwenden.
-                cache_headers=False,
-            )
-        ]
-    )
-    hass.data[_STATIC_PATH_REGISTERED] = True
+    verzeichnis = str(Path(__file__).parent)
+    pfade = [
+        # Unter der Version: jede Datei bekommt bei einer neuen Version eine
+        # neue URL, auch die relativ importierten Bausteine.
+        StaticPathConfig(VERSIONED_BASE, verzeichnis, cache_headers=True),
+    ]
+
+    # Der unversionierte Pfad bleibt fuer Kartenkonfigurationen erhalten, die
+    # noch auf die alte URL zeigen.
+    if FRONTEND_URL_BASE not in registriert:
+        pfade.append(StaticPathConfig(FRONTEND_URL_BASE, verzeichnis, cache_headers=False))
+        registriert.add(FRONTEND_URL_BASE)
+
+    await hass.http.async_register_static_paths(pfade)
+    registriert.add(VERSIONED_BASE)
 
 
 async def _async_register_card(hass: HomeAssistant) -> None:
@@ -92,7 +105,7 @@ async def _async_register_card(hass: HomeAssistant) -> None:
     if await _async_register_lovelace_resource(hass):
         return
 
-    frontend.add_extra_js_url(hass, CARD_URL_VERSIONED)
+    frontend.add_extra_js_url(hass, CARD_URL)
     _LOGGER.debug("Card als zusaetzliches Frontend-Modul eingebunden")
 
 
@@ -112,15 +125,15 @@ async def _async_register_lovelace_resource(hass: HomeAssistant) -> bool:
             await resources.async_get_info()
 
         for eintrag in resources.async_items():
-            if str(eintrag.get("url", "")).split("?")[0] != CARD_URL:
+            if not _ist_unsere_card(str(eintrag.get("url", ""))):
                 continue
-            if eintrag["url"] != CARD_URL_VERSIONED:
-                # Version in der URL nachziehen, damit der Browser die neue
-                # Datei holt statt der zwischengespeicherten.
-                await resources.async_update_item(eintrag["id"], {"url": CARD_URL_VERSIONED})
+            if eintrag["url"] != CARD_URL:
+                # Version im Pfad nachziehen, damit der Browser die neue Datei
+                # holt statt der zwischengespeicherten.
+                await resources.async_update_item(eintrag["id"], {"url": CARD_URL})
             return True
 
-        await resources.async_create_item({"res_type": "module", "url": CARD_URL_VERSIONED})
+        await resources.async_create_item({"res_type": "module", "url": CARD_URL})
     except Exception:
         _LOGGER.exception("Card konnte nicht als Lovelace-Ressource eingetragen werden")
         return False
@@ -139,12 +152,17 @@ def async_unregister_panel(hass: HomeAssistant) -> None:
     frontend.async_remove_panel(hass, PANEL_URL_PATH)
 
 
+def _ist_unsere_card(url: str) -> bool:
+    """Erkennt den Ressourceneintrag der Card, egal unter welcher Version."""
+    return url.split("?")[0].endswith(f"/{CARD_MODULE}.js") and url.startswith(FRONTEND_URL_BASE)
+
+
 def card_resource(hass: HomeAssistant) -> dict[str, Any] | None:
     """Der Ressourceneintrag der Card, sofern vorhanden. Nur fuer Tests."""
     resources = getattr(hass.data.get("lovelace"), "resources", None)
     if resources is None or not hasattr(resources, "async_items"):
         return None
     for eintrag in resources.async_items():
-        if str(eintrag.get("url", "")).split("?")[0] == CARD_URL:
+        if _ist_unsere_card(str(eintrag.get("url", ""))):
             return dict(eintrag)
     return None

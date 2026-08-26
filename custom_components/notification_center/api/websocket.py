@@ -33,6 +33,7 @@ from ..const import (
     API_VERSION,
     DEFAULT_PAGE_SIZE,
     DOMAIN,
+    INTEGRATION_VERSION,
     MAX_EVENTS_OPTIONS,
     MAX_PAGE_SIZE,
     RETENTION_DAYS_OPTIONS,
@@ -86,7 +87,17 @@ def _requires_runtime(
 
 
 def _envelope(payload: dict[str, Any]) -> dict[str, Any]:
-    return {"api_version": API_VERSION, **payload}
+    """Jede Antwort traegt API- und Integrationsversion.
+
+    Die Integrationsversion erlaubt dem Frontend zu erkennen, dass es selbst
+    aus einem aelteren Stand stammt, etwa aus dem Zwischenspeicher des
+    Browsers. Ohne diesen Hinweis wirkt so ein Fall wie ein leeres Dashboard.
+    """
+    return {
+        "api_version": API_VERSION,
+        "version": INTEGRATION_VERSION,
+        **payload,
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -171,10 +182,22 @@ async def ws_get_config(hass, connection, msg, runtime) -> None:
         msg["id"],
         _envelope(
             {
-                "entities": [eintrag.to_dict() for eintrag in config.entities.values()],
+                "entities": [
+                    {
+                        **eintrag.to_dict(),
+                        **runtime.discovery.entity_placement(eintrag.entity_id),
+                    }
+                    for eintrag in config.entities.values()
+                ],
                 "rules": [regel.to_dict() for regel in config.rules.values()],
                 "groups": [gruppe.to_dict() for gruppe in config.groups.values()],
-                "settings": config.settings.to_dict(),
+                "settings": {
+                    **config.settings.to_dict(),
+                    # Wer bereits Entities ueberwacht, hat die Einrichtung
+                    # hinter sich, auch wenn der Assistent nie bestaetigt
+                    # wurde. Ihn erneut zu zeigen waere nur laestig.
+                    "setup_completed": (config.settings.setup_completed or bool(config.entities)),
+                },
                 "options": {
                     "retention_days": list(RETENTION_DAYS_OPTIONS),
                     "max_events": list(MAX_EVENTS_OPTIONS),
