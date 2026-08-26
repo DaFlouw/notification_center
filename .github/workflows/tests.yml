@@ -62,7 +62,7 @@ jobs:
           fi
 
   frontend:
-    name: Frontend-Syntax
+    name: Frontend
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -94,6 +94,9 @@ jobs:
             fi
           done < <(find custom_components/notification_center/frontend -name '*.js')
           exit $fehler
+
+      - name: Darstellungstests
+        run: node --test tests/frontend/
 
   hassfest:
     name: Hassfest
