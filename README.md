@@ -246,6 +246,21 @@ GitHub-API nur mit Admin-Rechten abrufbar, Annotationen dagegen frei lesbar.
 Das Frontend ist buildfrei; die CI prueft lediglich, ob die ausgelieferten
 ES-Module parsen.
 
+## Icon
+
+Das Logo liegt als `icon.png` im Wurzelverzeichnis und wird oben in dieser
+Datei angezeigt.
+
+In der Home-Assistant-Oberflaeche erscheint es damit **nicht**: das Logo einer
+Integration laedt das Frontend von `brands.home-assistant.io`. Eine Datei im
+Integrationsordner wird dafuer nicht ausgewertet. Wer das Logo dort sehen
+will, reicht es per Pull Request bei
+[home-assistant/brands](https://github.com/home-assistant/brands) ein.
+
+Was innerhalb von Home Assistant wirkt, sind mdi-Icons: das Symbol in der
+Seitenleiste (`mdi:bell-ring-outline`) sowie die Icons der Zaehler-Entities
+und Services aus `icons.json`.
+
 ## Lizenz
 
 MIT, siehe [LICENSE](LICENSE).

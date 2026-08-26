@@ -1,0 +1,16 @@
+{
+  "entity": {
+    "sensor": {
+      "info_count": { "default": "mdi:information-outline" },
+      "warning_count": { "default": "mdi:alert-outline" },
+      "alarm_count": { "default": "mdi:alert-octagon-outline" },
+      "active_count": { "default": "mdi:bell-ring-outline" },
+      "events_today": { "default": "mdi:calendar-today-outline" }
+    }
+  },
+  "services": {
+    "create": { "service": "mdi:bell-plus-outline" },
+    "update": { "service": "mdi:bell-cog-outline" },
+    "dismiss": { "service": "mdi:bell-off-outline" }
+  }
+}
