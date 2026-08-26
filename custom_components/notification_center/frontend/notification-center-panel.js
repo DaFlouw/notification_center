@@ -19,6 +19,7 @@ import {
   leereRegel,
   renderRuleOverview,
   renderRules,
+  uebersichtAusKonfiguration,
 } from "./views/rules.js";
 
 const SEITEN = [
@@ -176,12 +177,7 @@ class NotificationCenterPanel extends HTMLElement {
 
     try {
       const konfiguration = await api.getConfig(this.#hass);
-      this.#ruleOverview.rules = konfiguration.rules;
-      this.#ruleOverview.entities = konfiguration.entities.map((eintrag) => ({
-        entity_id: eintrag.entity_id,
-        name: this.#hass?.states?.[eintrag.entity_id]?.attributes?.friendly_name
-          || eintrag.entity_id,
-      }));
+      this.#ruleOverview = uebersichtAusKonfiguration(konfiguration);
       this.#fehler = null;
     } catch (fehler) {
       this.#fehler = fehler.message || String(fehler);
