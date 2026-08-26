@@ -66,7 +66,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: "22"
       # Das Panel ist buildfrei; geprueft wird deshalb nur, ob die
@@ -95,8 +95,9 @@ jobs:
           done < <(find custom_components/notification_center/frontend -name '*.js')
           exit $fehler
 
+      # Die Dateien einzeln benennen: node --test nimmt kein Verzeichnis.
       - name: Darstellungstests
-        run: node --test tests/frontend/
+        run: node --test tests/frontend/*.test.js
 
   hassfest:
     name: Hassfest

@@ -273,7 +273,7 @@ Das Frontend ist buildfrei. Die reinen Darstellungsfunktionen werden mit dem
 Testlaeufer von Node geprueft, ohne Browser und ohne Abhaengigkeiten:
 
 ```bash
-node --test tests/frontend/
+node --test tests/frontend/*.test.js
 ```
 
 Zusaetzlich prueft die CI, ob alle ausgelieferten ES-Module parsen und ob die
