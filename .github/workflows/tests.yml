@@ -71,6 +71,16 @@ jobs:
           node-version: "22"
       # Das Panel ist buildfrei; geprueft wird deshalb nur, ob die
       # ausgelieferten Module ueberhaupt parsen.
+      - name: Modulversion gegen das Manifest pruefen
+        run: |
+          manifest=$(python3 -c "import json; print(json.load(open('custom_components/notification_center/manifest.json'))['version'])")
+          modul=$(grep -oP 'MODULE_VERSION = "\K[^"]+' custom_components/notification_center/frontend/api.js)
+          if [ "$manifest" != "$modul" ]; then
+            echo "::error file=custom_components/notification_center/frontend/api.js::MODULE_VERSION $modul passt nicht zur Manifest-Version $manifest"
+            exit 1
+          fi
+          echo "Modulversion stimmt: $modul"
+
       - name: ES-Module pruefen
         run: |
           mkdir -p /tmp/jscheck
