@@ -14,7 +14,7 @@ keine externen Datenquellen, keine Cloud, keine externe Datenbank.
 
 ## Status
 
-Aktuelle Version: `1.0.3`. Alle zehn Entwicklungsphasen sind abgeschlossen.
+Aktuelle Version: `1.0.4`. Alle zehn Entwicklungsphasen sind abgeschlossen.
 
 | Phase | Inhalt | Status |
 |-------|--------|--------|
@@ -34,7 +34,8 @@ Aktuelle Version: `1.0.3`. Alle zehn Entwicklungsphasen sind abgeschlossen.
 Voraussetzung ist Home Assistant 2026.8 oder neuer.
 
 **Ueber HACS**: Repository als benutzerdefiniertes Repository der Kategorie
-*Integration* hinzufuegen, installieren, Home Assistant neu starten.
+*Integration* hinzufuegen, installieren, Home Assistant neu starten. HACS
+folgt den GitHub-Releases; jeder Versions-Tag erzeugt automatisch eines.
 
 **Manuell**: den Ordner `custom_components/notification_center` nach
 `<config>/custom_components/` kopieren und Home Assistant neu starten.

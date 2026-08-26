@@ -1,0 +1,39 @@
+name: Release
+
+# HACS zeigt eine Versionsnummer nur, wenn es GitHub-Releases gibt. Ohne sie
+# faellt es auf den Commit-Hash des Standardzweigs zurueck und meldet auch
+# keine Aktualisierungen. Tags allein genuegen dafuer nicht.
+on:
+  push:
+    tags: ["v*"]
+
+jobs:
+  release:
+    name: Release veroeffentlichen
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Version gegen das Manifest pruefen
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          manifest=$(python3 -c "import json; print(json.load(open('custom_components/notification_center/manifest.json'))['version'])")
+          if [ "$tag" != "$manifest" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME passt nicht zur Manifest-Version $manifest"
+            exit 1
+          fi
+          echo "Tag und Manifest stimmen ueberein: $manifest"
+
+      - name: Release anlegen
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            --title "$GITHUB_REF_NAME" \
+            --generate-notes \
+            --verify-tag
