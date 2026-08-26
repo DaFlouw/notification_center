@@ -14,7 +14,7 @@ keine externen Datenquellen, keine Cloud, keine externe Datenbank.
 
 ## Status
 
-Aktuelle Version: `1.0.2`. Alle zehn Entwicklungsphasen sind abgeschlossen.
+Aktuelle Version: `1.0.3`. Alle zehn Entwicklungsphasen sind abgeschlossen.
 
 | Phase | Inhalt | Status |
 |-------|--------|--------|
@@ -260,9 +260,8 @@ dafuer nicht noetig.
 deckt es auch `logo.png`, `icon@2x.png` und die dunklen Varianten ab.
 Zusaetzlich liegt `icon@2x.png` mit 512 Pixeln bei.
 
-Davon unabhaengig beschreibt `icons.json` die mdi-Icons der Zaehler-Entities
-und der Services; das Symbol in der Seitenleiste ist
-`mdi:bell-ring-outline`.
+Das Symbol in der Seitenleiste ist davon unabhaengig: dort erlaubt Home
+Assistant nur mdi-Icons, hier `mdi:bell-ring-outline`.
 
 ## Lizenz
 
