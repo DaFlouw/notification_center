@@ -9,7 +9,7 @@
  * faellt im Backend (Spezifikation 50).
  */
 
-import { FRONTEND_VERSION, api, versionsKonflikt } from "./api.js";
+import { MODULE_VERSION, api, backendZuAlt, versionsKonflikt } from "./api.js";
 import { adoptStyles } from "./styles.js";
 import { renderDashboard } from "./views/dashboard.js";
 import { LEERER_FILTER, buildQuery, renderHistory } from "./views/history.js";
@@ -45,6 +45,7 @@ class NotificationCenterPanel extends HTMLElement {
   #rules = { entityId: null, entityName: "", rules: [], entwurf: null, states: [], attributes: [] };
   #ruleOverview = { entities: [], rules: [], loading: false };
   #setupErledigt = true;
+  #backendZuAlt = false;
   #fehler = null;
 
   constructor() {
@@ -102,6 +103,7 @@ class NotificationCenterPanel extends HTMLElement {
       // Der Einrichtungsassistent ist uebersprungbar und erscheint nur
       // einmal (Spezifikation 67).
       const konfiguration = await api.getConfig(this.#hass);
+      this.#backendZuAlt = backendZuAlt(konfiguration);
       this.#setupErledigt =
         Boolean(konfiguration.settings.setup_completed) ||
         (konfiguration.entities || []).length > 0;
@@ -359,9 +361,15 @@ class NotificationCenterPanel extends HTMLElement {
       }
 
       if (aktion === "edit-rule") {
+        // Aus der Uebersicht heraus sind die Regeln der Entity noch nicht
+        // geladen; ohne das faende der Editor nichts zu bearbeiten.
+        if (daten.entity && this.#rules.entityId !== daten.entity) {
+          await this.#ladeRegeln(daten.entity, daten.name);
+        }
         const regel = this.#rules.rules.find((eintrag) => eintrag.rule_id === daten.rule);
         if (regel) {
           this.#rules.entwurf = { ...regel };
+          this.#seite = "rule-editor";
           this.#render();
         }
         return;
@@ -389,7 +397,8 @@ class NotificationCenterPanel extends HTMLElement {
       if (aktion === "delete-rule") {
         if (!confirm("Regel löschen? Eine laufende Meldung dazu endet sofort.")) return;
         await api.deleteRule(this.#hass, daten.rule);
-        await this.#ladeRegeln(this.#rules.entityId);
+        if (this.#seite === "rules") await this.#ladeRegeluebersicht();
+        else await this.#ladeRegeln(this.#rules.entityId);
         return;
       }
 
@@ -526,13 +535,7 @@ class NotificationCenterPanel extends HTMLElement {
         ).join("")}
       </nav>
       <main>
-        ${
-          versionsKonflikt.erkannt
-            ? `<div class="error">Diese Seite stammt aus Version
-                 ${FRONTEND_VERSION}, das Notification Center läuft in Version
-                 ${versionsKonflikt.backend}. Bitte die Seite neu laden.</div>`
-            : ""
-        }
+        ${this.#versionshinweis()}
         ${this.#fehler ? `<div class="error">${this.#fehler}</div>` : ""}
         ${this.#inhalt(locale)}
       </main>
@@ -577,6 +580,23 @@ class NotificationCenterPanel extends HTMLElement {
         // Nicht jedes Eingabefeld erlaubt eine Schreibmarke.
       }
     }
+  }
+
+  #versionshinweis() {
+    if (this.#backendZuAlt) {
+      return `<div class="error">
+        Die Dateien stammen aus Version ${MODULE_VERSION}, Home Assistant führt
+        aber noch einen älteren Stand aus. Bitte Home Assistant neu starten.
+      </div>`;
+    }
+    if (versionsKonflikt.erkannt) {
+      return `<div class="error">
+        Diese Seite stammt aus Version ${versionsKonflikt.frontend}, das
+        Notification Center läuft in Version ${versionsKonflikt.backend}.
+        Bitte Home Assistant neu starten und die Seite neu laden.
+      </div>`;
+    }
+    return "";
   }
 
   #inhalt(locale) {

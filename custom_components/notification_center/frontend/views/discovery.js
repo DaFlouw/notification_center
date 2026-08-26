@@ -91,14 +91,16 @@ function entityZeile(eintrag, vorschlaege) {
 
 function vorschlagsBlock(entityId, vorschlaege) {
   if (!vorschlaege.length) {
-    return `<div class="entity-meta" style="padding: 0 0 12px">
-      Keine belastbaren Vorschläge. Eine eigene Regel ist trotzdem möglich:
-      Entity übernehmen und dann unter Regeln anlegen.
+    return `<div class="suggestions">
+      <div class="entity-meta">
+        Keine belastbaren Vorschläge. Eine eigene Regel ist trotzdem möglich:
+        Entity übernehmen und dann unter Regeln anlegen.
+      </div>
     </div>`;
   }
 
   return `
-    <div style="padding: 0 0 12px">
+    <div class="suggestions">
       <div class="entity-meta">${vorschlaege.length} ${
         vorschlaege.length === 1 ? "Vorschlag" : "Vorschläge"
       }</div>

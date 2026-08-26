@@ -14,7 +14,7 @@ keine externen Datenquellen, keine Cloud, keine externe Datenbank.
 
 ## Status
 
-Aktuelle Version: `1.0.5`. Alle zehn Entwicklungsphasen sind abgeschlossen.
+Aktuelle Version: `1.1.0`. Alle zehn Entwicklungsphasen sind abgeschlossen.
 
 | Phase | Inhalt | Status |
 |-------|--------|--------|
@@ -148,9 +148,33 @@ aktualisiert.
 
 ```yaml
 type: custom:notification-center-card
-mode: list       # list | counts
-title: Meldungen # optional
-max: 5           # nur bei mode: list
+mode: list             # list | counts, Vorgabe list
+title: Meldungen       # optional
+max: 10                # optional, hoechstens so viele je Kategorie
+show_events_today: true
+```
+
+Sie zeigt dasselbe wie das Dashboard im Panel: aktive Meldungen nach Alarmen,
+Warnungen und Infos gruppiert, je mit Meldung und Ausloeseuhrzeit.
+
+Das Aussehen laesst sich ueber CSS-Variablen anpassen, im Theme oder per
+`card_mod`; alle Bausteine tragen zusaetzlich einen `part`-Namen fuer
+`::part()`.
+
+```yaml
+--notification-center-alarm-color
+--notification-center-warning-color
+--notification-center-info-color
+--notification-center-heading-color
+--notification-center-heading-size
+--notification-center-message-size
+--notification-center-time-color
+--notification-center-time-size
+--notification-center-row-gap
+--notification-center-row-padding
+--notification-center-bar-width
+--notification-center-card-padding
+--notification-center-divider
 ```
 
 Die Card kommt mit der Integration. Sie traegt sich selbst in die

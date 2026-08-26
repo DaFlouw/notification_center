@@ -12,6 +12,18 @@ const PREFIX = "notification_center";
 export const EXPECTED_API_VERSION = 1;
 
 /**
+ * Die Version, aus der diese Dateien stammen.
+ *
+ * Sie steht hier fest im Code, nicht im Pfad: der Pfad wird vom laufenden
+ * Backend gebildet. Nach einer Aktualisierung ueber HACS liegen die neuen
+ * Dateien schon auf der Platte, waehrend Home Assistant noch den alten
+ * Python-Stand ausfuehrt und den alten Pfad vergibt. Nur eine im Modul selbst
+ * hinterlegte Version deckt diesen Fall auf. Die CI prueft, dass sie zum
+ * Manifest passt.
+ */
+export const MODULE_VERSION = "1.1.0";
+
+/**
  * Die Version dieses Frontends, abgelesen am eigenen Pfad.
  *
  * Die Dateien werden unter `/notification_center_frontend/<version>/`
@@ -24,7 +36,15 @@ export const FRONTEND_VERSION = (() => {
 })();
 
 /** Wird gesetzt, sobald Backend und Frontend auseinanderlaufen. */
-export const versionsKonflikt = { erkannt: false, backend: null };
+export const versionsKonflikt = { erkannt: false, backend: null, frontend: null };
+
+/**
+ * Ein Backend ohne Versionsangabe stammt aus einer Fassung vor 1.0.5. Dann
+ * laeuft Home Assistant noch mit altem Code, obwohl neue Dateien vorliegen.
+ */
+export function backendZuAlt(result) {
+  return Boolean(result) && !result.version;
+}
 
 /** Ruft ein Kommando auf und prueft dabei die API-Version. */
 async function call(hass, type, payload = {}) {
@@ -47,11 +67,15 @@ function checkVersion(result) {
     );
   }
 
-  // Ein aus dem Zwischenspeicher geladenes Frontend wuerde sonst still
-  // Falsches anzeigen. Sichtbar melden ist besser als leer bleiben.
-  if (result.version && FRONTEND_VERSION && result.version !== FRONTEND_VERSION) {
+  // Zwei Faelle laufen hier zusammen, beide wuerden sonst still Falsches
+  // anzeigen: ein aus dem Zwischenspeicher geladenes Frontend, und neue
+  // Dateien bei noch altem Backend, weil Home Assistant nicht neu gestartet
+  // wurde. Sichtbar melden ist besser als leer bleiben.
+  const eigene = FRONTEND_VERSION || MODULE_VERSION;
+  if (result.version && result.version !== MODULE_VERSION) {
     versionsKonflikt.erkannt = true;
     versionsKonflikt.backend = result.version;
+    versionsKonflikt.frontend = eigene;
   }
 }
 

@@ -172,7 +172,6 @@ def meta(**kwargs: object) -> EntityMetadata:
 
 def test_rauchmelder_wird_zum_alarm() -> None:
     vorschlaege = build_suggestions(meta(device_class="smoke", name="Rauchmelder Flur"))
-    assert len(vorschlaege) == 1
     assert vorschlaege[0].type is NotificationType.ALARM
     assert vorschlaege[0].confidence is Confidence.HIGH
     assert vorschlaege[0].states == ("on",)
@@ -181,7 +180,6 @@ def test_rauchmelder_wird_zum_alarm() -> None:
 def test_fenster_bekommt_eine_zeitbedingung() -> None:
     """Spezifikation 17: nicht jede geoeffnete Tuer ist sofort meldenswert."""
     vorschlaege = build_suggestions(meta(device_class="window"))
-    assert len(vorschlaege) == 1
     assert vorschlaege[0].duration_seconds == 900
     assert vorschlaege[0].type is NotificationType.WARNING
     assert "15 Minuten" in vorschlaege[0].title
@@ -192,9 +190,40 @@ def test_stoerung_wird_zur_warnung() -> None:
     assert vorschlaege[0].type is NotificationType.WARNING
 
 
-def test_unbekannter_binaersensor_ergibt_keinen_vorschlag() -> None:
-    """Spezifikation 12 und 79."""
+def test_unbekannter_binaersensor_bekommt_an_und_aus() -> None:
+    """Issue 1: fuer Binaersensoren sind an und aus immer gueltige Regeln.
+
+    Ohne sie stuende man vor einer leeren Liste, obwohl die beiden sinnvollen
+    Regeln auf der Hand liegen.
+    """
     vorschlaege = build_suggestions(meta(entity_id="binary_sensor.irgendwas", name="Irgendwas"))
+
+    assert [v.states for v in vorschlaege] == [("on",), ("off",)]
+    assert all(v.confidence is Confidence.MEDIUM for v in vorschlaege)
+
+
+def test_schalter_bekommt_an_und_aus() -> None:
+    """Issue 1: dasselbe gilt fuer Schalter."""
+    vorschlaege = build_suggestions(
+        EntityMetadata(entity_id="switch.pumpe", domain="switch", name="Pumpe")
+    )
+    assert len(vorschlaege) == 2
+    assert vorschlaege[0].title == "Information, wenn Pumpe an ist"
+
+
+def test_an_und_aus_stehen_hinter_den_klassenbezogenen() -> None:
+    """Was die Geraeteklasse hergibt, wiegt schwerer als der blosse Zustand."""
+    vorschlaege = build_suggestions(meta(device_class="smoke", name="Rauchmelder"))
+
+    assert vorschlaege[0].key == "smoke_state"
+    assert [v.key for v in vorschlaege[1:]] == ["on_off_on", "on_off_off"]
+
+
+def test_sensoren_bekommen_keine_an_aus_vorschlaege() -> None:
+    """Ein Messwert kennt kein an und aus."""
+    vorschlaege = build_suggestions(
+        EntityMetadata(entity_id="sensor.temperatur", domain="sensor", name="Temperatur")
+    )
     assert vorschlaege == []
 
 
@@ -210,9 +239,10 @@ def test_nur_der_name_ergibt_geringe_sicherheit() -> None:
     vorschlaege = build_suggestions(
         meta(entity_id="binary_sensor.wasser_keller", name="Wasser Keller")
     )
-    assert len(vorschlaege) == 1
-    assert vorschlaege[0].confidence is Confidence.LOW
-    assert vorschlaege[0].confidence.is_uncertain is True
+    aus_dem_namen = next(v for v in vorschlaege if v.key == "moisture_state")
+
+    assert aus_dem_namen.confidence is Confidence.LOW
+    assert aus_dem_namen.confidence.is_uncertain is True
 
 
 def test_geraeteklasse_schlaegt_irrefuehrenden_namen() -> None:

@@ -184,6 +184,13 @@ _NAME_HINTS = {
 #: Vorgabe fuer Oeffnungen: 15 Minuten, wie im Beispiel der Spezifikation.
 DEFAULT_OPENING_DURATION = 900.0
 
+#: Domaenen, deren Zustandsraum aus genau zwei Werten besteht.
+#:
+#: Fuer sie laesst sich immer eine gueltige Regel bilden, auch ohne
+#: device_class: dass die Entity an oder aus sein kann, steht fest. Ob es
+#: meldenswert ist, weiss nur der Anwender, deshalb mittlere Sicherheit.
+_ON_OFF_DOMAINS = frozenset({"binary_sensor", "switch", "input_boolean"})
+
 
 def build_suggestions(
     metadata: EntityMetadata,
@@ -202,8 +209,9 @@ def build_suggestions(
 
     vorschlaege: list[Suggestion] = []
 
-    if metadata.domain == "binary_sensor":
+    if metadata.domain in _ON_OFF_DOMAINS:
         vorschlaege.extend(_binary_suggestions(metadata, device_class, aus_namen))
+        vorschlaege.extend(_on_off_suggestions(metadata))
     elif metadata.is_numeric or (aus_namen and device_class in _ABSOLUTE_THRESHOLDS):
         vorschlaege.extend(
             _numeric_suggestions(metadata, device_class, aus_namen, numeric_profile, analysis_days)
@@ -261,6 +269,33 @@ def _binary_suggestions(
         ]
 
     return []
+
+
+def _on_off_suggestions(metadata: EntityMetadata) -> list[Suggestion]:
+    """Die immer gueltigen Vorschlaege fuer an und aus.
+
+    Ohne sie stehen Anwender bei einem Schalter oder einem Binaersensor ohne
+    Geraeteklasse vor einer leeren Liste, obwohl die beiden sinnvollen Regeln
+    auf der Hand liegen.
+    """
+    name = metadata.display_name
+
+    return [
+        Suggestion(
+            key=f"on_off_{zustand}",
+            title=f"Information, wenn {name} {beschriftung} ist",
+            confidence=Confidence.MEDIUM,
+            kind=ConditionKind.STATE_IS,
+            type=NotificationType.INFO,
+            states=(zustand,),
+            message_template=f"{{name}}: {beschriftung}",
+            reasons=(
+                Reason("Domaene", metadata.domain),
+                Reason("Grundlage", "der Zustandsraum dieser Domaene steht fest"),
+            ),
+        )
+        for zustand, beschriftung in (("on", "an"), ("off", "aus"))
+    ]
 
 
 def _zustandsvorschlag(

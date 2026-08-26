@@ -210,7 +210,7 @@ async def test_vorschlaege_enthalten_begruendungen(
     antwort = await sende(client, "get_suggestions", entity_id=FENSTER)
 
     vorschlaege = antwort["result"]["suggestions"]
-    assert len(vorschlaege) == 1
+    assert vorschlaege
     assert vorschlaege[0]["reasons"]
     assert antwort["result"]["states"] == ["on", "off"]
 
@@ -571,7 +571,7 @@ async def test_unsichere_vorschlaege_kommen_nicht_ueber_die_api(
 
     client = await hass_ws_client(hass)
     ohne = await sende(client, "get_suggestions", entity_id="binary_sensor.wasser_keller")
-    assert ohne["result"]["suggestions"] == []
+    assert all(not v["uncertain"] for v in ohne["result"]["suggestions"])
 
     mit = await sende(
         client,
@@ -579,7 +579,7 @@ async def test_unsichere_vorschlaege_kommen_nicht_ueber_die_api(
         entity_id="binary_sensor.wasser_keller",
         include_uncertain=True,
     )
-    assert len(mit["result"]["suggestions"]) == 1
+    assert any(v["uncertain"] for v in mit["result"]["suggestions"])
 
 
 async def test_card_ist_als_lovelace_ressource_eingetragen(hass: HomeAssistant, runtime) -> None:

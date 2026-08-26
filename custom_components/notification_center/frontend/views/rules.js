@@ -77,13 +77,20 @@ export function renderRuleOverview(state) {
         .sort(nachNamen)
         .map(
           ([raum, eintraege]) => `
-            <h3>${escapeHtml(raum)}</h3>
-            ${eintraege.map((paar) => entityBlock(paar, platzierung)).join("")}
+            <div class="rule-room">
+              <h3>${escapeHtml(raum)}</h3>
+              ${eintraege.map((paar) => entityBlock(paar, platzierung)).join("")}
+            </div>
           `
         )
         .join("");
 
-      return `<h2>${escapeHtml(geschoss)}</h2>${inhalt}`;
+      return `
+        <section class="rule-floor">
+          <h2>${escapeHtml(geschoss)}</h2>
+          ${inhalt}
+        </section>
+      `;
     });
 
   return `
@@ -126,13 +133,12 @@ function gruppiere(rules, platzierung) {
 function entityBlock([entityId, eintraege], platzierung) {
   const name = platzierung.get(entityId)?.name || entityId;
 
+  // Kein eigener Bearbeiten-Knopf: jede Regelzeile hat bereits einen, und
+  // zwei nebeneinander waren nur verwirrend.
   return `
-    <div style="margin-bottom: 12px">
-      <div class="entity-meta">${escapeHtml(name)}</div>
-      <ul>${eintraege.map(regelZeile).join("")}</ul>
-      <button class="link" data-action="show-rules"
-              data-entity="${escapeHtml(entityId)}"
-              data-name="${escapeHtml(name)}">Bearbeiten →</button>
+    <div class="rule-entity">
+      <div class="rule-entity-name">${escapeHtml(name)}</div>
+      <ul>${eintraege.map((regel) => regelZeile(regel, entityId, name)).join("")}</ul>
     </div>
   `;
 }
@@ -155,7 +161,9 @@ export function renderRules(state) {
 
     ${
       rules.length
-        ? `<ul>${rules.map(regelZeile).join("")}</ul>`
+        ? `<ul>${rules
+            .map((regel) => regelZeile(regel, entityId, entityName))
+            .join("")}</ul>`
         : '<div class="entity-meta" style="padding: 8px 0">Noch keine Regeln.</div>'
     }
 
@@ -171,14 +179,21 @@ export function renderRules(state) {
   `;
 }
 
-function regelZeile(regel) {
+function regelZeile(regel, entityId = regel.entity_id, entityName = "") {
+  // Entity und Name wandern mit: nur so kann der Editor auch aus der
+  // Uebersicht heraus die richtigen Regeln laden.
+  const ziel =
+    `data-rule="${escapeHtml(regel.rule_id)}" ` +
+    `data-entity="${escapeHtml(entityId || "")}" ` +
+    `data-name="${escapeHtml(entityName)}"`;
+
   return `
     <li class="row">
       <span class="bar ${regel.type}"></span>
       <span class="message">${escapeHtml(beschreibung(regel))}</span>
       ${regel.enabled === false ? '<span class="badge">deaktiviert</span>' : ""}
-      <button class="link" data-action="edit-rule" data-rule="${escapeHtml(regel.rule_id)}">Bearbeiten</button>
-      <button class="link" data-action="delete-rule" data-rule="${escapeHtml(regel.rule_id)}">Löschen</button>
+      <button class="link" data-action="edit-rule" ${ziel}>Bearbeiten</button>
+      <button class="link" data-action="delete-rule" ${ziel}>Löschen</button>
     </li>
   `;
 }

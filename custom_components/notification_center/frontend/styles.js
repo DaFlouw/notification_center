@@ -201,9 +201,38 @@ sheet.replaceSync(`
   details dt { color: var(--nc-muted); }
   details dd { margin: 0; }
 
-  .suggestion { padding: 10px 0; border-bottom: 1px solid var(--nc-border); }
+  /* Vorschlaege deutlich von der Trefferliste absetzen: eingerueckt, mit
+     eigener Flaeche und Randlinie, damit sie nicht als weitere
+     Listeneintraege gelesen werden. */
+  .suggestions {
+    margin: 4px 0 20px 24px;
+    padding: 8px 0 8px 16px;
+    border-left: 3px solid var(--primary-color);
+    background: var(--secondary-background-color, transparent);
+    border-radius: 0 4px 4px 0;
+  }
+
+  .suggestion { padding: 10px 12px 10px 0; border-bottom: 1px solid var(--nc-border); }
   .suggestion:last-child { border-bottom: none; }
-  .suggestion-head { display: flex; align-items: baseline; gap: 12px; }
+  .suggestion-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+
+  /* Regeluebersicht: Geschoss, Raum und Entity gestaffelt einruecken. */
+  .rule-floor { margin-bottom: 28px; }
+  .rule-floor h2 { margin-bottom: 4px; }
+
+  .rule-room {
+    margin: 12px 0 12px 12px;
+    padding-left: 12px;
+    border-left: 2px solid var(--nc-border);
+  }
+
+  .rule-entity { margin: 8px 0 12px 12px; }
+  .rule-entity-name {
+    color: var(--nc-muted);
+    font-size: 13px;
+    margin-bottom: 2px;
+    overflow-wrap: anywhere;
+  }
 
   .error { color: var(--nc-alarm); padding: 16px 0; }
   .loading { color: var(--nc-muted); padding: 16px 0; }

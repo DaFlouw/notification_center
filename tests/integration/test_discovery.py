@@ -248,7 +248,6 @@ async def test_vorschlaege_kommen_auch_ohne_historie(hass: HomeAssistant, runtim
     """Metadaten allein tragen bereits einen Vorschlag."""
     vorschlaege = await runtime.discovery.async_get_entity_suggestions(FENSTER)
 
-    assert len(vorschlaege) == 1
     assert vorschlaege[0].duration_seconds == 900
 
 
@@ -270,9 +269,14 @@ async def test_unsichere_vorschlaege_werden_nicht_angeboten(
     await hass.async_block_till_done()
     laufzeit = config_entry.runtime_data
 
-    assert (
-        await laufzeit.discovery.async_get_entity_suggestions("binary_sensor.wasser_keller") == []
+    vorschlaege = await laufzeit.discovery.async_get_entity_suggestions(
+        "binary_sensor.wasser_keller"
     )
+
+    # Der aus dem Namen geratene Vorschlag faellt weg; die immer gueltigen
+    # Zustandsvorschlaege an und aus bleiben (Issue 1).
+    assert all(not v.confidence.is_uncertain for v in vorschlaege)
+    assert {v.key for v in vorschlaege} == {"on_off_on", "on_off_off"}
 
 
 async def test_unsichere_vorschlaege_bleiben_erreichbar(
@@ -287,13 +291,12 @@ async def test_unsichere_vorschlaege_bleiben_erreichbar(
     vorschlaege = await laufzeit.discovery.async_get_entity_suggestions(
         "binary_sensor.wasser_keller", include_uncertain=True
     )
-    assert len(vorschlaege) == 1
-    assert vorschlaege[0].confidence.is_uncertain is True
+    assert any(v.confidence.is_uncertain for v in vorschlaege)
 
 
 async def test_sichere_vorschlaege_bleiben(hass: HomeAssistant, runtime) -> None:
     vorschlaege = await runtime.discovery.async_get_entity_suggestions(FENSTER)
-    assert len(vorschlaege) == 1
+    assert vorschlaege[0].confidence.is_uncertain is False
 
 
 # -- Zustandsauswahl (Fehlerticket 5) --------------------------------------
