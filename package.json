@@ -1,0 +1,6 @@
+{
+  "name": "notification-center-frontend-tests",
+  "private": true,
+  "type": "module",
+  "description": "Nur fuer die Tests des buildfreien Frontends. Node liest den Modultyp aus der naechstgelegenen package.json; ohne diese Datei wuerde es die ES-Module als CommonJS lesen. Die Integration selbst braucht sie nicht und liefert sie nicht aus."
+}

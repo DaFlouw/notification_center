@@ -14,7 +14,7 @@ keine externen Datenquellen, keine Cloud, keine externe Datenbank.
 
 ## Status
 
-Aktuelle Version: `1.1.0`. Alle zehn Entwicklungsphasen sind abgeschlossen.
+Aktuelle Version: `1.1.1`. Alle zehn Entwicklungsphasen sind abgeschlossen.
 
 | Phase | Inhalt | Status |
 |-------|--------|--------|
@@ -269,8 +269,17 @@ Schlaegt ein Testlauf in der CI fehl, meldet der Testschritt die
 Zusammenfassung zusaetzlich als Annotationen. Job-Logs sind ueber die
 GitHub-API nur mit Admin-Rechten abrufbar, Annotationen dagegen frei lesbar.
 
-Das Frontend ist buildfrei; die CI prueft lediglich, ob die ausgelieferten
-ES-Module parsen.
+Das Frontend ist buildfrei. Die reinen Darstellungsfunktionen werden mit dem
+Testlaeufer von Node geprueft, ohne Browser und ohne Abhaengigkeiten:
+
+```bash
+node --test tests/frontend/
+```
+
+Zusaetzlich prueft die CI, ob alle ausgelieferten ES-Module parsen und ob die
+in `api.js` hinterlegte Modulversion zum Manifest passt. Panel und Karte
+selbst sind nicht abgedeckt: sie binden Browser-APIs ein, die es in Node nicht
+gibt.
 
 ## Icon
 
