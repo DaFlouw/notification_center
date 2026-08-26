@@ -45,6 +45,24 @@ export function leereRegel(entityId) {
 }
 
 /**
+ * Baut den Zustand der Uebersicht aus der Antwort von get_config.
+ *
+ * Bewusst hier und nicht im Panel: eine Umformung im Panel liesse sich ohne
+ * Browser nicht pruefen. Genau dort ging zuvor die Raumzuordnung verloren,
+ * weil die Entities auf Kennung und Namen zusammengestrichen wurden, waehrend
+ * das Backend laengst Raum und Geschoss mitlieferte.
+ *
+ * Die Eintraege werden deshalb unveraendert durchgereicht.
+ */
+export function uebersichtAusKonfiguration(konfiguration) {
+  return {
+    entities: konfiguration.entities || [],
+    rules: konfiguration.rules || [],
+    loading: false,
+  };
+}
+
+/**
  * Uebersicht aller Regeln, nach Entity gruppiert.
  *
  * Regeln waren zuvor nur ueber die Discovery erreichbar und dort schwer

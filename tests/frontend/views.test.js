@@ -18,7 +18,10 @@ import { describe, it } from "node:test";
 import { escapeHtml, formatDuration, typeLabel } from "../../custom_components/notification_center/frontend/format.js";
 import { renderDashboard } from "../../custom_components/notification_center/frontend/views/dashboard.js";
 import { renderDiscovery } from "../../custom_components/notification_center/frontend/views/discovery.js";
-import { renderRuleOverview } from "../../custom_components/notification_center/frontend/views/rules.js";
+import {
+  renderRuleOverview,
+  uebersichtAusKonfiguration,
+} from "../../custom_components/notification_center/frontend/views/rules.js";
 
 /** Nachgebildet aus einer echten Antwort von get_config. */
 const ENTITIES = [
@@ -118,6 +121,70 @@ describe("Regeluebersicht", () => {
   it("kommt mit fehlender Platzierung zurecht", () => {
     const html = renderRuleOverview({ entities: [], rules: RULES });
     assert.match(html, /Ohne Geschoss/);
+  });
+});
+
+describe("Uebergabe der Konfiguration an die Uebersicht", () => {
+  /**
+   * Genau die Antwort, die get_config aus einer laufenden Instanz liefert.
+   *
+   * Hier lag der Fehler: das Panel strich die Eintraege auf Kennung und Namen
+   * zusammen, sodass Raum und Geschoss verschwanden, bevor sie die
+   * Gruppierung erreichten. Der Test der Darstellung allein hat das nicht
+   * gefangen, weil er die vollstaendigen Objekte direkt eingespeist hat.
+   */
+  const ANTWORT = {
+    api_version: 1,
+    version: "1.1.1",
+    entities: [
+      {
+        entity_id: "light.kueche_arbeitsplatte",
+        added_at: "2026-08-25T18:39:56.890704+00:00",
+        device_id: "dev_knoten_1",
+        area_id: "kueche",
+        name: "Licht Arbeitsplatte",
+        area_name: "Küche",
+        floor_id: "erdgeschoss",
+        floor_name: "Erdgeschoss",
+      },
+      {
+        entity_id: "switch.netzwerkspeicher",
+        added_at: "2026-08-26T10:37:37.726173+00:00",
+        device_id: null,
+        area_id: null,
+        name: "Netzwerkspeicher",
+        area_name: null,
+        floor_id: null,
+        floor_name: null,
+      },
+    ],
+    rules: [
+      { rule_id: "rule_1", entity_id: "light.kueche_arbeitsplatte", kind: "state_is", type: "info", states: ["off"] },
+      { rule_id: "rule_2", entity_id: "switch.netzwerkspeicher", kind: "state_is", type: "info", states: ["on"] },
+    ],
+    settings: {},
+  };
+
+  it("behaelt Raum und Geschoss", () => {
+    const zustand = uebersichtAusKonfiguration(ANTWORT);
+    const erste = zustand.entities[0];
+
+    assert.equal(erste.area_name, "Küche");
+    assert.equal(erste.floor_name, "Erdgeschoss");
+  });
+
+  it("fuehrt bis zur fertigen Gruppierung", () => {
+    const html = renderRuleOverview(uebersichtAusKonfiguration(ANTWORT));
+
+    assert.match(html, /Erdgeschoss/);
+    assert.match(html, /Küche/);
+    assert.match(html, /Ohne Geschoss/);
+  });
+
+  it("kommt mit einer leeren Antwort zurecht", () => {
+    const zustand = uebersichtAusKonfiguration({});
+    assert.deepEqual(zustand.entities, []);
+    assert.deepEqual(zustand.rules, []);
   });
 });
 
