@@ -9,18 +9,48 @@
 
 import { escapeHtml } from "../format.js";
 
-const TYPEN = [
-  { wert: "", text: "Alle Typen" },
-  { wert: "binary_sensor", text: "Binärsensor" },
-  { wert: "sensor", text: "Sensor" },
-  { wert: "cover", text: "Abdeckung" },
-  { wert: "lock", text: "Schloss" },
-  { wert: "climate", text: "Klima" },
-  { wert: "switch", text: "Schalter" },
-  { wert: "light", text: "Licht" },
-  { wert: "device_tracker", text: "Anwesenheit" },
-  { wert: "alarm_control_panel", text: "Alarmanlage" },
-  { wert: "update", text: "Aktualisierung" },
+/**
+ * Die auswaehlbaren Typen, nach Herkunft getrennt.
+ *
+ * Die Liste deckt genau die Domaenen ab, die das Backend zur Ueberwachung
+ * anbietet. Fehlt hier eine, taucht sie zwar unter "Alle Typen" auf, laesst
+ * sich aber nicht gezielt heraussuchen -- so waren die Helfer zuvor gar nicht
+ * und mehrere Geraetetypen nur zufaellig zu finden.
+ */
+const TYP_GRUPPEN = [
+  {
+    titel: "Geräte",
+    typen: [
+      { wert: "binary_sensor", text: "Binärsensor" },
+      { wert: "sensor", text: "Sensor" },
+      { wert: "cover", text: "Abdeckung" },
+      { wert: "lock", text: "Schloss" },
+      { wert: "climate", text: "Klima" },
+      { wert: "water_heater", text: "Warmwasser" },
+      { wert: "switch", text: "Schalter" },
+      { wert: "light", text: "Licht" },
+      { wert: "fan", text: "Lüftung" },
+      { wert: "humidifier", text: "Luftbefeuchter" },
+      { wert: "vacuum", text: "Staubsauger" },
+      { wert: "device_tracker", text: "Anwesenheit" },
+      { wert: "person", text: "Person" },
+      { wert: "alarm_control_panel", text: "Alarmanlage" },
+      { wert: "update", text: "Aktualisierung" },
+    ],
+  },
+  {
+    titel: "Helfer",
+    typen: [
+      { wert: "input_boolean", text: "Schalter" },
+      { wert: "input_number", text: "Zahl" },
+      { wert: "input_select", text: "Auswahl" },
+      { wert: "input_text", text: "Text" },
+      { wert: "input_datetime", text: "Datum und Zeit" },
+      { wert: "counter", text: "Zähler" },
+      { wert: "timer", text: "Timer" },
+      { wert: "schedule", text: "Zeitplan" },
+    ],
+  },
 ];
 
 export function renderDiscovery(state) {
@@ -29,9 +59,20 @@ export function renderDiscovery(state) {
   return `
     <div class="filters">
       <select data-discovery="domain" aria-label="Entity-Typ">
-        ${TYPEN.map(
-          (typ) =>
-            `<option value="${typ.wert}" ${domain === typ.wert ? "selected" : ""}>${typ.text}</option>`
+        <option value="" ${domain === "" ? "selected" : ""}>Alle Typen</option>
+        ${TYP_GRUPPEN.map(
+          (gruppe) => `
+            <optgroup label="${escapeHtml(gruppe.titel)}">
+              ${gruppe.typen
+                .map(
+                  (typ) =>
+                    `<option value="${typ.wert}" ${
+                      domain === typ.wert ? "selected" : ""
+                    }>${typ.text}</option>`
+                )
+                .join("")}
+            </optgroup>
+          `
         ).join("")}
       </select>
       <input type="search" data-discovery="search" placeholder="Name oder Entity-ID"

@@ -29,8 +29,6 @@ const SEITEN = [
   { id: "discovery", titel: "Discovery" },
 ];
 
-const SEITENGROESSE = 50;
-
 /** Wartezeit, bis eine Eingabe als fertig gilt. */
 const ENTPRELLUNG = 500;
 
@@ -134,7 +132,7 @@ class NotificationCenterPanel extends HTMLElement {
       const offset = anhaengen ? this.#history.events.length : 0;
       const antwort = await api.getHistory(
         this.#hass,
-        buildQuery(this.#history.filter, offset, SEITENGROESSE)
+        buildQuery(this.#history.filter, offset)
       );
 
       this.#history.events = anhaengen
@@ -311,6 +309,9 @@ class NotificationCenterPanel extends HTMLElement {
     if (feld === "quelle") filter.sources = wert ? [wert] : [];
     if (feld === "bereich") filter.area_ids = wert ? [wert] : [];
     if (feld === "zeitraum") filter.zeitraum = wert;
+    // Eine andere Seitengroesse beginnt die Liste von vorn: die bereits
+    // geladenen Eintraege passen sonst nicht mehr zum Versatz.
+    if (feld === "umfang") filter.limit = Number(wert);
     this.#ladeHistorie();
   }
 

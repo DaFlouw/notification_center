@@ -378,3 +378,38 @@ def test_ausgeglichene_zustaende_ergeben_keinen_vorschlag() -> None:
         state_profile=profil,
     )
     assert vorschlaege == []
+
+
+# ---------------------------------------------------------------------------
+# Helfer (Issue 4)
+# ---------------------------------------------------------------------------
+
+
+def test_zahlenhelfer_gilt_als_numerisch() -> None:
+    """Ohne Einheit und ohne state_class -- die Domaene genuegt.
+
+    Sonst bekaeme ein Zahlenhelfer Zustandsvorschlaege und damit
+    "Zustand ist 42" statt einer Schwelle angeboten.
+    """
+    assert EntityMetadata(entity_id="input_number.grenze", domain="input_number").is_numeric
+    assert EntityMetadata(entity_id="counter.fehler", domain="counter").is_numeric
+
+
+def test_schalthelfer_bekommt_an_und_aus() -> None:
+    vorschlaege = build_suggestions(
+        EntityMetadata(entity_id="input_boolean.urlaub", domain="input_boolean", name="Urlaub")
+    )
+    assert {vorschlag.kind for vorschlag in vorschlaege} == {ConditionKind.STATE_IS}
+    assert {zustand for vorschlag in vorschlaege for zustand in vorschlag.states} == {"on", "off"}
+
+
+def test_zahlenhelfer_bekommt_keine_zustandsvorschlaege() -> None:
+    """Ohne Historie gibt es fuer eine Zahl nichts vorzuschlagen.
+
+    Wichtig ist, dass kein Zustandsvorschlag entsteht: eine Regel auf den
+    Zahlenwert von gestern waere schlechter als gar keine.
+    """
+    vorschlaege = build_suggestions(
+        EntityMetadata(entity_id="counter.fehlversuche", domain="counter", name="Fehlversuche")
+    )
+    assert all(vorschlag.kind is not ConditionKind.STATE_IS for vorschlag in vorschlaege)

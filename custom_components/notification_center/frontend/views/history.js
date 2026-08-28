@@ -1,13 +1,18 @@
 /**
  * Historie: aktive und abgeschlossene Ereignisse (Spezifikation 58 bis 62).
  *
- * Filtern, Suchen und Blaettern passieren im Backend. Geladen werden 50
- * Eintraege; weitere kommen auf Anforderung. Die Sortierung ist rein
- * chronologisch: aktive Ereignisse werden nicht nach oben geschoben
- * (Spezifikation 34).
+ * Filtern, Suchen und Blaettern passieren im Backend. Wie viele Eintraege eine
+ * Seite umfasst, waehlt der Anwender; weitere kommen auf Anforderung. Die
+ * Sortierung ist rein chronologisch: aktive Ereignisse werden nicht nach oben
+ * geschoben (Spezifikation 34).
  */
 
 import { escapeHtml, eventDuration, formatDateTime, typeLabel } from "../format.js";
+
+/** Waehlbare Seitengroessen. Das Backend laesst bis zu 500 Eintraege zu. */
+export const SEITENGROESSEN = [50, 100, 200];
+
+export const STANDARD_SEITENGROESSE = 100;
 
 export const LEERER_FILTER = {
   types: [],
@@ -15,6 +20,7 @@ export const LEERER_FILTER = {
   area_ids: [],
   search: "",
   zeitraum: "7",
+  limit: STANDARD_SEITENGROESSE,
 };
 
 const ZEITRAEUME = [
@@ -60,6 +66,15 @@ export function renderHistory(state, locale) {
               }>${escapeHtml(bereich.name)}</option>`
           )
           .join("")}
+      </select>
+
+      <select data-filter="umfang" aria-label="Einträge pro Seite">
+        ${SEITENGROESSEN.map(
+          (groesse) =>
+            `<option value="${groesse}" ${
+              seitengroesse(filter) === groesse ? "selected" : ""
+            }>${groesse} pro Seite</option>`
+        ).join("")}
       </select>
 
       <input type="search" data-filter="suche" placeholder="Suchen"
@@ -110,8 +125,18 @@ function zeile(event, locale) {
   `;
 }
 
+/**
+ * Die gewaehlte Seitengroesse, gegen unbekannte Werte abgesichert.
+ *
+ * Ein aus einer aelteren Fassung stammender Filter kennt das Feld noch nicht.
+ */
+export function seitengroesse(filter) {
+  const wert = Number(filter?.limit);
+  return SEITENGROESSEN.includes(wert) ? wert : STANDARD_SEITENGROESSE;
+}
+
 /** Uebersetzt die Filterauswahl in Parameter fuer die Backend-Abfrage. */
-export function buildQuery(filter, offset = 0, limit = 50) {
+export function buildQuery(filter, offset = 0, limit = seitengroesse(filter)) {
   const query = { limit, offset };
 
   if (filter.types.length) query.types = filter.types;

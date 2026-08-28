@@ -180,7 +180,7 @@ export function renderRules(state) {
     ${
       rules.length
         ? `<ul>${rules
-            .map((regel) => regelZeile(regel, entityId, entityName))
+            .map((regel) => regelZeile(regel, entityId, entityName, entwurf?.rule_id))
             .join("")}</ul>`
         : '<div class="entity-meta" style="padding: 8px 0">Noch keine Regeln.</div>'
     }
@@ -197,7 +197,16 @@ export function renderRules(state) {
   `;
 }
 
-function regelZeile(regel, entityId = regel.entity_id, entityName = "") {
+/**
+ * Eine Regel als Listenzeile.
+ *
+ * ``offeneRegel`` ist die Regel, deren Formular gerade unter der Liste steht.
+ * Sie bekommt keinen Bearbeiten-Knopf: er wuerde auf das verweisen, was
+ * ohnehin schon offen ist. Bei einer einzigen Regel war die Schaltflaeche
+ * damit durchgehend sinnlos, bei mehreren fuehrt sie weiterhin von einer
+ * Regel zur naechsten.
+ */
+function regelZeile(regel, entityId = regel.entity_id, entityName = "", offeneRegel = null) {
   // Entity und Name wandern mit: nur so kann der Editor auch aus der
   // Uebersicht heraus die richtigen Regeln laden.
   const ziel =
@@ -205,12 +214,18 @@ function regelZeile(regel, entityId = regel.entity_id, entityName = "") {
     `data-entity="${escapeHtml(entityId || "")}" ` +
     `data-name="${escapeHtml(entityName)}"`;
 
+  const wirdBearbeitet = Boolean(offeneRegel) && regel.rule_id === offeneRegel;
+
   return `
-    <li class="row">
+    <li class="row${wirdBearbeitet ? " editing" : ""}">
       <span class="bar ${regel.type}"></span>
       <span class="message">${escapeHtml(beschreibung(regel))}</span>
       ${regel.enabled === false ? '<span class="badge">deaktiviert</span>' : ""}
-      <button class="link" data-action="edit-rule" ${ziel}>Bearbeiten</button>
+      ${
+        wirdBearbeitet
+          ? '<span class="badge">wird bearbeitet</span>'
+          : `<button class="link" data-action="edit-rule" ${ziel}>Bearbeiten</button>`
+      }
       <button class="link" data-action="delete-rule" ${ziel}>Löschen</button>
     </li>
   `;

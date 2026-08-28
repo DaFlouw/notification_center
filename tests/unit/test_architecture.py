@@ -9,6 +9,7 @@ sie hier geprueft statt nur dokumentiert.
 from __future__ import annotations
 
 import ast
+import re
 from pathlib import Path
 
 import pytest
@@ -60,3 +61,49 @@ def test_alle_gelisteten_module_existieren() -> None:
     """Schuetzt davor, dass die Liste beim Umbenennen still veraltet."""
     fehlend = [name for name in PURE_MODULES if not (_PACKAGE / name).exists()]
     assert not fehlend, f"Nicht mehr vorhandene Module in PURE_MODULES: {fehlend}"
+
+
+def _supported_domains() -> set[str]:
+    """SUPPORTED_DOMAINS aus discovery/engine.py, ohne das Modul zu laden.
+
+    Das Modul importiert Home Assistant und liesse sich hier nicht einfuehren.
+    Der Wert steht aber als Literal im Quelltext und ist ueber den AST lesbar.
+    """
+    pfad = _PACKAGE / "discovery" / "engine.py"
+    tree = ast.parse(pfad.read_text(encoding="utf-8"), filename=str(pfad))
+
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Assign):
+            continue
+        namen = [ziel.id for ziel in node.targets if isinstance(ziel, ast.Name)]
+        if "SUPPORTED_DOMAINS" in namen:
+            return set(ast.literal_eval(node.value))
+
+    raise AssertionError("SUPPORTED_DOMAINS nicht in discovery/engine.py gefunden")
+
+
+def _domains_der_typauswahl() -> set[str]:
+    """Die Domaenen, die das Auswahlfeld der Discovery anbietet."""
+    pfad = _PACKAGE / "frontend" / "views" / "discovery.js"
+    quelle = pfad.read_text(encoding="utf-8")
+
+    anfang = quelle.index("const TYP_GRUPPEN")
+    ende = quelle.index("export function renderDiscovery")
+    return set(re.findall(r'wert:\s*"([^"]+)"', quelle[anfang:ende]))
+
+
+def test_typauswahl_deckt_alle_ueberwachbaren_domaenen_ab() -> None:
+    """Backend und Auswahlfeld muessen dieselben Domaenen kennen.
+
+    Die beiden Listen liegen in verschiedenen Sprachen und sind schon
+    auseinandergelaufen: die Helferdomaenen fehlten im Auswahlfeld vollstaendig,
+    mehrere Geraetetypen ebenfalls. Wer eine Domaene ergaenzt, muss beide
+    Stellen anfassen -- dieser Test sagt es ihm.
+    """
+    backend = _supported_domains()
+    auswahl = _domains_der_typauswahl()
+
+    assert auswahl == backend, (
+        f"Nur im Backend: {sorted(backend - auswahl)}; "
+        f"nur im Auswahlfeld: {sorted(auswahl - backend)}"
+    )

@@ -41,6 +41,15 @@ from .suggestions import Confidence, EntityMetadata, Suggestion, build_suggestio
 _LOGGER = logging.getLogger(__name__)
 
 #: Domains, die als Ueberwachungsgegenstand ueberhaupt sinnvoll sind.
+#:
+#: Die Helferdomaenen stehen bewusst mit in der Liste: Helfer halten oft genau
+#: den Zustand, um den es beim Melden geht -- ein Schalter fuer den
+#: Urlaubsmodus, ein Zaehler fuer Fehlversuche, ein Timer, der ablaufen soll.
+#: Dass sie keine Geraete sind, macht sie nicht weniger meldenswert.
+#:
+#: ``input_button`` fehlt mit Absicht: sein Zustand ist der Zeitpunkt des
+#: letzten Drucks und damit bei jedem Druck ein neuer Wert. Darauf laesst sich
+#: keine Bedingung formulieren, die dauerhaft zutrifft oder wieder abfaellt.
 SUPPORTED_DOMAINS = (
     "binary_sensor",
     "sensor",
@@ -57,6 +66,15 @@ SUPPORTED_DOMAINS = (
     "fan",
     "humidifier",
     "update",
+    # Helfer
+    "input_boolean",
+    "input_number",
+    "input_select",
+    "input_text",
+    "input_datetime",
+    "counter",
+    "timer",
+    "schedule",
 )
 
 #: Attribute, die keine auswertbare Groesse tragen (Spezifikation 16).

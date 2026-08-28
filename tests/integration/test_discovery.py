@@ -330,3 +330,67 @@ async def test_zustandsauswahl_kennt_seltene_zustaende_einer_domaene(
 async def test_zustandsauswahl_ohne_recorder_bleibt_brauchbar(hass: HomeAssistant, runtime) -> None:
     zustaende = await runtime.discovery.async_available_states(FENSTER)
     assert zustaende == ["on", "off"]
+
+
+# -- Helfer (Issue 4) -------------------------------------------------------
+
+
+async def test_discovery_findet_helfer(hass: HomeAssistant, runtime) -> None:
+    """Helfer halten oft genau den Zustand, um den es beim Melden geht.
+
+    Sie fehlten in der Auswahl der Discovery vollstaendig und waren damit
+    nicht ueberwachbar.
+    """
+    helfer = {
+        "input_boolean.urlaubsmodus": ("on", {"friendly_name": "Urlaubsmodus"}),
+        "input_number.warnschwelle": ("18.5", {"friendly_name": "Warnschwelle"}),
+        "input_select.hausmodus": (
+            "Zuhause",
+            {"options": ["Zuhause", "Urlaub"], "friendly_name": "Hausmodus"},
+        ),
+        "counter.fehlversuche": ("0", {"friendly_name": "Fehlversuche"}),
+        "timer.bewaesserung": ("idle", {"friendly_name": "Bewaesserung"}),
+        "schedule.nachtruhe": ("off", {"friendly_name": "Nachtruhe"}),
+        "input_text.notiz": ("Paketbote", {"friendly_name": "Notiz"}),
+        "input_datetime.weckzeit": ("2026-08-28 07:00:00", {"friendly_name": "Weckzeit"}),
+    }
+    for entity_id, (zustand, attribute) in helfer.items():
+        hass.states.async_set(entity_id, zustand, attribute)
+    await hass.async_block_till_done()
+
+    gefunden = {e["entity_id"] for e in runtime.discovery.discover_entities()}
+    assert set(helfer) <= gefunden
+
+
+async def test_discovery_uebergeht_tastenhelfer(hass: HomeAssistant, runtime) -> None:
+    """Ein Tastenhelfer traegt den Zeitpunkt des letzten Drucks.
+
+    Darauf laesst sich keine Bedingung formulieren, die dauerhaft zutrifft
+    oder wieder abfaellt.
+    """
+    hass.states.async_set("input_button.klingel", "2026-08-28T07:00:00+00:00")
+    await hass.async_block_till_done()
+
+    gefunden = {e["entity_id"] for e in runtime.discovery.discover_entities()}
+    assert "input_button.klingel" not in gefunden
+
+
+async def test_zustaende_eines_auswahlhelfers(hass: HomeAssistant, runtime) -> None:
+    hass.states.async_set(
+        "input_select.hausmodus", "Zuhause", {"options": ["Zuhause", "Urlaub", "Gäste"]}
+    )
+    await hass.async_block_till_done()
+
+    assert runtime.discovery.available_states("input_select.hausmodus") == [
+        "Zuhause",
+        "Urlaub",
+        "Gäste",
+    ]
+
+
+async def test_texthelfer_bekommt_keine_auswahl(hass: HomeAssistant, runtime) -> None:
+    """Der Regel-Editor soll hier ein Textfeld zeigen, keine Liste."""
+    hass.states.async_set("input_text.notiz", "Paketbote")
+    await hass.async_block_till_done()
+
+    assert runtime.discovery.available_states("input_text.notiz") == []
