@@ -170,11 +170,42 @@ Stufe 2 ab 50 (Warnung), Stufe 3 ab 60 (Alarm).
 
 **K1 bis K4** lassen sich ueber einen Dashboard-Screenshot pruefen.
 
-**K5 bis K9** brauchen einen angemeldeten Browser: das Panel liegt unter
-`/notification-center` und damit ausserhalb von Lovelace, sodass die
-Screenshot-Werkzeuge es nicht erreichen. Die Darstellungsfunktionen dahinter
-sind durch `tests/frontend/views.test.js` abgedeckt, das Zusammensetzen im
-Browser ist es nicht.
+**K5 bis K9** betreffen das Panel. Es liegt unter `/notification-center` und
+damit ausserhalb von Lovelace; die Screenshot-Werkzeuge fuer Dashboards
+erreichen es nicht, und ein angemeldeter Browser steht nicht immer zur
+Verfuegung.
+
+Dafuer gibt es `tests/panel/` -- einen Pruefstand, der das Panel ohne Home
+Assistant betreibt:
+
+```bash
+python -m http.server 8792
+```
+
+Dann `http://localhost:8792/tests/panel/` oeffnen.
+
+Die Seite laedt **das ausgelieferte Modul** aus
+`custom_components/notification_center/frontend/` und prueft damit immer den
+aktuellen Stand, keine Kopie. An die Stelle der WebSocket-Verbindung tritt ein
+`hass`-Ersatz, der die Kommandos aus `daten.js` beantwortet -- Antworten, die
+wortgleich aus einer laufenden Instanz stammen. Das Panel braucht von Home
+Assistant nur `hass.areas`, `hass.locale` und `hass.connection` und bindet
+keine HA-Elemente ein; deshalb laeuft es eigenstaendig.
+
+Zum Bedienen aus der Konsole:
+
+```js
+__klick('nav button[data-page="rules"]')   // Seite wechseln
+__wurzel()                                  // shadowRoot
+__protokoll                                 // abgesetzte Kommandos samt Parametern
+```
+
+`__protokoll` ist der eigentliche Gewinn: damit laesst sich nicht nur pruefen,
+was angezeigt wird, sondern auch, was das Panel dafuer **abgefragt** hat.
+
+Was der Pruefstand **nicht** abdeckt: die echte WebSocket-Verbindung, das
+Abonnement der Aktualisierungen, die Einbettung in die Seitenleiste und die
+Themes des Anwenders.
 
 ---
 
@@ -194,7 +225,28 @@ Ausgefuehrt gegen die produktive Instanz.
 | H Historie | bestanden |
 | I Einstellungen | bestanden |
 | J Wiederherstellung | bestanden |
-| K Oberflaeche | K1 bis K4 bestanden, K5 bis K9 nicht ausgefuehrt |
+| K Oberflaeche | bestanden |
+
+Zu K im Einzelnen:
+
+* **K5** Dashboard zeigt genau die sieben aktiven Meldungen, nach Alarmen,
+  Warnungen und Infos getrennt, mit Uhrzeit und Dauer; Fusszeile
+  *74 Ereignisse heute*.
+* **K6** Regeln stehen unter *Erdgeschoss* mit den Raeumen Arbeiten, Flur EG,
+  Gaestebad, Kueche, WohnEsszimmer, darunter eingerueckt die Entities.
+  *Ohne Geschoss / Ohne Raum* steht am Ende. Alle zwoelf Regeln sind
+  vorhanden, je mit genau einem Bearbeiten-Knopf.
+* **K7** Beim Bearbeiten einer Regel von *Arbeiten Heizung Raum* traegt deren
+  Zeile *wird bearbeitet* und keinen Knopf mehr, die zweite Regel derselben
+  Entity behaelt ihren. Das Formular ist mit den echten Werten gefuellt.
+* **K8** Auswahl 50 / 100 / 200, vorgewaehlt 100. Die Abfrage ging mit
+  `limit: 100` hinaus; nach dem Umstellen auf 200 mit `limit: 200, offset: 0`.
+* **K9** Die Typauswahl fuehrt *Alle Typen* sowie die Gruppen *Geraete* (15
+  Domaenen) und *Helfer* (8 Domaenen) -- deckungsgleich mit
+  `SUPPORTED_DOMAINS`.
+
+Ueber den gesamten Durchlauf durch alle vier Seiten gab die Browserkonsole
+nichts aus: keine Fehler, keine Warnungen, kein Versionskonflikt.
 
 Offene Punkte:
 [Issue 6](https://github.com/DaFlouw/notification_center/issues/6),

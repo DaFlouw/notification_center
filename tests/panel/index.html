@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Notification Center — Panel-Pruefstand</title>
+<style>
+  html, body { margin: 0; padding: 0; background: #fff; color: #212121; font-family: Roboto, system-ui, sans-serif; }
+  /* Die Variablen, die Home Assistant sonst stellt. Werte aus dem
+     Standard-Theme, damit das Bild dem echten Panel entspricht. */
+  :root {
+    --primary-color: #03a9f4;
+    --primary-text-color: #212121;
+    --secondary-text-color: #727272;
+    --divider-color: rgba(0,0,0,.12);
+    --card-background-color: #fff;
+    --primary-background-color: #fafafa;
+    --error-color: #db4437;
+    --warning-color: #ffa600;
+    --app-header-background-color: #03a9f4;
+    --app-header-text-color: #fff;
+  }
+</style>
+</head>
+<body>
+<notification-center-panel id="panel"></notification-center-panel>
+
+<script type="module">
+import { GET_CONFIG, GET_ACTIVE, GET_COUNTS, GET_HISTORY, DISCOVER, GET_SUGGESTIONS, AREAS } from "./daten.js";
+import "../../custom_components/notification_center/frontend/notification-center-panel.js";
+
+const PREFIX = "notification_center/";
+
+/** Beantwortet die Kommandos mit den mitgelieferten echten Antworten. */
+const ANTWORTEN = {
+  get_config: GET_CONFIG,
+  get_active: GET_ACTIVE,
+  get_counts: GET_COUNTS,
+  get_history: GET_HISTORY,
+  discover: DISCOVER,
+  get_suggestions: GET_SUGGESTIONS,
+};
+
+const protokoll = [];
+window.__protokoll = protokoll;
+
+const hass = {
+  locale: { language: "de" },
+  areas: AREAS,
+  states: {},
+  connection: {
+    async sendMessagePromise(nachricht) {
+      const kommando = String(nachricht.type).replace(PREFIX, "");
+      protokoll.push({ kommando, nachricht });
+      const antwort = ANTWORTEN[kommando];
+      if (antwort === undefined) {
+        throw new Error(`Pruefstand kennt das Kommando nicht: ${nachricht.type}`);
+      }
+      return antwort;
+    },
+    async subscribeMessage(rueckruf, nachricht) {
+      protokoll.push({ kommando: "subscribe", nachricht });
+      return () => {};
+    },
+  },
+};
+
+const panel = document.getElementById("panel");
+panel.hass = hass;
+
+/** Hilfen, damit sich das Panel von aussen bedienen laesst. */
+window.__panel = panel;
+window.__wurzel = () => panel.shadowRoot;
+window.__klick = (auswahl, index = 0) => {
+  const treffer = panel.shadowRoot.querySelectorAll(auswahl);
+  if (!treffer[index]) return `nicht gefunden: ${auswahl} [${index}]`;
+  treffer[index].click();
+  return `geklickt: ${treffer[index].textContent.trim().slice(0, 40)}`;
+};
+window.__text = () => panel.shadowRoot.textContent.replace(/\s+/g, " ").trim();
+window.__html = () => panel.shadowRoot.innerHTML;
+</script>
+</body>
+</html>
