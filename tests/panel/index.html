@@ -19,29 +19,72 @@
     --app-header-background-color: #03a9f4;
     --app-header-text-color: #fff;
   }
+  #leiste { padding: 8px 12px; border-bottom: 1px solid #ddd; font: 13px/1.6 system-ui; }
+  #leiste button { font: inherit; padding: 4px 12px; cursor: pointer; }
+  #ausgabe { white-space: pre-wrap; font: 12px/1.5 ui-monospace, monospace; padding: 8px 12px; }
 </style>
 </head>
 <body>
+<div id="leiste">
+  <button id="start">Bedienungstests starten</button>
+  <span id="stand"></span>
+</div>
+<div id="ausgabe"></div>
+
 <notification-center-panel id="panel"></notification-center-panel>
 
 <script type="module">
 import { GET_CONFIG, GET_ACTIVE, GET_COUNTS, GET_HISTORY, DISCOVER, GET_SUGGESTIONS, AREAS } from "./daten.js";
 import "../../custom_components/notification_center/frontend/notification-center-panel.js";
+import { lauf } from "./interaktion.js";
 
 const PREFIX = "notification_center/";
 
-/** Beantwortet die Kommandos mit den mitgelieferten echten Antworten. */
+/**
+ * Die Antworten des Pruefstands.
+ *
+ * Lesende Kommandos liefern echte Antworten aus einer laufenden Instanz.
+ * Schreibende liefern nur eine gueltige Huelle: hier geht es darum, **ob und
+ * womit** das Panel sie aufruft. Was das Backend daraus macht, ist in den
+ * Abschnitten A bis J gegen die echte Instanz geprueft.
+ */
 const ANTWORTEN = {
-  get_config: GET_CONFIG,
-  get_active: GET_ACTIVE,
-  get_counts: GET_COUNTS,
-  get_history: GET_HISTORY,
-  discover: DISCOVER,
-  get_suggestions: GET_SUGGESTIONS,
+  get_config: () => GET_CONFIG,
+  get_active: () => GET_ACTIVE,
+  get_counts: () => GET_COUNTS,
+  get_history: () => GET_HISTORY,
+  discover: () => DISCOVER,
+  get_suggestions: () => GET_SUGGESTIONS,
+  save_rule: (n) => ({ api_version: 1, version: "1.1.3", rule: n.rule }),
+  delete_rule: (n) => ({ api_version: 1, version: "1.1.3", deleted: n.rule_id }),
+  add_entities: (n) => ({ api_version: 1, version: "1.1.3", added: n.entity_ids }),
+  remove_entity: (n) => ({ api_version: 1, version: "1.1.3", removed: n.entity_id }),
+  replace_entity: (n) => ({ api_version: 1, version: "1.1.3", replaced: n.old_entity_id }),
+  delete_event: () => ({ api_version: 1, version: "1.1.3", deleted: true }),
+  clear_history: () => ({ api_version: 1, version: "1.1.3", cleared: true }),
+  set_settings: () => ({ api_version: 1, version: "1.1.3", settings: GET_CONFIG.settings }),
 };
 
+/** Jedes abgesetzte Kommando samt Parametern. */
 const protokoll = [];
 window.__protokoll = protokoll;
+
+/** Antworten auf confirm/prompt, von den Testfaellen gesetzt. */
+window.__dialoge = [];
+window.__confirmAntwort = true;
+window.__promptAntwort = null;
+
+window.confirm = (text) => {
+  window.__dialoge.push({ art: "confirm", text });
+  return window.__confirmAntwort;
+};
+window.prompt = (text) => {
+  window.__dialoge.push({ art: "prompt", text });
+  return window.__promptAntwort;
+};
+
+/** Laesst das naechste Kommando scheitern -- fuer die Fehlerbehandlung. */
+window.__naechsterFehler = null;
 
 const hass = {
   locale: { language: "de" },
@@ -51,15 +94,21 @@ const hass = {
     async sendMessagePromise(nachricht) {
       const kommando = String(nachricht.type).replace(PREFIX, "");
       protokoll.push({ kommando, nachricht });
+      if (window.__naechsterFehler) {
+        const meldung = window.__naechsterFehler;
+        window.__naechsterFehler = null;
+        throw new Error(meldung);
+      }
       const antwort = ANTWORTEN[kommando];
       if (antwort === undefined) {
         throw new Error(`Pruefstand kennt das Kommando nicht: ${nachricht.type}`);
       }
-      return antwort;
+      return antwort(nachricht);
     },
     async subscribeMessage(rueckruf, nachricht) {
       protokoll.push({ kommando: "subscribe", nachricht });
-      return () => {};
+      window.__push = rueckruf;
+      return () => protokoll.push({ kommando: "unsubscribe", nachricht: {} });
     },
   },
 };
@@ -67,17 +116,40 @@ const hass = {
 const panel = document.getElementById("panel");
 panel.hass = hass;
 
-/** Hilfen, damit sich das Panel von aussen bedienen laesst. */
+/** Ereignisse, die das Panel nach aussen meldet. */
+window.__ereignisse = [];
+panel.addEventListener("hass-more-info", (e) => {
+  window.__ereignisse.push({ typ: "hass-more-info", detail: e.detail });
+});
+
+/* Bedienhilfen fuer die Konsole und die Testfaelle. */
 window.__panel = panel;
+window.__hass = hass;
 window.__wurzel = () => panel.shadowRoot;
 window.__klick = (auswahl, index = 0) => {
   const treffer = panel.shadowRoot.querySelectorAll(auswahl);
-  if (!treffer[index]) return `nicht gefunden: ${auswahl} [${index}]`;
+  if (!treffer[index]) throw new Error(`nicht gefunden: ${auswahl} [${index}]`);
   treffer[index].click();
-  return `geklickt: ${treffer[index].textContent.trim().slice(0, 40)}`;
+  return treffer[index];
 };
 window.__text = () => panel.shadowRoot.textContent.replace(/\s+/g, " ").trim();
-window.__html = () => panel.shadowRoot.innerHTML;
+
+const ausgabe = document.getElementById("ausgabe");
+const stand = document.getElementById("stand");
+
+window.__lauf = async () => {
+  stand.textContent = " läuft …";
+  const ergebnis = await lauf();
+  window.__ergebnis = ergebnis;
+  const durchgefallen = ergebnis.filter((e) => !e.bestanden);
+  stand.textContent = ` ${ergebnis.length - durchgefallen.length} von ${ergebnis.length} bestanden`;
+  ausgabe.textContent = ergebnis
+    .map((e) => `${e.bestanden ? "✓" : "✗"} ${e.id}  ${e.titel}${e.bestanden ? "" : `\n    ${e.fehler}`}`)
+    .join("\n");
+  return ergebnis;
+};
+
+document.getElementById("start").addEventListener("click", () => window.__lauf());
 </script>
 </body>
 </html>

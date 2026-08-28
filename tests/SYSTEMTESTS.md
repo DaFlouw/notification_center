@@ -207,6 +207,76 @@ Was der Pruefstand **nicht** abdeckt: die echte WebSocket-Verbindung, das
 Abonnement der Aktualisierungen, die Einbettung in die Seitenleiste und die
 Themes des Anwenders.
 
+## L -- Bedienelemente
+
+Schaltflaechen, Filter und Eingabefelder. Geprueft wird beides: was die
+Oberflaeche zeigt **und welches Kommando sie mit welchen Parametern
+abschickt**. Das zweite ist der eigentliche Zweck -- die Naht zwischen
+Bedienung und Backend hat sich als die Stelle erwiesen, an der Fehler
+unbemerkt bleiben.
+
+Die Faelle liegen als ausfuehrbare Suite in `tests/panel/interaktion.js`.
+Server starten, `http://localhost:8792/tests/panel/` oeffnen, *Bedienungstests
+starten*. Sie laufen gegen den Pruefstand, nicht gegen die Anlage: `Alle
+loeschen` und `Entfernen` duerfen dabei folgenlos ausgeloest werden.
+
+| ID | Fall |
+|----|------|
+| L1 | Die vier Reiter wechseln die Seite und markieren den aktiven |
+| L2 | Der Verweis *Historie* im Dashboard fuehrt zur Historie |
+| L3 | *Alle Regeln* fuehrt aus dem Editor zurueck und laedt neu |
+| L4 | Eine Meldung mit Entity oeffnet die Detailansicht |
+| L5 | Jede aktive Meldung im Dashboard ist anklickbar |
+| L6 | Filter Typ schickt `types` mit |
+| L7 | Filter Quelle schickt `sources` mit |
+| L8 | Filter Bereich schickt `area_ids` mit |
+| L9 | Filter Zeitraum setzt `start`, *Alle* laesst es weg |
+| L10 | Filter Seitengroesse setzt `limit` und beginnt von vorn |
+| L11 | Das Suchfeld fragt entprellt und mit `search` ab |
+| L12 | Mehrere Filter wirken gemeinsam |
+| L13 | Die leere Auswahl eines Filters entfernt ihn wieder |
+| L14 | *Weitere laden* blaettert mit dem Versatz der geladenen Menge |
+| L15 | Das Kreuz an einer Zeile loescht genau dieses Ereignis |
+| L16 | Aktive Ereignisse tragen kein Loeschkreuz |
+| L17 | *Alle loeschen* fragt nach und bricht auf Abbruch folgenlos ab |
+| L18 | *Alle loeschen* loescht nach Bestaetigung |
+| L19 | *Bearbeiten* oeffnet den Editor mit genau dieser Regel |
+| L20 | *Loeschen* fragt nach und bricht auf Abbruch folgenlos ab |
+| L21 | *Loeschen* schickt nach Bestaetigung die richtige Regel |
+| L22 | *Regel erstellen* oeffnet ein leeres Formular |
+| L23 | Die Bedingung schaltet zwischen Zustands- und Wertfeldern um |
+| L24 | Die Wertquelle laesst sich auf ein Attribut umstellen |
+| L25 | Vergleich und Schwelle wandern als Zahl in die Regel |
+| L26 | Die Mehrfachauswahl der Zustaende landet als Liste in der Regel |
+| L27 | Der Meldungstext zeichnet nicht neu, damit der Fokus bleibt |
+| L28 | Hysterese und Zeitbedingung; Minuten werden zu Sekunden |
+| L29 | *Speichern* behaelt die Kennung einer bestehenden Regel |
+| L30 | *Abbrechen* schliesst das Formular ohne Kommando |
+| L31 | *Entity ersetzen* fragt nach und bricht ohne Eingabe ab |
+| L32 | *Entity ersetzen* schickt beide Kennungen, ohne Leerzeichen |
+| L33 | Die Typauswahl der Discovery schickt `domain` mit |
+| L34 | Das Suchfeld der Discovery fragt entprellt ab |
+| L35 | *Uebernehmen* meldet genau diese Entity zur Ueberwachung an |
+| L36 | *Entfernen* fragt nach und schickt danach die Entity |
+| L37 | *Vorschlaege* holt sie, derselbe Knopf klappt sie wieder ein |
+| L38 | Ein Vorschlag uebernimmt Entity und Regel in einem Zug |
+| L39 | Die Begruendung eines Vorschlags laesst sich aufklappen |
+| L40 | *Regeln* fuehrt aus der Discovery in den Editor |
+| L41 | Ein Fehler des Backends wird angezeigt, das Panel bleibt bedienbar |
+| L42 | Ohne Einrichtung und ohne Entities erscheint der Assistent |
+| L43 | *Ueberspringen* merkt sich das und fuehrt ins Dashboard (Ticket 9) |
+| L44 | *Einrichtung starten* merkt sich das und fuehrt in die Discovery |
+| L45 | Mit vorhandenen Entities bleibt der Assistent fort |
+| L46 | Die Nutzlasten aus L24 bis L38 werden vom echten Backend angenommen |
+
+**L46 gehoert an die Anlage.** Der Pruefstand zeigt, *was* die Oberflaeche
+abschickt; ob das Backend es annimmt, zeigt nur die laufende Instanz. Die in
+L24 bis L38 aufgezeichneten Nutzlasten werden dafuer unveraendert gegen eine
+eigens angelegte Wegwerf-Entity gesendet.
+
+`clear_history` wird dabei **nicht** gesendet: es loescht die Historie der
+gesamten Installation.
+
 ---
 
 ## Durchlauf vom 28.08.2026, Version 1.1.3
@@ -226,6 +296,7 @@ Ausgefuehrt gegen die produktive Instanz.
 | I Einstellungen | bestanden |
 | J Wiederherstellung | bestanden |
 | K Oberflaeche | bestanden |
+| L Bedienelemente | L46 (`replace_entity`) fehlgeschlagen (Issue 10), uebrige bestanden |
 
 Zu K im Einzelnen:
 
@@ -248,7 +319,23 @@ Zu K im Einzelnen:
 Ueber den gesamten Durchlauf durch alle vier Seiten gab die Browserkonsole
 nichts aus: keine Fehler, keine Warnungen, kein Versionskonflikt.
 
+Zu L: **45 der 46 Faelle bestanden.** L1 bis L45 laufen im Pruefstand, L46
+gegen die Anlage. Dabei nahm das Backend jede aufgezeichnete Nutzlast
+unveraendert an:
+
+* die Regel mit Attribut als Wertquelle, Hysterese und Zeitbedingung, wie sie
+  aus dem Formular entsteht,
+* die Regel aus einem uebernommenen Vorschlag -- sie enthaelt gar kein
+  `value_source` und wird richtig auf den Zustand als Quelle ergaenzt,
+* `set_settings` mit `setup_completed`, wie es der Assistent schickt, ohne die
+  uebrigen Einstellungen anzutasten.
+
+Durchgefallen ist **L46 fuer `replace_entity`**: eine Kennung, die es nicht
+gibt, wird angenommen. Siehe
+[Issue 10](https://github.com/DaFlouw/notification_center/issues/10).
+
 Offene Punkte:
 [Issue 6](https://github.com/DaFlouw/notification_center/issues/6),
 [Issue 7](https://github.com/DaFlouw/notification_center/issues/7),
-[Issue 8](https://github.com/DaFlouw/notification_center/issues/8).
+[Issue 8](https://github.com/DaFlouw/notification_center/issues/8),
+[Issue 10](https://github.com/DaFlouw/notification_center/issues/10).
