@@ -214,3 +214,49 @@ def test_vollstaendiger_eskalationsverlauf(gruppe: RuleGroup) -> None:
         ("start", 2),
         ("stop", 2),
     ]
+
+
+def test_deeskalierte_stufe_beginnt_beim_wechsel_nicht_frueher(gruppe: RuleGroup) -> None:
+    """Issue 8: sonst ueberlappen sich die Eintraege der Historie.
+
+    Bei 33 Grad ist auch die Stufe ab 28 erfuellt, nur verdeckt. Faellt der
+    Wert auf 29, wird sie sichtbar -- sie darf dann nicht den Beginn ihrer
+    verdeckten Bedingung erben, der vor dem Ende der Stufe darueber liegt.
+    """
+    state = GroupState(group_id="group_1")
+    evaluate_group(gruppe, snap("33"), state, T0)
+    spaeter = T0 + timedelta(minutes=1)
+    ergebnis = evaluate_group(gruppe, snap("29", minutes=1), state, spaeter)
+
+    absichten = intents_for_group(gruppe, snap("29", minutes=1), ergebnis)
+
+    assert absichten[1].level == 2
+    assert absichten[1].since is None, (
+        "Die abgeloeste Stufe beginnt jetzt, nicht als ihre Bedingung zu greifen begann"
+    )
+
+
+def test_eskalierte_stufe_behaelt_ihren_eigenen_beginn(gruppe: RuleGroup) -> None:
+    """Beim Hochstufen faellt der Beginn mit dem Stufenwechsel zusammen.
+
+    Er wird gebraucht: nach einem Neustart haelt er fest, wie lange die
+    Bedingung schon anliegt (Spezifikation 37).
+    """
+    state = GroupState(group_id="group_1")
+    evaluate_group(gruppe, snap("26"), state, T0)
+    spaeter = T0 + timedelta(minutes=1)
+    ergebnis = evaluate_group(gruppe, snap("29", minutes=1), state, spaeter)
+
+    absichten = intents_for_group(gruppe, snap("29", minutes=1), ergebnis)
+
+    assert absichten[1].level == 2
+    assert absichten[1].since == spaeter
+
+
+def test_erste_stufe_behaelt_ihren_beginn(gruppe: RuleGroup) -> None:
+    state = GroupState(group_id="group_1")
+    ergebnis = evaluate_group(gruppe, snap("26"), state, T0)
+
+    absichten = intents_for_group(gruppe, snap("26"), ergebnis)
+
+    assert absichten[0].since == T0

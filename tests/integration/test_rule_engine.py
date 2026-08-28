@@ -269,3 +269,91 @@ async def test_ueberwachung_folgt_der_konfiguration(
     await hass.async_block_till_done()
 
     assert aktive(runtime) == 0
+
+
+# -- Neu angelegte Flankenregeln (Issue 7) ---------------------------------
+
+
+def _ereignisse_von(laufzeit: NotificationCenterRuntime, rule_id: str) -> list:
+    return [e for e in laufzeit.notification_engine.active_events() if e.rule_id == rule_id]
+
+
+async def test_neue_flankenregel_meldet_schon_beim_ersten_wechsel(
+    hass: HomeAssistant, runtime: NotificationCenterRuntime
+) -> None:
+    """Issue 7: die erste Flanke ging verloren.
+
+    Ohne mitgefuehrten Ausgangszustand hatte die erste Auswertung nichts zu
+    vergleichen und diente nur dazu, ihn zu setzen. Wer eine Regel anlegte und
+    sie gleich ausprobierte, sah nichts.
+    """
+    await runtime.async_save_rule(
+        fensterregel(
+            rule_id="rule_flanke",
+            kind=ConditionKind.STATE_CHANGED_TO,
+            message_template="Wechsel nach {state}",
+        )
+    )
+
+    hass.states.async_set(FENSTER, "on")
+    await hass.async_block_till_done()
+
+    assert len(_ereignisse_von(runtime, "rule_flanke")) == 1
+
+
+async def test_flankenregel_meldet_nicht_fuer_den_zustand_bei_ihrer_anlage(
+    hass: HomeAssistant, runtime: NotificationCenterRuntime
+) -> None:
+    """Der Zielzustand liegt beim Anlegen bereits an -- das ist kein Wechsel.
+
+    Die Gegenprobe zum Test darueber: der Ausgangszustand darf nicht so
+    gesetzt werden, dass daraus eine Flanke entsteht, die es nie gab.
+    """
+    hass.states.async_set(FENSTER, "on")
+    await hass.async_block_till_done()
+
+    await runtime.async_save_rule(
+        fensterregel(
+            rule_id="rule_flanke",
+            kind=ConditionKind.STATE_CHANGED_TO,
+            message_template="Wechsel nach {state}",
+        )
+    )
+    await hass.async_block_till_done()
+
+    assert _ereignisse_von(runtime, "rule_flanke") == []
+
+
+async def test_flankenregel_meldet_jeden_weiteren_wechsel(
+    hass: HomeAssistant, runtime: NotificationCenterRuntime
+) -> None:
+    await runtime.async_save_rule(
+        fensterregel(
+            rule_id="rule_flanke",
+            kind=ConditionKind.STATE_CHANGED_TO,
+            message_template="Wechsel nach {state}",
+        )
+    )
+
+    for zustand in ("on", "off", "on"):
+        hass.states.async_set(FENSTER, zustand)
+        await hass.async_block_till_done()
+
+    assert len(_ereignisse_von(runtime, "rule_flanke")) == 1
+
+
+async def test_das_saeen_ruehrt_bestehende_regeln_nicht_an(
+    hass: HomeAssistant, runtime: NotificationCenterRuntime
+) -> None:
+    """Eine Regel, deren Bedingung anliegt, meldet weiterhin sofort."""
+    hass.states.async_set(FENSTER, "on")
+    await hass.async_block_till_done()
+    assert len(_ereignisse_von(runtime, "rule_fenster")) == 1
+
+    # Eine zweite Regel anzulegen loest das Saeen aus.
+    await runtime.async_save_rule(
+        fensterregel(rule_id="rule_zweite", message_template="zweite Regel")
+    )
+    await hass.async_block_till_done()
+
+    assert len(_ereignisse_von(runtime, "rule_fenster")) == 1

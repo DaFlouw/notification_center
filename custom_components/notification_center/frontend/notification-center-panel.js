@@ -400,10 +400,18 @@ class NotificationCenterPanel extends HTMLElement {
       }
 
       if (aktion === "replace-entity") {
-        const neu = prompt("Entity-ID der neuen Entity:");
+        // Die aktuelle Kennung steht im Text und als Vorgabe im Feld: beim
+        // Geraetetausch unterscheidet sich die neue oft nur in einem Wort,
+        // und aus dem Kopf getippt trifft man sie selten.
+        const neu = prompt(
+          `Entity-ID der neuen Entity.\n\nAktuell: ${daten.entity}`,
+          daten.entity
+        );
         if (!neu) return;
-        await api.replaceEntity(this.#hass, daten.entity, neu.trim());
-        await this.#ladeRegeln(neu.trim());
+        const kennung = neu.trim();
+        if (!kennung || kennung === daten.entity) return;
+        await api.replaceEntity(this.#hass, daten.entity, kennung);
+        await this.#ladeRegeln(kennung);
         return;
       }
 

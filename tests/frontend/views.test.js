@@ -458,3 +458,40 @@ describe("Typauswahl der Discovery (Issue 4)", () => {
     assert.match(html, /<option value="counter" selected>/);
   });
 });
+
+describe("Die Entity im Regel-Editor (Issue 9)", () => {
+  const zustand = {
+    entityId: "light.kueche_arbeitsplatte",
+    entityName: "Licht Arbeitsplatte",
+    rules: [],
+    entwurf: null,
+    states: [],
+    attributes: [],
+  };
+
+  it("nennt die Entity-ID auf der Seite", () => {
+    // Von hier aus laesst sich die Entity ersetzen; dafuer muss sichtbar
+    // sein, welche gerade gemeint ist.
+    const html = renderRules(zustand);
+    assert.match(html, /light\.kueche_arbeitsplatte/);
+  });
+
+  it("setzt sie zurueckhaltend, nicht als Ueberschrift", () => {
+    const html = renderRules(zustand);
+    assert.match(
+      html,
+      /<div class="entity-meta"[^>]*>light\.kueche_arbeitsplatte<\/div>/
+    );
+    assert.match(html, /<h2>Regeln für Licht Arbeitsplatte<\/h2>/);
+  });
+
+  it("kommt ohne Anzeigenamen zurecht", () => {
+    const html = renderRules({ ...zustand, entityName: "" });
+    assert.match(html, /<h2>Regeln für light\./);
+  });
+
+  it("maskiert die Kennung", () => {
+    const html = renderRules({ ...zustand, entityId: '<img src=x onerror=alert(1)>' });
+    assert.doesNotMatch(html, /<img/);
+  });
+});

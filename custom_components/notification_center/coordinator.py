@@ -11,6 +11,7 @@ import logging
 from dataclasses import dataclass, field
 
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import entity_registry as er
 
 from .discovery.engine import DiscoveryEngine
 from .notifications.engine import NotificationEngine
@@ -92,6 +93,11 @@ class NotificationCenterRuntime:
         """Nach jeder Aenderung an Entities oder Regeln aufzurufen."""
         self.config_store.schedule_save()
         self.rule_engine.async_refresh_tracking()
+        # Muss ausserhalb von async_refresh_tracking geschehen: eine neue Regel
+        # auf einer bereits ueberwachten Entity aendert die Menge der
+        # beobachteten Entities nicht, und refresh_tracking kehrt dann sofort
+        # zurueck.
+        self.rule_engine.async_seed_rule_states()
 
     async def async_remove_entity(self, entity_id: str) -> None:
         """Entfernt eine Entity aus der Ueberwachung (Spezifikation 78)."""
@@ -107,7 +113,14 @@ class NotificationCenterRuntime:
         Die Regeln wandern mit und behalten ihre IDs. Laufende Notifications
         der alten Entity werden abgeschlossen, ihre Historie bleibt der alten
         Entity zugeordnet.
+
+        Eine unbekannte Kennung wird abgelehnt. Sonst nimmt ein Tippfehler die
+        richtige Entity aus der Ueberwachung und haengt alle ihre Regeln an
+        etwas, das nie einen Zustand meldet -- die Ueberwachung hoert
+        stillschweigend auf zu arbeiten.
         """
+        self._pruefe_entity(new_entity_id)
+
         metadata = self.discovery.metadata_for(new_entity_id)
         neu = WatchedEntity(
             entity_id=new_entity_id,
@@ -118,6 +131,20 @@ class NotificationCenterRuntime:
         umgehaengt = self.config.replace_entity(old_entity_id, neu)
         await self.notification_engine.async_close_rules(umgehaengt, CloseReason.ENTITY_REPLACED)
         await self.async_config_changed()
+
+    def _pruefe_entity(self, entity_id: str) -> None:
+        """Stellt sicher, dass es die Entity ueberhaupt gibt.
+
+        Gefragt wird nicht nur die Zustandsmaschine, sondern auch die
+        Entity-Registry: eine Entity kann voruebergehend nicht geladen sein
+        und traegt dann keinen Zustand, gehoert aber weiterhin zur Anlage.
+        Nur was in beiden fehlt, ist ein Tippfehler.
+        """
+        if self.hass.states.get(entity_id) is not None:
+            return
+        if er.async_get(self.hass).async_get(entity_id) is not None:
+            return
+        raise ValueError(f"Die Entity {entity_id} gibt es nicht.")
 
     async def async_save_rule(self, rule: Rule) -> None:
         """Legt eine Regel an oder ersetzt sie.

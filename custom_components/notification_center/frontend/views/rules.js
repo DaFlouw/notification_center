@@ -177,6 +177,13 @@ export function renderRules(state) {
 
     <h2>Regeln für ${escapeHtml(entityName || entityId)}</h2>
 
+    <!--
+      Die Entity-ID gehoert auf diese Seite: von hier aus laesst sich die
+      Entity ersetzen, und dafuer muss man wissen, welche gerade gemeint ist.
+      Zurueckhaltend gesetzt -- sie ist Beleg, nicht Ueberschrift.
+    -->
+    <div class="entity-meta" style="margin: -8px 0 12px">${escapeHtml(entityId || "")}</div>
+
     ${
       rules.length
         ? `<ul>${rules

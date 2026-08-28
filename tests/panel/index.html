@@ -78,8 +78,8 @@ window.confirm = (text) => {
   window.__dialoge.push({ art: "confirm", text });
   return window.__confirmAntwort;
 };
-window.prompt = (text) => {
-  window.__dialoge.push({ art: "prompt", text });
+window.prompt = (text, vorgabe) => {
+  window.__dialoge.push({ art: "prompt", text, vorgabe });
   return window.__promptAntwort;
 };
 

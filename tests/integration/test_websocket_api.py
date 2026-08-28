@@ -375,6 +375,70 @@ async def test_entity_ersetzen_nimmt_regeln_mit(
     assert FENSTER not in runtime.config.entities
 
 
+async def test_ersetzen_lehnt_eine_unbekannte_entity_ab(
+    hass: HomeAssistant, runtime, hass_ws_client
+) -> None:
+    """Issue 10: sonst nimmt ein Tippfehler die Ueberwachung still ausser Betrieb.
+
+    Die Oberflaeche fragt die neue Kennung als freien Text ab. Wird eine
+    Entity angenommen, die es nicht gibt, faellt die richtige aus der
+    Ueberwachung und ihre Regeln haengen an etwas, das nie einen Zustand
+    meldet.
+    """
+    client = await hass_ws_client(hass)
+    runtime.config.add_entity(WatchedEntity(entity_id=FENSTER))
+    antwort = await sende(
+        client,
+        "save_rule",
+        rule={"entity_id": FENSTER, "kind": str(ConditionKind.STATE_IS), "states": ["on"]},
+    )
+    rule_id = antwort["result"]["rule"]["rule_id"]
+
+    antwort = await sende(
+        client,
+        "replace_entity",
+        old_entity_id=FENSTER,
+        new_entity_id="binary_sensor.gibt_es_nicht",
+    )
+
+    assert antwort["success"] is False
+    assert "gibt_es_nicht" in antwort["error"]["message"]
+
+    # Nichts darf sich verschoben haben.
+    assert FENSTER in runtime.config.entities
+    assert runtime.config.rules[rule_id].entity_id == FENSTER
+
+
+async def test_ersetzen_erlaubt_eine_registrierte_entity_ohne_zustand(
+    hass: HomeAssistant, runtime, hass_ws_client
+) -> None:
+    """Eine Entity kann voruebergehend nicht geladen sein.
+
+    Sie traegt dann keinen Zustand, gehoert aber zur Anlage. Deshalb wird die
+    Entity-Registry mitgefragt und nicht nur die Zustandsmaschine.
+    """
+    from homeassistant.helpers import entity_registry as er
+
+    registry = er.async_get(hass)
+    eintrag = registry.async_get_or_create(
+        "binary_sensor", "demo", "fenster_ohne_zustand", suggested_object_id="fenster_offline"
+    )
+    assert hass.states.get(eintrag.entity_id) is None
+
+    client = await hass_ws_client(hass)
+    runtime.config.add_entity(WatchedEntity(entity_id=FENSTER))
+
+    antwort = await sende(
+        client,
+        "replace_entity",
+        old_entity_id=FENSTER,
+        new_entity_id=eintrag.entity_id,
+    )
+
+    assert antwort["success"] is True
+    assert eintrag.entity_id in runtime.config.entities
+
+
 # -- Einrichtungsassistent (Spezifikation 67) ------------------------------
 
 
