@@ -28,6 +28,14 @@ from typing import Any
 #: Zustaende, die keine sinnvolle Regelgrundlage sind.
 UNUSABLE = frozenset({"unknown", "unavailable", "none", ""})
 
+#: Domaenen mit freiem Wert.
+#:
+#: Ein Texthelfer kann jeden Text tragen, ein Datumshelfer jeden Zeitpunkt.
+#: Eine Auswahlliste waere hier immer unvollstaendig und wuerde den Anwender
+#: auf den einen Wert festnageln, der zufaellig gerade eingetragen ist. Fuer
+#: sie bleibt die Auswahl leer, damit der Regel-Editor ein Textfeld zeigt.
+FREEFORM_DOMAINS = frozenset({"input_text", "input_datetime"})
+
 #: Was die gaengigen Domaenen annehmen koennen. Quelle: die Zustandsdefinition
 #: von Home Assistant, nicht die Beobachtung einer einzelnen Anlage.
 DOMAIN_STATES: dict[str, tuple[str, ...]] = {
@@ -95,6 +103,9 @@ def available_states(
     Katalog ihrer Domaene, dann zusaetzlich Beobachtetes. So stehen die
     erwarteten Werte oben und Ueberraschungen unten.
     """
+    if domain in FREEFORM_DOMAINS:
+        return []
+
     attributes = attributes or {}
     gesehen: set[str] = set()
     ergebnis: list[str] = []

@@ -45,6 +45,12 @@ class Confidence(StrEnum):
         return self is Confidence.LOW
 
 
+#: Domaenen, deren Zustand immer eine Zahl ist, auch ohne Einheit und ohne
+#: ``state_class``. Ohne diese Liste bekaemen ein Zahlenhelfer und ein Zaehler
+#: Zustandsvorschlaege angeboten -- "Zustand ist 42" statt einer Schwelle.
+_NUMERIC_DOMAINS = frozenset({"input_number", "counter"})
+
+
 @dataclass(frozen=True, slots=True)
 class EntityMetadata:
     """Was ueber eine Entity bekannt ist, bevor die Historie befragt wird."""
@@ -66,7 +72,13 @@ class EntityMetadata:
 
     @property
     def is_numeric(self) -> bool:
-        """Numerisch ist, was eine Einheit oder eine state_class traegt."""
+        """Numerisch ist, was eine Einheit oder eine state_class traegt.
+
+        Dazu die Domaenen, die von sich aus nur Zahlen kennen und deshalb
+        beides nicht brauchen.
+        """
+        if self.domain in _NUMERIC_DOMAINS:
+            return True
         return self.domain == "sensor" and bool(self.unit or self.state_class)
 
 

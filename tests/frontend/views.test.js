@@ -20,8 +20,15 @@ import { renderDashboard } from "../../custom_components/notification_center/fro
 import { renderDiscovery } from "../../custom_components/notification_center/frontend/views/discovery.js";
 import {
   renderRuleOverview,
+  renderRules,
   uebersichtAusKonfiguration,
 } from "../../custom_components/notification_center/frontend/views/rules.js";
+import {
+  LEERER_FILTER,
+  buildQuery,
+  renderHistory,
+  seitengroesse,
+} from "../../custom_components/notification_center/frontend/views/history.js";
 
 /** Nachgebildet aus einer echten Antwort von get_config. */
 const ENTITIES = [
@@ -329,5 +336,125 @@ describe("Formatierung", () => {
   it("vertraegt fehlende Werte", () => {
     assert.equal(escapeHtml(null), "");
     assert.equal(escapeHtml(undefined), "");
+  });
+});
+
+describe("Regel-Editor", () => {
+  const EINE_REGEL = [{ rule_id: "rule_1", entity_id: "light.a", kind: "state_is", type: "info", states: ["off"] }];
+  const ZWEI_REGELN = [
+    ...EINE_REGEL,
+    { rule_id: "rule_2", entity_id: "light.a", kind: "state_is", type: "alarm", states: ["on"] },
+  ];
+
+  const zustand = (rules, entwurf) => ({
+    entityId: "light.a",
+    entityName: "Licht A",
+    rules,
+    entwurf,
+    states: ["on", "off"],
+    attributes: [],
+  });
+
+  it("bietet ohne offenes Formular je Regel einen Bearbeiten-Knopf", () => {
+    const html = renderRules(zustand(ZWEI_REGELN, null));
+    assert.equal((html.match(/>Bearbeiten/g) || []).length, 2);
+  });
+
+  it("laesst den Knopf an der Regel weg, die gerade offen ist (Issue 3)", () => {
+    // Der Anwender ist bereits in der Bearbeitung; der Knopf verwies auf
+    // genau das, was schon vor ihm steht.
+    const html = renderRules(zustand(EINE_REGEL, { ...EINE_REGEL[0] }));
+
+    assert.doesNotMatch(html, />Bearbeiten/);
+    assert.match(html, /wird bearbeitet/);
+  });
+
+  it("behaelt ihn an den uebrigen Regeln (Issue 3)", () => {
+    const html = renderRules(zustand(ZWEI_REGELN, { ...ZWEI_REGELN[0] }));
+
+    assert.equal((html.match(/>Bearbeiten/g) || []).length, 1);
+    assert.match(html, /data-action="edit-rule" data-rule="rule_2"/);
+  });
+
+  it("laesst bei einer neuen Regel alle Knoepfe stehen", () => {
+    // Ein Entwurf ohne rule_id gehoert zu keiner vorhandenen Zeile.
+    const html = renderRules(zustand(ZWEI_REGELN, { entity_id: "light.a", kind: "state_is" }));
+    assert.equal((html.match(/>Bearbeiten/g) || []).length, 2);
+  });
+
+  it("markiert in der Uebersicht nichts als in Bearbeitung", () => {
+    const html = renderRuleOverview({ entities: ENTITIES, rules: RULES });
+    assert.doesNotMatch(html, /wird bearbeitet/);
+  });
+});
+
+describe("Seitengroesse der Historie (Issue 5)", () => {
+  const ZUSTAND = { events: [], total: 0, filter: { ...LEERER_FILTER }, areas: [] };
+
+  it("bietet 50, 100 und 200 an", () => {
+    const html = renderHistory(ZUSTAND, "de-DE");
+
+    assert.match(html, /<option value="50"[^>]*>50 pro Seite/);
+    assert.match(html, /<option value="100"[^>]*>100 pro Seite/);
+    assert.match(html, /<option value="200"[^>]*>200 pro Seite/);
+  });
+
+  it("waehlt 100 als Standard vor", () => {
+    const html = renderHistory(ZUSTAND, "de-DE");
+    assert.match(html, /<option value="100" selected>/);
+  });
+
+  it("zeigt die getroffene Wahl wieder an", () => {
+    const html = renderHistory({ ...ZUSTAND, filter: { ...LEERER_FILTER, limit: 200 } }, "de-DE");
+
+    assert.match(html, /<option value="200" selected>/);
+    assert.doesNotMatch(html, /<option value="100" selected>/);
+  });
+
+  it("fragt genau die gewaehlte Menge ab", () => {
+    assert.equal(buildQuery({ ...LEERER_FILTER, limit: 200 }).limit, 200);
+    assert.equal(buildQuery({ ...LEERER_FILTER }).limit, 100);
+  });
+
+  it("faellt bei einem unbekannten Wert auf den Standard zurueck", () => {
+    // Ein Filter aus einer aelteren Fassung kennt das Feld nicht.
+    assert.equal(seitengroesse({}), 100);
+    assert.equal(seitengroesse({ limit: 37 }), 100);
+  });
+
+  it("blaettert von der gewaehlten Menge aus weiter", () => {
+    const query = buildQuery({ ...LEERER_FILTER, limit: 200 }, 200);
+    assert.equal(query.offset, 200);
+    assert.equal(query.limit, 200);
+  });
+});
+
+describe("Typauswahl der Discovery (Issue 4)", () => {
+  it("bietet die Helfer an", () => {
+    const html = renderDiscovery({ entities: [], suggestions: {} });
+
+    assert.match(html, /<optgroup label="Helfer">/);
+    for (const domaene of [
+      "input_boolean",
+      "input_number",
+      "input_select",
+      "input_text",
+      "input_datetime",
+      "counter",
+      "timer",
+      "schedule",
+    ]) {
+      assert.match(html, new RegExp(`value="${domaene}"`), `${domaene} fehlt`);
+    }
+  });
+
+  it("behaelt Alle Typen als Voreinstellung", () => {
+    const html = renderDiscovery({ entities: [], suggestions: {} });
+    assert.match(html, /<option value="" selected>Alle Typen/);
+  });
+
+  it("merkt sich die getroffene Wahl", () => {
+    const html = renderDiscovery({ entities: [], suggestions: {}, domain: "counter" });
+    assert.match(html, /<option value="counter" selected>/);
   });
 });

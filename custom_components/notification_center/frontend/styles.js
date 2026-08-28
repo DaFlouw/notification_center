@@ -101,6 +101,12 @@ sheet.replaceSync(`
 
   .row.clickable { cursor: pointer; }
 
+  /* Die Regel, deren Formular gerade offen ist. */
+  .row.editing {
+    box-shadow: inset 2px 0 0 var(--primary-color, #03a9f4);
+    padding-left: 10px;
+  }
+
   .message { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 
   .time, .duration {
