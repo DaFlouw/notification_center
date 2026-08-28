@@ -96,9 +96,27 @@ export const GET_SUGGESTIONS = {
   api_version: 1,
   version: "1.1.3",
   entity_id: "light.knx_interface_arbeiten_licht_fenster",
-  suggestions: [],
+  suggestions: [
+    {
+      key: "window_open",
+      title: "Warnung, wenn das Fenster laenger offen steht",
+      confidence: "high",
+      kind: "state_is",
+      type: "warning",
+      states: ["on"],
+      operator: null,
+      threshold: null,
+      release_threshold: null,
+      duration_seconds: 900,
+      message_template: "{name} steht offen",
+      reasons: [
+        { label: "Geraeteklasse", value: "window" },
+        { label: "Grundlage", value: "allgemein uebliche Schwelle" },
+      ],
+    },
+  ],
   states: ["on", "off"],
-  attributes: [],
+  attributes: [{ name: "temperature", kind: "numeric", value: 21.5 }],
 };
 
 /** Bereiche, wie das Frontend sie aus `hass.areas` bekommt. */
