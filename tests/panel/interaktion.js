@@ -561,6 +561,46 @@ const FAELLE = [
     },
   },
 
+  {
+    id: "L47",
+    titel: "Der Ersetzen-Dialog nennt die aktuelle Entity (Issue 9)",
+    async fn() {
+      await oeffneEditor();
+      await klick('[data-action="cancel-rule"]');
+      await bisSichtbar('[data-action="replace-entity"]');
+      window.__dialoge.length = 0;
+      window.__promptAntwort = null;
+      await klick('[data-action="replace-entity"]');
+      const dialog = window.__dialoge.find((d) => d.art === "prompt");
+      pruefe(dialog, "es wurde nicht nachgefragt");
+      pruefe(dialog.text.includes(HEIZUNG), "der Dialog nennt die aktuelle Entity nicht");
+    },
+  },
+  {
+    id: "L48",
+    titel: "Die Seite des Editors zeigt die aktuelle Entity (Issue 9)",
+    async fn() {
+      await oeffneEditor();
+      pruefe(window.__text().includes(HEIZUNG), "die Entity-ID fehlt auf der Seite");
+    },
+  },
+  {
+    id: "L49",
+    titel: "Die unveraendert bestaetigte Entity loest kein Ersetzen aus",
+    async fn() {
+      await oeffneEditor();
+      await klick('[data-action="cancel-rule"]');
+      await bisSichtbar('[data-action="replace-entity"]');
+      // Die aktuelle Kennung steht als Vorgabe im Feld; wer nur bestaetigt,
+      // will nichts ersetzen.
+      window.__promptAntwort = HEIZUNG;
+      const ab = marke();
+      await klick('[data-action="replace-entity"]');
+      window.__promptAntwort = null;
+      gleich(anzahl(ab, "replace_entity"), 0, "Aufrufe");
+    },
+  },
+
   // -- Discovery ----------------------------------------------------------
   {
     id: "L33",

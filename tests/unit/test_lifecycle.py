@@ -288,3 +288,72 @@ def test_zustand_als_dict(aktive: ActiveNotifications) -> None:
     assert daten["counts"]["active"] == 1
     assert len(daten["active"]) == 1
     assert daten["active"][0]["type"] == "alarm"
+
+
+# -- Typwechsel an einer laufenden Notification (Issue 6) -------------------
+
+
+def test_typwechsel_am_selben_objekt_bucht_richtig_um() -> None:
+    """Issue 6: die Automations-API aendert das Ereignis an Ort und Stelle.
+
+    ``async_update_automation`` setzt ``ereignis.type`` und reicht *dasselbe*
+    Objekt an ``put``. Wer beim Abbuchen ``event.type`` liest, liest dann
+    schon den neuen Wert und zieht vom falschen Zaehler ab. Der alte Typ bleibt
+    dauerhaft zu hoch, der neue zu niedrig.
+    """
+    aktive = ActiveNotifications()
+    ereignis = automationsereignis(type=NotificationType.INFO)
+    aktive.put(ereignis)
+    assert aktive.counts.to_dict() == Counts(info=1).to_dict()
+
+    # Genau das, was die Engine tut: am Objekt aendern, dann erneut ablegen.
+    ereignis.type = NotificationType.ALARM
+    aktive.put(ereignis)
+
+    zaehler = aktive.counts
+    assert zaehler.info == 0, "der alte Typ wurde nicht abgebucht"
+    assert zaehler.alarm == 1
+    assert zaehler.active == 1
+
+
+def test_beenden_nach_typwechsel_leert_den_zaehler() -> None:
+    """Nach dem Wechsel muss auch das Beenden den richtigen Zaehler treffen."""
+    aktive = ActiveNotifications()
+    ereignis = automationsereignis(type=NotificationType.INFO)
+    aktive.put(ereignis)
+
+    ereignis.type = NotificationType.ALARM
+    aktive.put(ereignis)
+    aktive.close(key_for(ereignis), T0 + timedelta(minutes=1), CloseReason.DISMISSED)
+
+    assert aktive.counts.to_dict() == Counts().to_dict()
+
+
+def test_typwechsel_zaehlt_kein_zweites_ereignis_fuer_heute() -> None:
+    """Ein Aendern ist kein neues Ereignis (Spezifikation 75)."""
+    aktive = ActiveNotifications()
+    aktive.roll_day(T0, events_today=0)
+
+    ereignis = automationsereignis(type=NotificationType.INFO)
+    aktive.put(ereignis)
+    ereignis.type = NotificationType.WARNING
+    aktive.put(ereignis)
+
+    assert aktive.counts.events_today == 1
+
+
+def test_mehrfacher_typwechsel_laeuft_nicht_aus_dem_takt() -> None:
+    aktive = ActiveNotifications()
+    ereignis = automationsereignis(type=NotificationType.INFO)
+
+    for typ in (
+        NotificationType.INFO,
+        NotificationType.ALARM,
+        NotificationType.WARNING,
+        NotificationType.ALARM,
+        NotificationType.INFO,
+    ):
+        ereignis.type = typ
+        aktive.put(ereignis)
+
+    assert aktive.counts.to_dict() == Counts(info=1).to_dict()

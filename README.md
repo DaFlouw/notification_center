@@ -14,7 +14,7 @@ keine externen Datenquellen, keine Cloud, keine externe Datenbank.
 
 ## Status
 
-Aktuelle Version: `1.1.3`. Alle zehn Entwicklungsphasen sind abgeschlossen.
+Aktuelle Version: `1.1.4`. Alle zehn Entwicklungsphasen sind abgeschlossen.
 
 | Phase | Inhalt | Status |
 |-------|--------|--------|

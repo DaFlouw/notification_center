@@ -133,7 +133,7 @@ def intents_for_group(
                     rule=neu,
                     snapshot=snapshot,
                     level=evaluation.active_level,
-                    since=stufe.since if stufe else None,
+                    since=_beginn(evaluation, stufe),
                     value=stufe.value if stufe else None,
                 )
             )
@@ -147,6 +147,29 @@ def _stop_reason(evaluation: GroupEvaluation) -> CloseReason:
     if evaluation.deescalated:
         return CloseReason.DEESCALATED
     return CloseReason.CONDITION_CLEARED
+
+
+def _beginn(evaluation: GroupEvaluation, stufe: Evaluation | None) -> datetime | None:
+    """Der Beginn der neu sichtbaren Stufe.
+
+    Jede Stufe fuehrt ihren eigenen Zustand mit, damit ihre Hysterese
+    unabhaengig arbeitet. Ihre Bedingung liegt deshalb oft schon an, waehrend
+    eine hoehere Stufe sichtbar ist -- bei 65 Grad ist auch die Stufe ab 50
+    erfuellt, nur verdeckt.
+
+    Beim Herunterstufen darf dieser verdeckte Beginn nicht zum Beginn der
+    Meldung werden: er liegt vor dem Ende der Stufe, die sie abloest, und die
+    beiden Eintraege der Historie wuerden sich ueberlappen. Sichtbar wird die
+    Stufe jetzt, also beginnt sie jetzt (``None`` heisst fuer die Engine
+    "jetzt").
+
+    Beim Hochstufen und beim ersten Auftreten gilt der eigene Beginn weiter:
+    dort faellt er mit dem Stufenwechsel zusammen, und nach einem Neustart
+    haelt er die bereits verstrichene Wartezeit fest (Spezifikation 37).
+    """
+    if evaluation.deescalated:
+        return None
+    return stufe.since if stufe else None
 
 
 def _value_for(evaluation: GroupEvaluation, level: int) -> Any:

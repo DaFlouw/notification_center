@@ -85,6 +85,14 @@ class ActiveNotifications:
     _by_type: dict[NotificationType, int] = field(
         default_factory=lambda: dict.fromkeys(NotificationType, 0)
     )
+    #: Der Typ, unter dem ein Schluessel gezaehlt wird.
+    #:
+    #: Bewusst getrennt von ``event.type``: die Aufrufer aendern eine laufende
+    #: Notification an Ort und Stelle und reichen dasselbe Objekt herein. Wer
+    #: beim Abbuchen ``event.type`` liest, liest dann bereits den neuen Wert
+    #: und zieht vom falschen Zaehler ab. Diese Buchfuehrung gehoert hierher
+    #: und nicht in die Hand der Aufrufer.
+    _type_by_key: dict[str, NotificationType] = field(default_factory=dict)
     _events_today: int = 0
     _day_start: datetime | None = None
 
@@ -136,12 +144,14 @@ class ActiveNotifications:
         key = key_for(event)
         vorher = self._by_key.get(key)
 
-        if vorher is not None:
-            self._by_type[vorher.type] -= 1
+        gezaehlt = self._type_by_key.pop(key, None)
+        if gezaehlt is not None:
+            self._by_type[gezaehlt] -= 1
         else:
             self._count_new(event)
 
         self._by_key[key] = event
+        self._type_by_key[key] = event.type
         self._by_type[event.type] += 1
         return vorher
 
@@ -151,7 +161,8 @@ class ActiveNotifications:
         if event is None:
             return None
 
-        self._by_type[event.type] -= 1
+        gezaehlt = self._type_by_key.pop(key, event.type)
+        self._by_type[gezaehlt] -= 1
         event.close(end_time, reason)
         return event
 
@@ -202,6 +213,7 @@ class ActiveNotifications:
         einer einzigen Zaehlabfrage, nicht aus einem Durchlauf durch das Log.
         """
         self._by_key.clear()
+        self._type_by_key.clear()
         self._by_type = dict.fromkeys(NotificationType, 0)
         self._day_start = day_start
         self._events_today = events_today
@@ -214,6 +226,7 @@ class ActiveNotifications:
                 # der uebrigen nicht verhindern.
                 continue
             self._by_key[key] = event
+            self._type_by_key[key] = event.type
             self._by_type[event.type] += 1
 
     def to_dict(self) -> dict[str, Any]:

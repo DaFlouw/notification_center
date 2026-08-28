@@ -146,6 +146,35 @@ class RuleEngine:
                     zustand.last_state = snapshot.state
                     zustand.phase = Phase.PENDING
 
+    @callback
+    def async_seed_rule_states(self) -> None:
+        """Gibt neuen Regeln den aktuellen Zustand ihrer Entity als Ausgangspunkt.
+
+        Eine Flankenregel (*Zustand aendert sich zu*) vergleicht den neuen mit
+        dem zuletzt gesehenen Zustand. Ohne Ausgangspunkt gibt es keinen
+        Vergleich: die erste Auswertung diente bisher nur dazu, ihn zu setzen,
+        und die Flanke, die sie ausgeloest hat, ging dabei verloren. Wer eine
+        Regel anlegte und sie gleich ausprobierte, sah nichts.
+
+        Gesetzt wird ausschliesslich ``last_state``. Phase und Beginn bleiben
+        unberuehrt, damit eine Regel, deren Bedingung schon anliegt,
+        weiterhin sofort meldet.
+
+        Liegt der Zustand bereits im Zielzustand, entsteht *keine* Meldung --
+        richtig so: es hat kein Wechsel stattgefunden.
+        """
+        for entity_id in self._config.monitored_entity_ids:
+            snapshot = None
+            for rule in self._all_rules_for(entity_id):
+                zustand = self._state_for(rule)
+                if zustand.last_state is not None:
+                    continue
+                if snapshot is None:
+                    snapshot = self._snapshot(entity_id)
+                    if snapshot is None:
+                        break
+                zustand.last_state = snapshot.state
+
     def _all_rules_for(self, entity_id: str) -> list[Rule]:
         """Alle Regeln einer Entity, auch die aus Gruppen."""
         return [rule for rule in self._config.rules.values() if rule.entity_id == entity_id]

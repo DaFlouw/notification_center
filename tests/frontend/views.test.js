@@ -458,3 +458,40 @@ describe("Typauswahl der Discovery (Issue 4)", () => {
     assert.match(html, /<option value="counter" selected>/);
   });
 });
+
+describe("Die Entity im Regel-Editor (Issue 9)", () => {
+  const zustand = {
+    entityId: "light.knx_interface_arbeiten_licht_fenster",
+    entityName: "Arbeiten Licht Fenster",
+    rules: [],
+    entwurf: null,
+    states: [],
+    attributes: [],
+  };
+
+  it("nennt die Entity-ID auf der Seite", () => {
+    // Von hier aus laesst sich die Entity ersetzen; dafuer muss sichtbar
+    // sein, welche gerade gemeint ist.
+    const html = renderRules(zustand);
+    assert.match(html, /light\.knx_interface_arbeiten_licht_fenster/);
+  });
+
+  it("setzt sie zurueckhaltend, nicht als Ueberschrift", () => {
+    const html = renderRules(zustand);
+    assert.match(
+      html,
+      /<div class="entity-meta"[^>]*>light\.knx_interface_arbeiten_licht_fenster<\/div>/
+    );
+    assert.match(html, /<h2>Regeln für Arbeiten Licht Fenster<\/h2>/);
+  });
+
+  it("kommt ohne Anzeigenamen zurecht", () => {
+    const html = renderRules({ ...zustand, entityName: "" });
+    assert.match(html, /<h2>Regeln für light\./);
+  });
+
+  it("maskiert die Kennung", () => {
+    const html = renderRules({ ...zustand, entityId: '<img src=x onerror=alert(1)>' });
+    assert.doesNotMatch(html, /<img/);
+  });
+});
