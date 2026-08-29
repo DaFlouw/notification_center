@@ -601,6 +601,24 @@ const FAELLE = [
     },
   },
 
+  {
+    id: "L50",
+    titel: "Die Ablehnung des Backends erscheint als Fehlermeldung (Issue 10)",
+    async fn() {
+      await oeffneEditor();
+      await klick('[data-action="cancel-rule"]');
+      await bisSichtbar('[data-action="replace-entity"]');
+      window.__promptAntwort = "switch.gibt_es_nicht";
+      window.__naechsterFehler = "Die Entity switch.gibt_es_nicht gibt es nicht.";
+      await klick('[data-action="replace-entity"]');
+      window.__promptAntwort = null;
+      pruefe(
+        window.__text().includes("gibt es nicht"),
+        "die Ablehnung wird dem Anwender nicht gezeigt"
+      );
+    },
+  },
+
   // -- Discovery ----------------------------------------------------------
   {
     id: "L33",
