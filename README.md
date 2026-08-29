@@ -12,7 +12,7 @@ Es arbeitet ausschliesslich mit Daten der lokalen Home-Assistant-Instanz: keine 
 
 ## Inhalt
 
-**[`Installation`](#installation)**  **[`Einrichtung`](#einrichtung)**  **[`Das Panel`](#das-panel)**  **[`Regeln`](#regeln)**  **[`Regelgruppen`](#regelgruppen)**  **[`Lovelace-Card`](#lovelace-card)**  **[`Automations-API`](#automations-api)**  **[`Entities`](#entities)**  **[`Einstellungen`](#einstellungen)**  **[`Wie es arbeitet`](#wie-es-arbeitet)**  **[`Entwicklung`](#entwicklung)**  **[`Transparenz`](#transparenz)**  **[`Lizenz`](#lizenz)**
+**[`Installation`](#installation)**  **[`Einrichtung`](#einrichtung)**  **[`Das Panel`](#das-panel)**  **[`Regeln`](#regeln)**  **[`Regelgruppen`](#regelgruppen)**  **[`Lovelace-Card`](#lovelace-card)**  **[`Automations-API`](#automations-api)**  **[`Entities`](#entities)**  **[`Einstellungen`](#einstellungen)**  **[`Wie es arbeitet`](#wie-es-arbeitet)**  **[`Transparenz`](#transparenz)**  **[`Lizenz`](#lizenz)**
 
 ---
 
@@ -298,36 +298,6 @@ custom_components/notification_center/
 **Leistung.** Die Ueberwachung ist vollstaendig ereignisbasiert: beobachtet werden nur die uebernommenen Entities, es gibt keine Schleife ueber alle Entities und kein Polling. Timer entstehen ausschliesslich fuer Regeln, deren Bedingung bereits anliegt. Die Zaehler werden fortgeschrieben und nie aus dem Log berechnet; nach einem Neustart kostet die Wiederherstellung zwei Abfragen.
 
 Die Historienanalyse nutzt bevorzugt die Langzeitstatistiken von Home Assistant — bei sieben Tagen sind das hoechstens 168 Zeilen statt womoeglich Zehntausender Rohzustaende. Sie laeuft nur auf Anforderung, nie im Hintergrund; die Entitysuche fasst die Datenbank gar nicht an.
-
----
-
-## Entwicklung
-
-Die Domaenentests laufen ohne Home Assistant und damit auch unter Windows:
-
-```bash
-python -m venv .venv
-.venv/Scripts/python.exe -m pip install -r requirements-dev.txt
-.venv/Scripts/python.exe -m pytest tests/unit
-```
-
-Die Home-Assistant-Tests unter `tests/integration` laufen ausschliesslich in der GitHub-Actions-CI unter Linux: Home Assistant importiert `fcntl` und startet damit unter Windows grundsaetzlich nicht.
-
-Das Frontend ist buildfrei. Die reinen Darstellungsfunktionen werden mit dem Testlaeufer von Node geprueft, ohne Browser und ohne Abhaengigkeiten:
-
-```bash
-node --test tests/frontend/*.test.js
-```
-
-Panel und Card lassen sich zusaetzlich **ohne Home Assistant** betreiben — mit einem `hass`-Ersatz, der die Kommandos aus erfundenen Beispieldaten bedient. Daher stammen auch die Bilder in dieser Datei:
-
-```bash
-python -m http.server 8792
-```
-
-Dann `http://localhost:8792/tests/panel/` oeffnen und auf **Bedienungstests starten** klicken: 49 Faelle pruefen Schaltflaechen, Filter und Eingabefelder — und jeweils, welches Kommando mit welchen Parametern hinausgeht.
-
-Die Testfaelle fuer den Durchlauf gegen eine laufende Anlage stehen in [tests/SYSTEMTESTS.md](tests/SYSTEMTESTS.md).
 
 ---
 
