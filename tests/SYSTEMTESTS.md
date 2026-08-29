@@ -66,7 +66,7 @@ auch fuer die echten Geraete keine Eintraege.
 | C3 | *Wert ueberschreitet* 25, Rueckkehr 20; Wert auf 30 | Notification entsteht, `{value}` und `{unit}` ersetzt. |
 | C4 | Wert auf 22 (zwischen den Schwellen) | Notification bleibt bestehen -- Hysterese. |
 | C5 | Wert auf 19 | Notification endet. |
-| C6 | *Zustand aendert sich zu* `Urlaub`, erster Wechsel dorthin | Notification entsteht. **Faellt derzeit aus, siehe Issue 7.** |
+| C6 | *Zustand aendert sich zu* `Urlaub`, erster Wechsel dorthin | Notification entsteht. |
 | C7 | Zweiter und dritter Wechsel dorthin | Je eine neue Notification. |
 | C8 | *Zustand ist nicht*, ueber ein Attribut als Wertquelle | Notification, solange das Attribut keinen der Werte hat. |
 | C9 | *Zustand ist* mit `duration_seconds` 60, Schalter einschalten | Zunaechst **keine** Notification. |
@@ -84,7 +84,7 @@ Stufe 2 ab 50 (Warnung), Stufe 3 ab 60 (Alarm).
 | D2 | Wert auf 45 | Nur Stufe 1 aktiv. |
 | D3 | Wert auf 65 | Stufe 1 endet, Stufe 3 beginnt, Stufe 2 bleibt unsichtbar. |
 | D4 | Wert auf 55 | Stufe 3 endet, Stufe 2 wird sichtbar. |
-| D5 | Zeitstempel nach D4 | Beginn von Stufe 2 liegt **nach** dem Ende von Stufe 3. **Faellt derzeit aus, siehe Issue 8.** |
+| D5 | Zeitstempel nach D4 | Beginn von Stufe 2 liegt **nach** dem Ende von Stufe 3. |
 | D6 | Wert auf 10 | Alle Stufen beendet. |
 | D7 | `save_group` mit uneinheitlichem Operator oder doppelter Stufennummer | Wird abgelehnt. |
 
@@ -96,8 +96,9 @@ Stufe 2 ab 50 (Warnung), Stufe 3 ab 60 (Alarm).
 | E2 | `remove_entity` bei laufender Notification | Notification endet, Historie bleibt. |
 | E3 | `remove_entity` | Auch Regeln und Gruppen dieser Entity verschwinden. |
 | E4 | `replace_entity` | Neue Entity traegt `replaced_entity_id`, alte ist fort. |
-| E5 | `delete_event` auf ein beendetes Ereignis | `deleted: true`. |
-| E6 | `delete_event` auf ein **laufendes** Ereignis | `deleted: false` -- aktive Meldungen sind geschuetzt. |
+| E5 | `replace_entity` auf eine Kennung, die es nicht gibt | Wird abgelehnt, nichts verschiebt sich. |
+| E6 | `delete_event` auf ein beendetes Ereignis | `deleted: true`. |
+| E7 | `delete_event` auf ein **laufendes** Ereignis | `deleted: false` -- aktive Meldungen sind geschuetzt. |
 
 ## F -- Automations-API
 
@@ -105,7 +106,7 @@ Stufe 2 ab 50 (Warnung), Stufe 3 ab 60 (Alarm).
 |----|------|-----------|
 | F1 | `create` mit `owner`, `type`, `title`, `entity_id` | Ereignis mit `source: automation`, alle Felder uebernommen. |
 | F2 | `update` von Typ und Text | Aendert das bestehende Ereignis, **kein** zweiter Eintrag, `start_time` bleibt. |
-| F3 | Zaehler nach F2 | Aufteilung nach Typ passt weiter zur Liste. **Faellt derzeit aus, siehe Issue 6.** |
+| F3 | Zaehler nach F2 | Aufteilung nach Typ passt weiter zur Liste. |
 | F4 | `create` mit gleicher `notification_id`, anderem `owner` | Zwei unabhaengige Notifications. |
 | F5 | `dismiss` einer davon | Nur diese endet. |
 | F6 | `create` mit `duration: "00:00:30"` | Endet nach 30 Sekunden von selbst. |
@@ -119,7 +120,7 @@ Stufe 2 ab 50 (Warnung), Stufe 3 ab 60 (Alarm).
 | G1 | Die fuenf Sensoren gegen `get_counts` | Gleiche Werte. |
 | G2 | Nach jedem Beginn und Ende | Zaehler stimmen weiter mit der Liste ueberein. |
 | G3 | `events_today` | Steigt mit jedem neuen Ereignis, nie beim Beenden. |
-| G4 | Nach `update` mit Typwechsel | Aufteilung bleibt richtig. **Faellt derzeit aus, siehe Issue 6.** |
+| G4 | Nach `update` mit Typwechsel | Aufteilung bleibt richtig. |
 
 ## H -- Historie
 
@@ -268,6 +269,10 @@ loeschen` und `Entfernen` duerfen dabei folgenlos ausgeloest werden.
 | L44 | *Einrichtung starten* merkt sich das und fuehrt in die Discovery |
 | L45 | Mit vorhandenen Entities bleibt der Assistent fort |
 | L46 | Die Nutzlasten aus L24 bis L38 werden vom echten Backend angenommen |
+| L47 | Der Ersetzen-Dialog nennt die aktuelle Entity |
+| L48 | Die Seite des Editors zeigt die aktuelle Entity |
+| L49 | Die unveraendert bestaetigte Entity loest kein Ersetzen aus |
+| L50 | Die Ablehnung des Backends erscheint als Fehlermeldung |
 
 **L46 gehoert an die Anlage.** Der Pruefstand zeigt, *was* die Oberflaeche
 abschickt; ob das Backend es annimmt, zeigt nur die laufende Instanz. Die in
@@ -339,3 +344,22 @@ Offene Punkte:
 [Issue 7](https://github.com/DaFlouw/notification_center/issues/7),
 [Issue 8](https://github.com/DaFlouw/notification_center/issues/8),
 [Issue 10](https://github.com/DaFlouw/notification_center/issues/10).
+
+---
+
+## Nachpruefung vom 29.08.2026, Version 1.1.4
+
+Gegen dieselbe Instanz, nach Neustart auf 1.1.4. Geprueft wurden die vier
+Faelle, die im ersten Durchlauf gescheitert waren, jeweils mit eigens
+angelegten Wegwerf-Entities.
+
+| Fall | Issue | Ergebnis |
+|------|-------|----------|
+| C6 -- erste Flanke einer neuen Regel | 7 | Meldung entsteht beim ersten Wechsel |
+| F3 / G4 -- Zaehler nach Typwechsel | 6 | Info 2->1, Alarm 0->1; nach dem Beenden deckungsgleich mit der Liste |
+| D5 -- Beginn der deeskalierten Stufe | 8 | Stufe 2 beginnt `00:26:09.189297`, exakt zum Ende von Stufe 3 -- keine Ueberlappung |
+| E5 -- Ersetzen mit unbekannter Kennung | 10 | Abgelehnt: *Die Entity switch.gibt_es_wirklich_nicht gibt es nicht.* Nichts verschoben |
+
+Die Bedienelemente (Abschnitt L) laufen im Pruefstand: **49 von 49
+bestanden**, darunter die drei neuen Faelle zur Anzeige der aktuellen Entity
+und der Fall, dass die Ablehnung des Backends dem Anwender gezeigt wird.
