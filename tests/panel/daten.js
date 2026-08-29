@@ -1,39 +1,51 @@
 /**
- * Antworten, wortgleich aus der laufenden Instanz vom 28.08.2026 (1.1.3)
- * uebernommen. Nichts davon ist erfunden -- nur die Historie ist auf neun
- * Eintraege gekuerzt, damit die Seite in einen Screenshot passt.
+ * Beispieldaten fuer den Pruefstand und die Bilder der Dokumentation.
+ *
+ * Frei erfunden. Die Struktur entspricht genau dem, was die WebSocket-API
+ * liefert -- die Werte gehoeren zu keiner echten Anlage. Das ist Absicht:
+ * Testdaten und Screenshots eines oeffentlichen Repositories sollen keine
+ * Entity-Kennungen, Raumnamen oder Personennamen einer bewohnten Wohnung
+ * enthalten.
+ *
+ * Die Zeitpunkte entstehen relativ zum Aufruf, damit Dauern und Uhrzeiten in
+ * den Bildern plausibel bleiben statt zu veralten.
  */
+
+const JETZT = Date.now();
+
+/** ISO-Zeitpunkt, der so viele Minuten zurueckliegt. */
+const vor = (minuten) => new Date(JETZT - minuten * 60_000).toISOString();
+
+/** Dauer in Sekunden, passend zu einem noch laufenden Ereignis. */
+const seit = (minuten) => minuten * 60;
 
 export const GET_CONFIG = {
   api_version: 1,
-  version: "1.1.3",
+  version: "1.1.4",
   entities: [
-    { entity_id: "light.knx_interface_arbeiten_licht_fenster", device_id: "093d2a2d30f52032f1ae991a6e375000", area_id: "buro", name: "Arbeiten Licht Fenster", area_name: "Arbeiten", floor_id: "erdgeschoss", floor_name: "Erdgeschoss" },
-    { entity_id: "binary_sensor.knx_interface_flureg_sensor_bewegung", device_id: "093d2a2d30f52032f1ae991a6e375000", area_id: "flureg", name: "FlurEG Sensor Bewegung", area_name: "Flur EG", floor_id: "erdgeschoss", floor_name: "Erdgeschoss" },
-    { entity_id: "light.knx_interface_arbeiten_licht_mitte", device_id: "093d2a2d30f52032f1ae991a6e375000", area_id: "buro", name: "Arbeiten Licht Mitte", area_name: "Arbeiten", floor_id: "erdgeschoss", floor_name: "Erdgeschoss" },
-    { entity_id: "climate.knx_interface_arbeiten_heizung_raum", device_id: "093d2a2d30f52032f1ae991a6e375000", area_id: "buro", name: "Arbeiten Heizung Raum", area_name: "Arbeiten", floor_id: "erdgeschoss", floor_name: "Erdgeschoss" },
-    { entity_id: "person.florian_witt", device_id: null, area_id: null, name: "Florian Witt", area_name: null, floor_id: null, floor_name: null },
-    { entity_id: "sensor.knx_interface_gastebad_temperatur_raum", device_id: "093d2a2d30f52032f1ae991a6e375000", area_id: "gastebad", name: "Gästebad Temperatur Raum", area_name: "Gästebad", floor_id: "erdgeschoss", floor_name: "Erdgeschoss" },
-    { entity_id: "light.knx_interface_kuche_licht_kuchenzeile", device_id: "093d2a2d30f52032f1ae991a6e375000", area_id: "kuche", name: "Küche Licht Küchenzeile", area_name: "Küche", floor_id: "erdgeschoss", floor_name: "Erdgeschoss" },
-    { entity_id: "switch.diskstation", device_id: null, area_id: null, name: "Diskstation", area_name: null, floor_id: null, floor_name: null },
-    { entity_id: "binary_sensor.0x00158d0009f422e4_contact", device_id: "fb0defe75012de175ce702572109b5ca", area_id: "gastebad", name: "Aqara Fensterkontakt Tür", area_name: "Gästebad", floor_id: "erdgeschoss", floor_name: "Erdgeschoss" },
-    { entity_id: "binary_sensor.knx_interface_wohn_ess_status_terrassentur", device_id: "093d2a2d30f52032f1ae991a6e375000", area_id: "wohnzimmer", name: "Wohn-ess Status Terrassentür", area_name: "WohnEsszimmer", floor_id: "erdgeschoss", floor_name: "Erdgeschoss" },
-    { entity_id: "binary_sensor.knx_interface_wohn_ess_status_gartentur", device_id: "093d2a2d30f52032f1ae991a6e375000", area_id: "wohnzimmer", name: "Wohn-ess Status Gartentür", area_name: "WohnEsszimmer", floor_id: "erdgeschoss", floor_name: "Erdgeschoss" },
-    { entity_id: "switch.knx_interface_gastebad_schalten_handtuchtrockner", device_id: "093d2a2d30f52032f1ae991a6e375000", area_id: "gastebad", name: "Gästebad Schalten Handtuchtrockner", area_name: "Gästebad", floor_id: "erdgeschoss", floor_name: "Erdgeschoss" },
+    { entity_id: "binary_sensor.wohnzimmer_terrassentuer", device_id: "dev_kontakt_1", area_id: "wohnzimmer", name: "Terrassentür", area_name: "Wohnzimmer", floor_id: "erdgeschoss", floor_name: "Erdgeschoss" },
+    { entity_id: "binary_sensor.flur_haustuer", device_id: "dev_kontakt_2", area_id: "flur", name: "Haustür", area_name: "Flur", floor_id: "erdgeschoss", floor_name: "Erdgeschoss" },
+    { entity_id: "binary_sensor.kueche_fenster", device_id: "dev_kontakt_3", area_id: "kueche", name: "Küchenfenster", area_name: "Küche", floor_id: "erdgeschoss", floor_name: "Erdgeschoss" },
+    { entity_id: "light.kueche_arbeitsplatte", device_id: "dev_licht_1", area_id: "kueche", name: "Licht Arbeitsplatte", area_name: "Küche", floor_id: "erdgeschoss", floor_name: "Erdgeschoss" },
+    { entity_id: "sensor.bad_luftfeuchte", device_id: "dev_klima_1", area_id: "bad", name: "Luftfeuchte Bad", area_name: "Bad", floor_id: "obergeschoss", floor_name: "Obergeschoss" },
+    { entity_id: "climate.schlafzimmer_heizung", device_id: "dev_klima_2", area_id: "schlafzimmer", name: "Heizung Schlafzimmer", area_name: "Schlafzimmer", floor_id: "obergeschoss", floor_name: "Obergeschoss" },
+    { entity_id: "binary_sensor.waschkueche_leckmelder", device_id: "dev_leck_1", area_id: "waschkueche", name: "Leckmelder Waschküche", area_name: "Waschküche", floor_id: "keller", floor_name: "Keller" },
+    { entity_id: "switch.hobbyraum_loetstation", device_id: "dev_schalter_1", area_id: "hobbyraum", name: "Lötstation", area_name: "Hobbyraum", floor_id: "keller", floor_name: "Keller" },
+    { entity_id: "switch.netzwerkspeicher", device_id: null, area_id: null, name: "Netzwerkspeicher", area_name: null, floor_id: null, floor_name: null },
+    { entity_id: "person.alex", device_id: null, area_id: null, name: "Alex", area_name: null, floor_id: null, floor_name: null },
   ],
   rules: [
-    { rule_id: "rule_b07214cb5729", entity_id: "light.knx_interface_arbeiten_licht_fenster", kind: "state_is", type: "info", enabled: true, value_source: { kind: "state", attribute: null }, states: ["off"], operator: null, threshold: null, release_threshold: null, duration_seconds: null, message_template: "Licht aus im Arbeitszimmer", group_id: null, level: null },
-    { rule_id: "rule_469851a9bd92", entity_id: "binary_sensor.knx_interface_flureg_sensor_bewegung", kind: "state_is", type: "alarm", enabled: true, value_source: { kind: "state", attribute: null }, states: ["on"], operator: null, threshold: null, release_threshold: null, duration_seconds: null, message_template: "Bewegungs im Flur", group_id: null, level: null },
-    { rule_id: "rule_0dd3a15421f8", entity_id: "light.knx_interface_arbeiten_licht_mitte", kind: "state_is", type: "warning", enabled: true, value_source: { kind: "state", attribute: null }, states: ["on"], operator: null, threshold: null, release_threshold: null, duration_seconds: null, message_template: "Arbeitslicht an", group_id: null, level: null },
-    { rule_id: "rule_0e1a62fe63d7", entity_id: "climate.knx_interface_arbeiten_heizung_raum", kind: "numeric", type: "warning", enabled: true, value_source: { kind: "attribute", attribute: "temperature" }, states: [], operator: "gt", threshold: 15, release_threshold: 3, duration_seconds: null, message_template: "Hot in here", group_id: null, level: null },
-    { rule_id: "rule_67b741ae555f", entity_id: "person.florian_witt", kind: "state_is", type: "info", enabled: true, value_source: { kind: "state", attribute: null }, states: ["home"], operator: null, threshold: null, release_threshold: null, duration_seconds: null, message_template: "{name}: {state}", group_id: null, level: null },
-    { rule_id: "rule_0963d2881c46", entity_id: "climate.knx_interface_arbeiten_heizung_raum", kind: "state_is_not", type: "alarm", enabled: true, value_source: { kind: "attribute", attribute: "hvac_action" }, states: ["comfort"], operator: null, threshold: null, release_threshold: null, duration_seconds: null, message_template: "Heizung außer Rand und aBand", group_id: null, level: null },
-    { rule_id: "rule_428321a8ccc3", entity_id: "light.knx_interface_kuche_licht_kuchenzeile", kind: "state_is", type: "info", enabled: true, value_source: { kind: "state", attribute: null }, states: ["on"], operator: null, threshold: null, release_threshold: null, duration_seconds: null, message_template: "Licht in der Küche an", group_id: null, level: null },
-    { rule_id: "rule_e460259a7cf6", entity_id: "switch.diskstation", kind: "state_is", type: "info", enabled: true, value_source: { kind: "state", attribute: null }, states: ["on"], operator: null, threshold: null, release_threshold: null, duration_seconds: null, message_template: "{name}: an", group_id: null, level: null },
-    { rule_id: "rule_aa88d8de0cd8", entity_id: "binary_sensor.0x00158d0009f422e4_contact", kind: "state_is", type: "info", enabled: true, value_source: { kind: "state", attribute: null }, states: ["on"], operator: null, threshold: null, release_threshold: null, duration_seconds: null, message_template: "Fenster im Gästebad ist geöffnet", group_id: null, level: null },
-    { rule_id: "rule_ade621e3f228", entity_id: "binary_sensor.knx_interface_wohn_ess_status_terrassentur", kind: "state_is", type: "info", enabled: true, value_source: { kind: "state", attribute: null }, states: ["on"], operator: null, threshold: null, release_threshold: null, duration_seconds: null, message_template: "Terrassentür ist offen", group_id: null, level: null },
-    { rule_id: "rule_448b216f8029", entity_id: "binary_sensor.knx_interface_wohn_ess_status_gartentur", kind: "state_is", type: "info", enabled: true, value_source: { kind: "state", attribute: null }, states: ["on"], operator: null, threshold: null, release_threshold: null, duration_seconds: null, message_template: "Gartentür ist geöffnet", group_id: null, level: null },
-    { rule_id: "rule_7bb2974e5a4a", entity_id: "switch.knx_interface_gastebad_schalten_handtuchtrockner", kind: "state_is", type: "warning", enabled: true, value_source: { kind: "state", attribute: null }, states: ["on"], operator: null, threshold: null, release_threshold: null, duration_seconds: 3600, message_template: "Handtuchtrocker im Gästebad ist länger als 60min an.", group_id: null, level: null },
+    { rule_id: "rule_terrasse", entity_id: "binary_sensor.wohnzimmer_terrassentuer", kind: "state_is", type: "info", enabled: true, value_source: { kind: "state", attribute: null }, states: ["on"], operator: null, threshold: null, release_threshold: null, duration_seconds: null, message_template: "Terrassentür ist offen", group_id: null, level: null },
+    { rule_id: "rule_haustuer", entity_id: "binary_sensor.flur_haustuer", kind: "state_is", type: "alarm", enabled: true, value_source: { kind: "state", attribute: null }, states: ["on"], operator: null, threshold: null, release_threshold: null, duration_seconds: 120, message_template: "Haustür steht seit zwei Minuten offen", group_id: null, level: null },
+    { rule_id: "rule_kuechenfenster", entity_id: "binary_sensor.kueche_fenster", kind: "state_is", type: "warning", enabled: true, value_source: { kind: "state", attribute: null }, states: ["on"], operator: null, threshold: null, release_threshold: null, duration_seconds: 900, message_template: "Küchenfenster länger als 15 min offen", group_id: null, level: null },
+    { rule_id: "rule_arbeitsplatte", entity_id: "light.kueche_arbeitsplatte", kind: "state_is", type: "info", enabled: true, value_source: { kind: "state", attribute: null }, states: ["on"], operator: null, threshold: null, release_threshold: null, duration_seconds: null, message_template: "{name} an", group_id: null, level: null },
+    { rule_id: "rule_luftfeuchte", entity_id: "sensor.bad_luftfeuchte", kind: "numeric", type: "warning", enabled: true, value_source: { kind: "state", attribute: null }, states: [], operator: "gt", threshold: 70, release_threshold: 60, duration_seconds: null, message_template: "Luftfeuchte im Bad bei {value} {unit}", group_id: null, level: null },
+    { rule_id: "rule_klima_temp", entity_id: "climate.schlafzimmer_heizung", kind: "numeric", type: "warning", enabled: true, value_source: { kind: "attribute", attribute: "temperature" }, states: [], operator: "gt", threshold: 23, release_threshold: 21, duration_seconds: null, message_template: "Schlafzimmer auf {value} °C gestellt", group_id: null, level: null },
+    { rule_id: "rule_klima_modus", entity_id: "climate.schlafzimmer_heizung", kind: "state_is_not", type: "info", enabled: true, value_source: { kind: "attribute", attribute: "hvac_action" }, states: ["idle", "heating"], operator: null, threshold: null, release_threshold: null, duration_seconds: null, message_template: "Heizung in ungewohntem Zustand", group_id: null, level: null },
+    { rule_id: "rule_leck", entity_id: "binary_sensor.waschkueche_leckmelder", kind: "state_is", type: "alarm", enabled: true, value_source: { kind: "state", attribute: null }, states: ["on"], operator: null, threshold: null, release_threshold: null, duration_seconds: null, message_template: "Wasser in der Waschküche", group_id: null, level: null },
+    { rule_id: "rule_loetstation", entity_id: "switch.hobbyraum_loetstation", kind: "state_is", type: "warning", enabled: true, value_source: { kind: "state", attribute: null }, states: ["on"], operator: null, threshold: null, release_threshold: null, duration_seconds: 3600, message_template: "Lötstation läuft seit über einer Stunde", group_id: null, level: null },
+    { rule_id: "rule_nas", entity_id: "switch.netzwerkspeicher", kind: "state_is", type: "info", enabled: true, value_source: { kind: "state", attribute: null }, states: ["on"], operator: null, threshold: null, release_threshold: null, duration_seconds: null, message_template: "{name}: an", group_id: null, level: null },
+    { rule_id: "rule_alex", entity_id: "person.alex", kind: "state_is", type: "info", enabled: true, value_source: { kind: "state", attribute: null }, states: ["home"], operator: null, threshold: null, release_threshold: null, duration_seconds: null, message_template: "{name} ist zu Hause", group_id: null, level: null },
   ],
   groups: [],
   settings: { paused: false, retention_days: 90, max_events: 5000, analysis_days: 7, setup_completed: true },
@@ -42,64 +54,64 @@ export const GET_CONFIG = {
 
 export const GET_ACTIVE = {
   api_version: 1,
-  version: "1.1.3",
-  counts: { info: 3, warning: 2, alarm: 2, active: 7, events_today: 74 },
+  version: "1.1.4",
+  counts: { info: 3, warning: 2, alarm: 2, active: 7, events_today: 23 },
   paused: false,
   active: [
-    { event_id: "afb15bb645b243ac94244d7deda9dc93", source: "entity_rule", type: "alarm", active: true, start_time: "2026-08-28T20:24:41.544680+00:00", end_time: null, duration: 43.6, title: null, message: "Bewegungs im Flur", entity_id: "binary_sensor.knx_interface_flureg_sensor_bewegung", area_id: "flureg", rule_id: "rule_469851a9bd92" },
-    { event_id: "f04ddb321d39458b8163a886e192456f", source: "entity_rule", type: "warning", active: true, start_time: "2026-08-28T19:52:45.959410+00:00", end_time: null, duration: 1959.2, title: null, message: "Hot in here", entity_id: "climate.knx_interface_arbeiten_heizung_raum", area_id: "buro", rule_id: "rule_0e1a62fe63d7" },
-    { event_id: "73f3b59b54534710b572de1af9e9e40d", source: "entity_rule", type: "warning", active: true, start_time: "2026-08-28T19:49:39.930632+00:00", end_time: null, duration: 2145.2, title: null, message: "Arbeitslicht an", entity_id: "light.knx_interface_arbeiten_licht_mitte", area_id: "buro", rule_id: "rule_0dd3a15421f8" },
-    { event_id: "5824ea61f5314840b4ecb7b275b9a100", source: "entity_rule", type: "alarm", active: true, start_time: "2026-08-28T19:49:29.307660+00:00", end_time: null, duration: 2155.8, title: null, message: "Heizung außer Rand und aBand", entity_id: "climate.knx_interface_arbeiten_heizung_raum", area_id: "buro", rule_id: "rule_0963d2881c46" },
-    { event_id: "c215d285db644175871c004161949048", source: "entity_rule", type: "info", active: true, start_time: "2026-08-28T19:49:28.902660+00:00", end_time: null, duration: 2156.0, title: null, message: "Licht aus im Arbeitszimmer", entity_id: "light.knx_interface_arbeiten_licht_fenster", area_id: "buro", rule_id: "rule_b07214cb5729" },
-    { event_id: "fb819d1b96544f8eb471248d558f0a23", source: "entity_rule", type: "info", active: true, start_time: "2026-08-26T11:11:05.096430+00:00", end_time: null, duration: 205526.9, title: null, message: "Diskstation: an", entity_id: "switch.diskstation", area_id: null, rule_id: "rule_e460259a7cf6" },
-    { event_id: "7612d7b55036491ab8b0fdca287af433", source: "entity_rule", type: "info", active: true, start_time: "2026-08-26T04:50:20.093748+00:00", end_time: null, duration: 228371.9, title: null, message: "Florian Witt: home", entity_id: "person.florian_witt", area_id: null, rule_id: "rule_67b741ae555f" },
+    { event_id: "ev_leck", source: "entity_rule", type: "alarm", active: true, start_time: vor(4), end_time: null, duration: seit(4), title: null, message: "Wasser in der Waschküche", entity_id: "binary_sensor.waschkueche_leckmelder", area_id: "waschkueche", rule_id: "rule_leck" },
+    { event_id: "ev_haustuer", source: "entity_rule", type: "alarm", active: true, start_time: vor(9), end_time: null, duration: seit(9), title: null, message: "Haustür steht seit zwei Minuten offen", entity_id: "binary_sensor.flur_haustuer", area_id: "flur", rule_id: "rule_haustuer" },
+    { event_id: "ev_luftfeuchte", source: "entity_rule", type: "warning", active: true, start_time: vor(26), end_time: null, duration: seit(26), title: null, message: "Luftfeuchte im Bad bei 74 %", entity_id: "sensor.bad_luftfeuchte", area_id: "bad", rule_id: "rule_luftfeuchte" },
+    { event_id: "ev_loetstation", source: "entity_rule", type: "warning", active: true, start_time: vor(83), end_time: null, duration: seit(83), title: null, message: "Lötstation läuft seit über einer Stunde", entity_id: "switch.hobbyraum_loetstation", area_id: "hobbyraum", rule_id: "rule_loetstation" },
+    { event_id: "ev_terrasse", source: "entity_rule", type: "info", active: true, start_time: vor(41), end_time: null, duration: seit(41), title: null, message: "Terrassentür ist offen", entity_id: "binary_sensor.wohnzimmer_terrassentuer", area_id: "wohnzimmer", rule_id: "rule_terrasse" },
+    { event_id: "ev_arbeitsplatte", source: "entity_rule", type: "info", active: true, start_time: vor(52), end_time: null, duration: seit(52), title: null, message: "Licht Arbeitsplatte an", entity_id: "light.kueche_arbeitsplatte", area_id: "kueche", rule_id: "rule_arbeitsplatte" },
+    { event_id: "ev_alex", source: "entity_rule", type: "info", active: true, start_time: vor(447), end_time: null, duration: seit(447), title: null, message: "Alex ist zu Hause", entity_id: "person.alex", area_id: null, rule_id: "rule_alex" },
   ],
 };
 
 export const GET_COUNTS = {
   api_version: 1,
-  version: "1.1.3",
-  counts: { info: 3, warning: 2, alarm: 2, active: 7, events_today: 74 },
+  version: "1.1.4",
+  counts: { info: 3, warning: 2, alarm: 2, active: 7, events_today: 23 },
 };
 
 export const GET_HISTORY = {
   api_version: 1,
-  version: "1.1.3",
-  total: 119,
+  version: "1.1.4",
+  total: 214,
   offset: 0,
   has_more: true,
   events: [
-    { event_id: "afb15bb645b243ac94244d7deda9dc93", source: "entity_rule", type: "alarm", active: true, start_time: "2026-08-28T20:24:41.544680+00:00", end_time: null, duration: 43.6, message: "Bewegungs im Flur", entity_id: "binary_sensor.knx_interface_flureg_sensor_bewegung", area_id: "flureg" },
-    { event_id: "292c2cda3ad64d7ea45ecbb4c9c1a550", source: "entity_rule", type: "info", active: false, start_time: "2026-08-28T20:17:11.462021+00:00", end_time: "2026-08-28T20:17:52.065074+00:00", duration: 40.6, message: "Licht in der Küche an", entity_id: "light.knx_interface_kuche_licht_kuchenzeile", area_id: "kuche" },
-    { event_id: "f2a518ae02144f9aa20046ed6cf2e53f", source: "entity_rule", type: "alarm", active: false, start_time: "2026-08-28T20:15:09.302275+00:00", end_time: "2026-08-28T20:21:16.848860+00:00", duration: 367.5, message: "Bewegungs im Flur", entity_id: "binary_sensor.knx_interface_flureg_sensor_bewegung", area_id: "flureg" },
-    { event_id: "3fb8591db6d74800bab759599a5fa00c", source: "entity_rule", type: "alarm", active: false, start_time: "2026-08-28T19:54:07.976246+00:00", end_time: "2026-08-28T20:01:12.885556+00:00", duration: 424.9, message: "Bewegungs im Flur", entity_id: "binary_sensor.knx_interface_flureg_sensor_bewegung", area_id: "flureg" },
-    { event_id: "f04ddb321d39458b8163a886e192456f", source: "entity_rule", type: "warning", active: true, start_time: "2026-08-28T19:52:45.959410+00:00", end_time: null, duration: 1959.2, message: "Hot in here", entity_id: "climate.knx_interface_arbeiten_heizung_raum", area_id: "buro" },
-    { event_id: "d84900d443664f07aaaedac3c74c6813", source: "entity_rule", type: "info", active: false, start_time: "2026-08-28T19:50:02.636521+00:00", end_time: "2026-08-28T19:55:40.848203+00:00", duration: 338.2, message: "Licht in der Küche an", entity_id: "light.knx_interface_kuche_licht_kuchenzeile", area_id: "kuche" },
-    { event_id: "73f3b59b54534710b572de1af9e9e40d", source: "entity_rule", type: "warning", active: true, start_time: "2026-08-28T19:49:39.930632+00:00", end_time: null, duration: 2145.2, message: "Arbeitslicht an", entity_id: "light.knx_interface_arbeiten_licht_mitte", area_id: "buro" },
-    { event_id: "5824ea61f5314840b4ecb7b275b9a100", source: "entity_rule", type: "alarm", active: true, start_time: "2026-08-28T19:49:29.307660+00:00", end_time: null, duration: 2155.8, message: "Heizung außer Rand und aBand", entity_id: "climate.knx_interface_arbeiten_heizung_raum", area_id: "buro" },
-    { event_id: "890610d1135f4cfab7954b5bfc6638d5", source: "entity_rule", type: "alarm", active: false, start_time: "2026-08-28T19:49:29.053625+00:00", end_time: "2026-08-28T19:53:50.904931+00:00", duration: 261.9, message: "Bewegungs im Flur", entity_id: "binary_sensor.knx_interface_flureg_sensor_bewegung", area_id: "flureg" },
+    { event_id: "ev_leck", source: "entity_rule", type: "alarm", active: true, start_time: vor(4), end_time: null, duration: seit(4), message: "Wasser in der Waschküche", entity_id: "binary_sensor.waschkueche_leckmelder", area_id: "waschkueche" },
+    { event_id: "ev_haustuer", source: "entity_rule", type: "alarm", active: true, start_time: vor(9), end_time: null, duration: seit(9), message: "Haustür steht seit zwei Minuten offen", entity_id: "binary_sensor.flur_haustuer", area_id: "flur" },
+    { event_id: "ev_luftfeuchte", source: "entity_rule", type: "warning", active: true, start_time: vor(26), end_time: null, duration: seit(26), message: "Luftfeuchte im Bad bei 74 %", entity_id: "sensor.bad_luftfeuchte", area_id: "bad" },
+    { event_id: "ev_fenster_zu", source: "entity_rule", type: "warning", active: false, start_time: vor(64), end_time: vor(38), duration: 1560, message: "Küchenfenster länger als 15 min offen", entity_id: "binary_sensor.kueche_fenster", area_id: "kueche" },
+    { event_id: "ev_wartung", source: "automation", type: "info", active: false, start_time: vor(95), end_time: vor(92), duration: 180, message: "Sicherung abgeschlossen", entity_id: null, area_id: null },
+    { event_id: "ev_terrasse_alt", source: "entity_rule", type: "info", active: false, start_time: vor(160), end_time: vor(151), duration: 540, message: "Terrassentür ist offen", entity_id: "binary_sensor.wohnzimmer_terrassentuer", area_id: "wohnzimmer" },
+    { event_id: "ev_klima", source: "entity_rule", type: "warning", active: false, start_time: vor(220), end_time: vor(180), duration: 2400, message: "Schlafzimmer auf 24.0 °C gestellt", entity_id: "climate.schlafzimmer_heizung", area_id: "schlafzimmer" },
+    { event_id: "ev_licht_alt", source: "entity_rule", type: "info", active: false, start_time: vor(300), end_time: vor(240), duration: 3600, message: "Licht Arbeitsplatte an", entity_id: "light.kueche_arbeitsplatte", area_id: "kueche" },
+    { event_id: "ev_leck_alt", source: "entity_rule", type: "alarm", active: false, start_time: vor(1400), end_time: vor(1385), duration: 900, message: "Wasser in der Waschküche", entity_id: "binary_sensor.waschkueche_leckmelder", area_id: "waschkueche" },
   ],
 };
 
 export const DISCOVER = {
   api_version: 1,
-  version: "1.1.3",
+  version: "1.1.4",
   entities: [
-    { entity_id: "sensor.knx_interface_gastebad_temperatur_raum", name: "Gästebad Temperatur Raum", domain: "sensor", state: "22.74", device_class: "temperature", unit: "°C", device_id: "093d2a2d30f52032f1ae991a6e375000", device_name: "KNX Interface", area_id: "gastebad", area_name: "Gästebad", monitored: true, rule_count: 0, has_suggestions: false },
-    { entity_id: "light.beleuchtung_gastebad", name: "Beleuchtung_Gästebad", domain: "light", state: "unavailable", device_class: null, unit: null, device_id: "69c4fb49bf4c2f733f875997108fbe82", device_name: "Beleuchtung_Gästebad", area_id: "gastebad", area_name: "Gästebad", monitored: false, rule_count: 0, has_suggestions: false },
-    { entity_id: "sensor.knx_interface_gastebad_heizung_stellwert", name: "Gästebad Heizung Stellwert", domain: "sensor", state: "0", device_class: null, unit: "%", device_id: "093d2a2d30f52032f1ae991a6e375000", device_name: "KNX Interface", area_id: "gastebad", area_name: "Gästebad", monitored: false, rule_count: 0, has_suggestions: false },
-    { entity_id: "light.knx_interface_gastebad_licht_spiegel", name: "Gästebad Licht Spiegel", domain: "light", state: "off", device_class: null, unit: null, device_id: "093d2a2d30f52032f1ae991a6e375000", device_name: "KNX Interface", area_id: "gastebad", area_name: "Gästebad", monitored: false, rule_count: 0, has_suggestions: true },
+    { entity_id: "sensor.bad_luftfeuchte", name: "Luftfeuchte Bad", domain: "sensor", state: "74", device_class: "humidity", unit: "%", device_id: "dev_klima_1", device_name: "Klimasensor Bad", area_id: "bad", area_name: "Bad", monitored: true, rule_count: 1, has_suggestions: false },
+    { entity_id: "binary_sensor.bad_fenster", name: "Badfenster", domain: "binary_sensor", state: "off", device_class: "window", unit: null, device_id: "dev_kontakt_4", device_name: "Fensterkontakt Bad", area_id: "bad", area_name: "Bad", monitored: false, rule_count: 0, has_suggestions: true },
+    { entity_id: "sensor.bad_temperatur", name: "Temperatur Bad", domain: "sensor", state: "22.4", device_class: "temperature", unit: "°C", device_id: "dev_klima_1", device_name: "Klimasensor Bad", area_id: "bad", area_name: "Bad", monitored: false, rule_count: 0, has_suggestions: true },
+    { entity_id: "light.bad_spiegel", name: "Spiegellicht", domain: "light", state: "off", device_class: null, unit: null, device_id: "dev_licht_2", device_name: "Spiegellicht", area_id: "bad", area_name: "Bad", monitored: false, rule_count: 0, has_suggestions: false },
   ],
 };
 
 export const GET_SUGGESTIONS = {
   api_version: 1,
-  version: "1.1.3",
-  entity_id: "light.knx_interface_arbeiten_licht_fenster",
+  version: "1.1.4",
+  entity_id: "binary_sensor.bad_fenster",
   suggestions: [
     {
       key: "window_open",
-      title: "Warnung, wenn das Fenster laenger offen steht",
+      title: "Warnung, wenn das Fenster länger als 15 min offen steht",
       confidence: "high",
       kind: "state_is",
       type: "warning",
@@ -110,20 +122,22 @@ export const GET_SUGGESTIONS = {
       duration_seconds: 900,
       message_template: "{name} steht offen",
       reasons: [
-        { label: "Geraeteklasse", value: "window" },
-        { label: "Grundlage", value: "allgemein uebliche Schwelle" },
+        { label: "Geräteklasse", value: "window" },
+        { label: "Grundlage", value: "allgemein übliche Schwelle" },
       ],
     },
   ],
   states: ["on", "off"],
-  attributes: [{ name: "temperature", kind: "numeric", value: 21.5 }],
+  attributes: [{ name: "temperature", kind: "numeric", value: 22.4 }],
 };
 
 /** Bereiche, wie das Frontend sie aus `hass.areas` bekommt. */
 export const AREAS = {
-  buro: { area_id: "buro", name: "Arbeiten" },
-  flureg: { area_id: "flureg", name: "Flur EG" },
-  gastebad: { area_id: "gastebad", name: "Gästebad" },
-  kuche: { area_id: "kuche", name: "Küche" },
-  wohnzimmer: { area_id: "wohnzimmer", name: "WohnEsszimmer" },
+  wohnzimmer: { area_id: "wohnzimmer", name: "Wohnzimmer" },
+  flur: { area_id: "flur", name: "Flur" },
+  kueche: { area_id: "kueche", name: "Küche" },
+  bad: { area_id: "bad", name: "Bad" },
+  schlafzimmer: { area_id: "schlafzimmer", name: "Schlafzimmer" },
+  waschkueche: { area_id: "waschkueche", name: "Waschküche" },
+  hobbyraum: { area_id: "hobbyraum", name: "Hobbyraum" },
 };

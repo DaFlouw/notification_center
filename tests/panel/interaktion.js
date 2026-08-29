@@ -91,9 +91,9 @@ async function seite(id) {
 }
 
 /** Oeffnet den Regel-Editor einer Entity mit zwei Regeln. */
-const HEIZUNG = "climate.knx_interface_arbeiten_heizung_raum";
-const REGEL_NUMERISCH = "rule_0e1a62fe63d7";
-const REGEL_ZUSTAND = "rule_0963d2881c46";
+const HEIZUNG = "climate.schlafzimmer_heizung";
+const REGEL_NUMERISCH = "rule_klima_temp";
+const REGEL_ZUSTAND = "rule_klima_modus";
 
 async function oeffneEditor(regelId = REGEL_NUMERISCH) {
   await seite("rules");
@@ -204,8 +204,8 @@ const FAELLE = [
     async fn() {
       await seite("history");
       const ab = marke();
-      await waehle('[data-filter="bereich"]', "kuche");
-      gleich(letztes(ab, "get_history").nachricht.area_ids, ["kuche"], "area_ids");
+      await waehle('[data-filter="bereich"]', "kueche");
+      gleich(letztes(ab, "get_history").nachricht.area_ids, ["kueche"], "area_ids");
     },
   },
   {
@@ -260,12 +260,12 @@ const FAELLE = [
     async fn() {
       await seite("history");
       await waehle('[data-filter="typ"]', "alarm");
-      await waehle('[data-filter="bereich"]', "flureg");
+      await waehle('[data-filter="bereich"]', "flur");
       const ab = marke();
       await waehle('[data-filter="quelle"]', "entity_rule");
       const nachricht = letztes(ab, "get_history").nachricht;
       gleich(nachricht.types, ["alarm"], "types");
-      gleich(nachricht.area_ids, ["flureg"], "area_ids");
+      gleich(nachricht.area_ids, ["flur"], "area_ids");
       gleich(nachricht.sources, ["entity_rule"], "sources");
     },
   },
@@ -354,7 +354,7 @@ const FAELLE = [
     titel: "'Bearbeiten' oeffnet den Editor mit genau dieser Regel",
     async fn() {
       await oeffneEditor(REGEL_ZUSTAND);
-      pruefe(window.__text().includes("Arbeiten Heizung Raum"), "falsche Entity");
+      pruefe(window.__text().includes("Heizung Schlafzimmer"), "falsche Entity");
       const offen = SR().querySelector(".row.editing");
       pruefe(offen, "keine Zeile als in Bearbeitung markiert");
       pruefe(offen.textContent.includes("hvac_action"), "die falsche Zeile ist offen");
