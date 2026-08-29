@@ -137,6 +137,12 @@ window.__text = () => panel.shadowRoot.textContent.replace(/\s+/g, " ").trim();
 const ausgabe = document.getElementById("ausgabe");
 const stand = document.getElementById("stand");
 
+// Mit ?rein bleibt die Testleiste weg -- fuer die Bilder der Dokumentation.
+if (new URLSearchParams(location.search).has("rein")) {
+  document.getElementById("leiste").style.display = "none";
+  ausgabe.style.display = "none";
+}
+
 window.__lauf = async () => {
   stand.textContent = " läuft …";
   const ergebnis = await lauf();
@@ -150,6 +156,55 @@ window.__lauf = async () => {
 };
 
 document.getElementById("start").addEventListener("click", () => window.__lauf());
+
+/* Fuer die Bilder der Dokumentation: ?zoom=2 rendert alles doppelt so gross,
+   damit die Aufnahme scharf bleibt statt hochskaliert zu werden. */
+(() => {
+  const wert = new URLSearchParams(location.search).get("zoom");
+  if (wert) document.body.style.zoom = wert;
+  window.__zoom = wert;
+})();
+
+/* Direktlinks fuer die Bilder der Dokumentation. Headless-Browser koennen
+   nicht klicken; ueber ?seite= faehrt der Pruefstand die Ansicht selbst an. */
+(async () => {
+  const p = new URLSearchParams(location.search);
+  const ziel = p.get("seite");
+  if (!ziel) return;
+
+  const warte = (ms) => new Promise((r) => setTimeout(r, ms));
+  const bis = async (auswahl, grenze = 3000) => {
+    const ende = Date.now() + grenze;
+    for (;;) {
+      const treffer = panel.shadowRoot.querySelector(auswahl);
+      if (treffer) return treffer;
+      if (Date.now() > ende) throw new Error(`erschien nicht: ${auswahl}`);
+      await warte(25);
+    }
+  };
+
+  await warte(200);
+
+  if (ziel === "editor") {
+    const regel = p.get("regel") || "rule_klima_temp";
+    (await bis('nav button[data-page="rules"]')).click();
+    (await bis(`[data-action="edit-rule"][data-rule="${regel}"]`)).click();
+    await bis('[data-rule-field="kind"]');
+  } else if (ziel === "discovery") {
+    (await bis('nav button[data-page="discovery"]')).click();
+    if (p.has("vorschlaege")) {
+      (await bis('[data-action="show-suggestions"]')).click();
+      await bis(".suggestions");
+      const auf = panel.shadowRoot.querySelector(".suggestions details");
+      if (auf) auf.open = true;
+    }
+  } else {
+    (await bis(`nav button[data-page="${ziel}"]`)).click();
+  }
+
+  await warte(150);
+  window.__bereit = true;
+})();
 </script>
 </body>
 </html>

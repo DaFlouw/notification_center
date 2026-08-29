@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Notification Center — Card-Pruefstand</title>
+<style>
+  html, body { margin: 0; padding: 24px; background: #f2f4f7; font-family: Roboto, system-ui, sans-serif; }
+  :root {
+    --primary-color: #03a9f4;
+    --primary-text-color: #212121;
+    --secondary-text-color: #727272;
+    --divider-color: rgba(0,0,0,.12);
+    --card-background-color: #fff;
+    --primary-background-color: #fafafa;
+    --error-color: #db4437;
+    --warning-color: #ffa600;
+    --ha-card-border-radius: 12px;
+    --ha-card-box-shadow: 0 2px 6px rgba(0,0,0,.12);
+  }
+  .buehne { display: flex; gap: 24px; align-items: flex-start; flex-wrap: wrap; }
+  .spalte { width: 380px; }
+  /* Home Assistant stellt ha-card; hier genuegt eine schlichte Nachbildung. */
+  notification-center-card {
+    display: block;
+    background: var(--card-background-color);
+    border-radius: var(--ha-card-border-radius);
+    box-shadow: var(--ha-card-box-shadow);
+    overflow: hidden;
+  }
+</style>
+</head>
+<body>
+<div class="buehne">
+  <div class="spalte"><notification-center-card id="liste"></notification-center-card></div>
+  <div class="spalte"><notification-center-card id="zaehler"></notification-center-card></div>
+</div>
+
+<script type="module">
+import { GET_ACTIVE, AREAS } from "./daten.js";
+import "../../custom_components/notification_center/frontend/notification-center-card.js";
+
+const hass = {
+  locale: { language: "de" },
+  areas: AREAS,
+  states: {},
+  connection: {
+    async sendMessagePromise(nachricht) {
+      if (String(nachricht.type).endsWith("get_active")) return GET_ACTIVE;
+      return { api_version: 1, version: GET_ACTIVE.version };
+    },
+    async subscribeMessage() {
+      return () => {};
+    },
+  },
+};
+
+const liste = document.getElementById("liste");
+liste.setConfig({ type: "custom:notification-center-card", title: "Meldungen", show_events_today: true });
+liste.hass = hass;
+
+const zaehler = document.getElementById("zaehler");
+zaehler.setConfig({ type: "custom:notification-center-card", mode: "counts", title: "Überblick" });
+zaehler.hass = hass;
+
+/* Fuer die Bilder der Dokumentation: ?zoom=2 rendert alles doppelt so gross,
+   damit die Aufnahme scharf bleibt statt hochskaliert zu werden. */
+(() => {
+  const wert = new URLSearchParams(location.search).get("zoom");
+  if (wert) document.body.style.zoom = wert;
+  window.__zoom = wert;
+})();
+</script>
+</body>
+</html>

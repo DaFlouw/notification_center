@@ -92,8 +92,8 @@ async function seite(id) {
 
 /** Oeffnet den Regel-Editor einer Entity mit zwei Regeln. */
 const HEIZUNG = "climate.schlafzimmer_heizung";
-const REGEL_NUMERISCH = "rule_000000000003";
-const REGEL_ZUSTAND = "rule_000000000001";
+const REGEL_NUMERISCH = "rule_klima_temp";
+const REGEL_ZUSTAND = "rule_klima_modus";
 
 async function oeffneEditor(regelId = REGEL_NUMERISCH) {
   await seite("rules");
