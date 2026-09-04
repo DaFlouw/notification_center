@@ -78,7 +78,12 @@ class NotificationCenterRuntime:
             _LOGGER.debug("Beim Start %s alte Ereignisse entfernt", entfernt)
 
         await self.notification_engine.async_start()
-        await self.rule_engine.async_start()
+        # Die Reihenfolge traegt: erst die offenen Meldungen wiederherstellen,
+        # dann die Rule Engine damit gleichziehen lassen. Sonst weiss sie
+        # nicht, welche Regeln bereits erfuellt sind, und beendet nichts mehr.
+        await self.rule_engine.async_start(
+            active_rules=self.notification_engine.active_rule_starts()
+        )
 
     async def async_stop(self) -> None:
         """Haelt die Engines an, sichert und schliesst die Ablagen."""

@@ -13,7 +13,7 @@ entstehen nur fuer Regeln, deren Bedingung bereits anliegt.
 from __future__ import annotations
 
 import logging
-from collections.abc import Awaitable, Callable, Iterable
+from collections.abc import Awaitable, Callable, Iterable, Mapping
 from datetime import datetime
 
 from homeassistant.core import CALLBACK_TYPE, Event, EventStateChangedData, HomeAssistant, callback
@@ -29,6 +29,7 @@ from ..notifications.models import CloseReason
 from ..storage.config_models import ConfigDocument
 from ..storage.config_store import ConfigStore
 from .evaluator import (
+    UNAVAILABLE_STATES,
     GroupState,
     Phase,
     RuleState,
@@ -76,10 +77,18 @@ class RuleEngine:
 
     # -- Lebenszyklus ----------------------------------------------------
 
-    async def async_start(self) -> None:
+    async def async_start(self, *, active_rules: Mapping[str, datetime] | None = None) -> None:
+        """Nimmt die Ueberwachung auf.
+
+        ``active_rules`` sind die aus der Datenbank wiederhergestellten
+        Meldungen: Regel-Kennung und Beginn. Sie muessen vor der ersten
+        Auswertung in den Regelzustand einfliessen, sonst haelt die Engine
+        jede Regel fuer unerfuellt und beendet nichts mehr.
+        """
         self.async_refresh_tracking()
+        self.async_adopt_active(active_rules or {})
         self.async_restore_timing()
-        await self.async_evaluate_all()
+        await self.async_evaluate_all(skip_unavailable=True)
 
     async def async_stop(self) -> None:
         if self._unsub_states is not None:
@@ -116,6 +125,50 @@ class RuleEngine:
         for key in list(self._timers):
             if key not in self._config.rules and key not in self._config.groups:
                 self._cancel_timer(key)
+
+    @callback
+    def async_adopt_active(self, active_rules: Mapping[str, datetime]) -> None:
+        """Uebernimmt wiederhergestellte Meldungen in den Regelzustand.
+
+        Nach einem Neustart holt die Notification-Engine die noch offenen
+        Meldungen aus der Datenbank. Der Regelzustand dagegen beginnt bei
+        null -- und damit hielt die Engine jede Regel fuer unerfuellt. Sie
+        beendet eine Meldung aber nur, wenn die Bedingung *vorher* erfuellt
+        war. Faellt die Bedingung waehrend des Neustarts oder kurz danach
+        weg, geschah deshalb gar nichts: die Meldung blieb stehen, bis ihre
+        Bedingung zufaellig noch einmal zutraf und wieder entfiel.
+
+        Beobachtet an einem Fensterkontakt, der nach einem Neustart fast
+        zwei Tage lang als offen gemeldet wurde, obwohl das Fenster eine
+        Minute nach dem Start geschlossen worden war.
+
+        Uebernommen wird auch der Beginn: die Wartezeit einer Zeitbedingung
+        soll nach einem Neustart nicht von vorn laufen (Spezifikation 37).
+        """
+        for rule_id, beginn in active_rules.items():
+            rule = self._config.rules.get(rule_id)
+            if rule is None:
+                # Die Regel wurde entfernt, waehrend die Meldung lief. Die
+                # Konfigurationsebene raeumt solche Meldungen auf.
+                continue
+
+            zustand = self._state_for(rule)
+            zustand.phase = Phase.SATISFIED
+            zustand.condition_since = beginn
+            zustand.satisfied_at = beginn
+
+            snapshot = self._snapshot(rule.entity_id)
+            if snapshot is not None:
+                zustand.last_state = snapshot.state
+
+            # Bei einer Gruppe muss auch die sichtbare Stufe wieder stimmen,
+            # sonst gilt der naechste Stufenwechsel als erster und die alte
+            # Stufe wird nie beendet.
+            if rule.group_id is not None and rule.level is not None:
+                gruppe = self._group_states.setdefault(
+                    rule.group_id, GroupState(group_id=rule.group_id)
+                )
+                gruppe.active_level = rule.level
 
     @callback
     def async_restore_timing(self) -> None:
@@ -206,14 +259,25 @@ class RuleEngine:
 
     # -- Auswertung ------------------------------------------------------
 
-    async def async_evaluate_all(self) -> None:
+    async def async_evaluate_all(self, *, skip_unavailable: bool = False) -> None:
         """Wertet alle ueberwachten Entities einmal aus.
 
         Wird beim Start und nach dem Ende einer Pause gebraucht
         (Spezifikation 43). Im laufenden Betrieb geschieht nichts dergleichen.
+
+        ``skip_unavailable`` ueberspringt Entities ohne belastbaren Zustand.
+        Beim Start ist das wichtig: die Integrationen sind dann noch am
+        Hochfahren, und ein voruebergehendes ``unavailable`` wuerde eine
+        wiederhergestellte Meldung beenden, die Sekunden spaeter mit neuem
+        Beginn wieder entstuende. Ein Zustandswechsel im laufenden Betrieb ist
+        dagegen eine echte Aussage und beendet die Meldung weiterhin.
         """
         jetzt = dt_util.utcnow()
         for entity_id in self._config.monitored_entity_ids:
+            if skip_unavailable:
+                snapshot = self._snapshot(entity_id)
+                if snapshot is None or str(snapshot.state).lower() in UNAVAILABLE_STATES:
+                    continue
             self._evaluate_entity(entity_id, jetzt)
 
     @callback
