@@ -21,7 +21,7 @@ export const EXPECTED_API_VERSION = 1;
  * hinterlegte Version deckt diesen Fall auf. Die CI prueft, dass sie zum
  * Manifest passt.
  */
-export const MODULE_VERSION = "1.1.4";
+export const MODULE_VERSION = "1.1.5";
 
 /**
  * Die Version dieses Frontends, abgelesen am eigenen Pfad.

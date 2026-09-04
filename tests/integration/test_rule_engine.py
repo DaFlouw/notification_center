@@ -357,3 +357,140 @@ async def test_das_saeen_ruehrt_bestehende_regeln_nicht_an(
     await hass.async_block_till_done()
 
     assert len(_ereignisse_von(runtime, "rule_fenster")) == 1
+
+
+# -- Neustart mit laufender Meldung ----------------------------------------
+
+
+async def _mit_dauerhafter_regel(
+    hass: HomeAssistant, config_entry: MockConfigEntry, **felder: object
+) -> NotificationCenterRuntime:
+    """Richtet eine Regel so ein, dass sie einen Neustart uebersteht.
+
+    ``_einrichten`` schreibt nur in den Speicher; hier soll die Regel wirklich
+    abgelegt werden, damit sie nach dem Neuladen noch da ist.
+    """
+    config_entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    laufzeit: NotificationCenterRuntime = config_entry.runtime_data
+    laufzeit.config.add_entity(WatchedEntity(entity_id=FENSTER))
+    await laufzeit.async_save_rule(fensterregel(rule_id="rule_fenster", **felder))
+    await hass.async_block_till_done()
+    return laufzeit
+
+
+async def _neu_laden(
+    hass: HomeAssistant, config_entry: MockConfigEntry
+) -> NotificationCenterRuntime:
+    await hass.config_entries.async_reload(config_entry.entry_id)
+    await hass.async_block_till_done()
+    return config_entry.runtime_data
+
+
+async def test_meldung_endet_wenn_die_bedingung_nach_einem_neustart_entfaellt(
+    hass: HomeAssistant, config_entry: MockConfigEntry
+) -> None:
+    """Der beobachtete Fall: Fenster nach einem Neustart fast zwei Tage offen.
+
+    Die Notification-Engine holt die offene Meldung aus der Datenbank, die
+    Rule Engine begann aber bei null. Sie beendet eine Meldung nur, wenn die
+    Bedingung *vorher* erfuellt war -- und hielt die Regel fuer unerfuellt.
+    Das Schliessen des Fensters blieb damit folgenlos.
+    """
+    hass.states.async_set(FENSTER, "off")
+    await _mit_dauerhafter_regel(hass, config_entry)
+
+    hass.states.async_set(FENSTER, "on")
+    await hass.async_block_till_done()
+    assert aktive(config_entry.runtime_data) == 1
+
+    laufzeit = await _neu_laden(hass, config_entry)
+    assert aktive(laufzeit) == 1, "die offene Meldung muss den Neustart ueberstehen"
+
+    hass.states.async_set(FENSTER, "off")
+    await hass.async_block_till_done()
+
+    assert aktive(laufzeit) == 0
+
+
+async def test_meldung_endet_wenn_die_bedingung_waehrend_des_stillstands_entfaellt(
+    hass: HomeAssistant, config_entry: MockConfigEntry
+) -> None:
+    """Das Fenster wird geschlossen, waehrend die Integration nicht laeuft."""
+    hass.states.async_set(FENSTER, "off")
+    await _mit_dauerhafter_regel(hass, config_entry)
+
+    hass.states.async_set(FENSTER, "on")
+    await hass.async_block_till_done()
+    assert aktive(config_entry.runtime_data) == 1
+
+    await hass.config_entries.async_unload(config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    hass.states.async_set(FENSTER, "off")
+    await hass.async_block_till_done()
+
+    assert await hass.config_entries.async_setup(config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    assert aktive(config_entry.runtime_data) == 0
+
+
+async def test_meldung_ueberdauert_den_neustart_mit_ihrem_beginn(
+    hass: HomeAssistant, config_entry: MockConfigEntry
+) -> None:
+    """Gilt die Bedingung weiter, bleibt es dieselbe Meldung.
+
+    Weder ein zweiter Eintrag noch ein neuer Beginn: sonst zerfiele ein
+    durchgehend offenes Fenster bei jedem Neustart in mehrere Ereignisse.
+    """
+    hass.states.async_set(FENSTER, "off")
+    await _mit_dauerhafter_regel(hass, config_entry)
+
+    hass.states.async_set(FENSTER, "on")
+    await hass.async_block_till_done()
+    vorher = config_entry.runtime_data.notification_engine.active_events()[0]
+
+    laufzeit = await _neu_laden(hass, config_entry)
+    ereignisse = laufzeit.notification_engine.active_events()
+
+    assert len(ereignisse) == 1
+    assert ereignisse[0].event_id == vorher.event_id
+    assert ereignisse[0].start_time == vorher.start_time
+
+
+async def test_ein_unavailable_beim_start_beendet_die_meldung_nicht(
+    hass: HomeAssistant, config_entry: MockConfigEntry
+) -> None:
+    """Beim Start fahren die Integrationen erst hoch.
+
+    Ein voruebergehendes ``unavailable`` ist dann keine Aussage ueber das
+    Fenster. Wuerde es die Meldung beenden, entstuende Sekunden spaeter eine
+    neue mit falschem Beginn.
+    """
+    hass.states.async_set(FENSTER, "off")
+    await _mit_dauerhafter_regel(hass, config_entry)
+
+    hass.states.async_set(FENSTER, "on")
+    await hass.async_block_till_done()
+    vorher = config_entry.runtime_data.notification_engine.active_events()[0]
+
+    await hass.config_entries.async_unload(config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    hass.states.async_set(FENSTER, "unavailable")
+    await hass.async_block_till_done()
+
+    assert await hass.config_entries.async_setup(config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    laufzeit: NotificationCenterRuntime = config_entry.runtime_data
+    assert aktive(laufzeit) == 1
+    assert laufzeit.notification_engine.active_events()[0].event_id == vorher.event_id
+
+    # Sobald der echte Zustand eintrifft, greift die normale Auswertung.
+    hass.states.async_set(FENSTER, "off")
+    await hass.async_block_till_done()
+    assert aktive(laufzeit) == 0

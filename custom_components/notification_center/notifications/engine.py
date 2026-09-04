@@ -85,6 +85,19 @@ class NotificationEngine:
     def active_events(self) -> list[NotificationEvent]:
         return self._active.events()
 
+    def active_rule_starts(self) -> dict[str, datetime]:
+        """Laufende Regel-Meldungen: Regel-Kennung und Beginn.
+
+        Die Rule Engine braucht das nach einem Neustart, um ihren Zustand mit
+        dem wiederhergestellten in Deckung zu bringen. Ohne diesen Abgleich
+        haelt sie jede Regel fuer unerfuellt und beendet nichts mehr.
+        """
+        return {
+            ereignis.rule_id: ereignis.start_time
+            for ereignis in self._active.events()
+            if ereignis.source is NotificationSource.ENTITY_RULE and ereignis.rule_id is not None
+        }
+
     # -- Lebenszyklus ----------------------------------------------------
 
     async def async_start(self) -> None:
