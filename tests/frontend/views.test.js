@@ -30,7 +30,7 @@ import {
   seitengroesse,
 } from "../../custom_components/notification_center/frontend/views/history.js";
 
-/** Nachgebildet aus einer echten Antwort von get_config. */
+/** Aufbau wie eine Antwort von get_config, Werte frei erfunden. */
 const ENTITIES = [
   {
     entity_id: "light.kueche_arbeitsplatte",
@@ -133,7 +133,7 @@ describe("Regeluebersicht", () => {
 
 describe("Uebergabe der Konfiguration an die Uebersicht", () => {
   /**
-   * Genau die Antwort, die get_config aus einer laufenden Instanz liefert.
+   * Aufgebaut wie eine Antwort von get_config, mit erfundenen Werten.
    *
    * Hier lag der Fehler: das Panel strich die Eintraege auf Kennung und Namen
    * zusammen, sodass Raum und Geschoss verschwanden, bevor sie die
@@ -146,8 +146,8 @@ describe("Uebergabe der Konfiguration an die Uebersicht", () => {
     entities: [
       {
         entity_id: "light.kueche_arbeitsplatte",
-        added_at: "2026-08-25T18:39:56.890704+00:00",
-        device_id: "dev_knoten_1",
+        added_at: "2026-01-15T09:00:00+00:00",
+        device_id: "dev_licht_1",
         area_id: "kueche",
         name: "Licht Arbeitsplatte",
         area_name: "Küche",
@@ -156,7 +156,7 @@ describe("Uebergabe der Konfiguration an die Uebersicht", () => {
       },
       {
         entity_id: "switch.netzwerkspeicher",
-        added_at: "2026-08-26T10:37:37.726173+00:00",
+        added_at: "2026-01-16T14:30:00+00:00",
         device_id: null,
         area_id: null,
         name: "Netzwerkspeicher",

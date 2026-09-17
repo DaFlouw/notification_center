@@ -308,13 +308,12 @@ Zu K im Einzelnen:
 * **K5** Dashboard zeigt genau die sieben aktiven Meldungen, nach Alarmen,
   Warnungen und Infos getrennt, mit Uhrzeit und Dauer; Fusszeile
   *74 Ereignisse heute*.
-* **K6** Regeln stehen unter *Erdgeschoss* mit den Raeumen Kueche, Flur,
-  Bad, Schlafzimmer, Wohnzimmer, darunter eingerueckt die Entities.
-  *Ohne Geschoss / Ohne Raum* steht am Ende. Alle zwoelf Regeln sind
-  vorhanden, je mit genau einem Bearbeiten-Knopf.
-* **K7** Beim Bearbeiten einer Regel von *Heizung Schlafzimmer* traegt deren
-  Zeile *wird bearbeitet* und keinen Knopf mehr, die zweite Regel derselben
-  Entity behaelt ihren. Das Formular ist mit den echten Werten gefuellt.
+* **K6** Regeln stehen unter ihrem Geschoss und darin unter ihrem Raum,
+  darunter eingerueckt die Entities. *Ohne Geschoss / Ohne Raum* steht am
+  Ende. Keine Regel fehlt, jede traegt genau einen Bearbeiten-Knopf.
+* **K7** Beim Bearbeiten einer Regel an einer Entity mit zwei Regeln traegt
+  deren Zeile *wird bearbeitet* und keinen Knopf mehr, die zweite Regel
+  derselben Entity behaelt ihren. Das Formular ist mit den echten Werten gefuellt.
 * **K8** Auswahl 50 / 100 / 200, vorgewaehlt 100. Die Abfrage ging mit
   `limit: 100` hinaus; nach dem Umstellen auf 200 mit `limit: 200, offset: 0`.
 * **K9** Die Typauswahl fuehrt *Alle Typen* sowie die Gruppen *Geraete* (15
