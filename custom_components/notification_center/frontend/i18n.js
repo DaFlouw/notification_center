@@ -17,9 +17,10 @@
 
 import de from "./translations/de.js";
 import en from "./translations/en.js";
+import es from "./translations/es.js";
 
 /** Alle mitgelieferten Sprachen. Der Schluessel ist der ISO-Code. */
-export const SPRACHEN = { en, de };
+export const SPRACHEN = { en, de, es };
 
 export const GRUNDSPRACHE = "en";
 

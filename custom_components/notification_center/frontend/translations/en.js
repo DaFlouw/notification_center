@@ -173,6 +173,8 @@ export default {
   "card.more_one": "and {count} more",
   "card.more_other": "and {count} more",
   "card.historyTitle": "Today",
+  "card.historyShow": "Today →",
+  "card.historyHide": "Hide",
   "card.historyEmpty": "No events today",
   "card.historyActive": "active",
   "card.backendOutdated": "Home Assistant is running an older version. Please restart.",

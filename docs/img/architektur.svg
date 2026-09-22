@@ -1,0 +1,144 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1040 720" width="1040" height="720" role="img" aria-labelledby="titel beschreibung" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif">
+  <title id="titel">Architecture of the Notification Center</title>
+  <desc id="beschreibung">Home Assistant delivers state changes, registry data and history. The integration decides in the backend what a notification is: the rule engine evaluates conditions, the notification engine owns the active set and writes the history, discovery proposes rules, storage keeps configuration and events. The API exposes WebSocket commands and services. Panel, card and automations only call that API; the panel and the card display, they decide nothing.</desc>
+
+  <defs>
+    <marker id="pfeil" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#57606a"/>
+    </marker>
+    <marker id="pfeilhell" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#8c959f"/>
+    </marker>
+  </defs>
+
+  <rect width="1040" height="720" fill="#ffffff"/>
+
+  <!-- Home Assistant -->
+  <rect x="24" y="24" width="992" height="104" rx="10" fill="#f2fbff" stroke="#41bdf5" stroke-width="1.5"/>
+  <text x="44" y="52" font-size="15" font-weight="600" fill="#0b6e99">Home Assistant</text>
+
+  <g font-size="13" fill="#1f2328">
+    <rect x="44" y="64" width="290" height="44" rx="7" fill="#ffffff" stroke="#b6e3f7"/>
+    <text x="60" y="82" font-weight="600">State machine and event bus</text>
+    <text x="60" y="99" fill="#57606a" font-size="12">state_changed of the adopted entities</text>
+
+    <rect x="354" y="64" width="290" height="44" rx="7" fill="#ffffff" stroke="#b6e3f7"/>
+    <text x="370" y="82" font-weight="600">Registries</text>
+    <text x="370" y="99" fill="#57606a" font-size="12">entity, device, area and floor</text>
+
+    <rect x="664" y="64" width="332" height="44" rx="7" fill="#ffffff" stroke="#b6e3f7"/>
+    <text x="680" y="82" font-weight="600">Recorder</text>
+    <text x="680" y="99" fill="#57606a" font-size="12">long-term statistics, read on request only</text>
+  </g>
+
+  <!-- Integration: Beschriftung ueber dem Rahmen, damit die Pfeile freie Bahn haben -->
+  <text x="24" y="196" font-size="15" font-weight="600" fill="#1f2328">custom_components/notification_center</text>
+  <text x="330" y="196" font-size="12.5" fill="#57606a">every decision lives here</text>
+
+  <rect x="24" y="208" width="992" height="300" rx="10" fill="#fbfcfd" stroke="#d0d7de" stroke-width="1.5"/>
+
+  <!-- rules -->
+  <rect x="44" y="228" width="300" height="118" rx="8" fill="#ffffff" stroke="#d0d7de"/>
+  <rect x="44" y="228" width="300" height="4" rx="2" fill="#0969da"/>
+  <text x="60" y="254" font-size="13.5" font-weight="600" fill="#1f2328">rules/</text>
+  <text x="60" y="274" font-size="12.5" fill="#1f2328">Decides when a notification</text>
+  <text x="60" y="291" font-size="12.5" fill="#1f2328">starts and when it ends.</text>
+  <text x="60" y="314" font-size="11.5" fill="#57606a">state listener · evaluator · timers</text>
+  <text x="60" y="331" font-size="11.5" fill="#57606a">hysteresis · time conditions · groups</text>
+
+  <!-- notifications -->
+  <rect x="370" y="228" width="300" height="118" rx="8" fill="#ffffff" stroke="#d0d7de"/>
+  <rect x="370" y="228" width="300" height="4" rx="2" fill="#bf3989"/>
+  <text x="386" y="254" font-size="13.5" font-weight="600" fill="#1f2328">notifications/</text>
+  <text x="386" y="274" font-size="12.5" fill="#1f2328">Owns the active set, writes</text>
+  <text x="386" y="291" font-size="12.5" fill="#1f2328">the history, keeps the counters.</text>
+  <text x="386" y="314" font-size="11.5" fill="#57606a">engine · lifecycle · models</text>
+  <text x="386" y="331" font-size="11.5" fill="#57606a">restores running events on start</text>
+
+  <!-- discovery -->
+  <rect x="696" y="228" width="300" height="118" rx="8" fill="#ffffff" stroke="#d0d7de"/>
+  <rect x="696" y="228" width="300" height="4" rx="2" fill="#1a7f37"/>
+  <text x="712" y="254" font-size="13.5" font-weight="600" fill="#1f2328">discovery/</text>
+  <text x="712" y="274" font-size="12.5" fill="#1f2328">Finds entities and proposes</text>
+  <text x="712" y="291" font-size="12.5" fill="#1f2328">rules for them.</text>
+  <text x="712" y="314" font-size="11.5" fill="#57606a">search · history analysis · suggestions</text>
+  <text x="712" y="331" font-size="11.5" fill="#57606a">quantiles, no model, no inference</text>
+
+  <!-- storage -->
+  <rect x="44" y="376" width="300" height="112" rx="8" fill="#ffffff" stroke="#d0d7de"/>
+  <rect x="44" y="376" width="300" height="4" rx="2" fill="#9a6700"/>
+  <text x="60" y="402" font-size="13.5" font-weight="600" fill="#1f2328">storage/</text>
+  <text x="60" y="422" font-size="12.5" fill="#1f2328">Keeps what has to survive</text>
+  <text x="60" y="439" font-size="12.5" fill="#1f2328">a restart.</text>
+  <text x="60" y="462" font-size="11.5" fill="#57606a">configuration as JSON in HA storage</text>
+  <text x="60" y="479" font-size="11.5" fill="#57606a">events in SQLite, filtered server-side</text>
+
+  <!-- api -->
+  <rect x="370" y="376" width="626" height="112" rx="8" fill="#ffffff" stroke="#d0d7de"/>
+  <rect x="370" y="376" width="626" height="4" rx="2" fill="#57606a"/>
+  <text x="386" y="402" font-size="13.5" font-weight="600" fill="#1f2328">api/</text>
+  <text x="386" y="422" font-size="12.5" fill="#1f2328">The only way in: WebSocket commands for the interface,</text>
+  <text x="386" y="439" font-size="12.5" fill="#1f2328">services for automations, an event on the bus for everyone else.</text>
+  <text x="386" y="462" font-size="11.5" fill="#57606a">get_active · get_history · save_rule · discover · subscribe_updates</text>
+  <text x="386" y="479" font-size="11.5" fill="#57606a">notification_center.create / update / dismiss</text>
+
+  <!-- Aussen: Oberflaeche, Automationen, Sensoren -->
+  <rect x="24" y="564" width="472" height="132" rx="10" fill="#fbfcfd" stroke="#d0d7de" stroke-width="1.5"/>
+  <text x="44" y="592" font-size="15" font-weight="600" fill="#1f2328">frontend/</text>
+  <text x="128" y="592" font-size="12.5" fill="#57606a">displays, decides nothing</text>
+
+  <rect x="44" y="606" width="212" height="72" rx="8" fill="#ffffff" stroke="#d0d7de"/>
+  <text x="60" y="630" font-size="13" font-weight="600" fill="#1f2328">Panel</text>
+  <text x="60" y="649" font-size="11.5" fill="#57606a">dashboard, history, rules,</text>
+  <text x="60" y="665" font-size="11.5" fill="#57606a">discovery · English, German, Spanish</text>
+
+  <rect x="268" y="606" width="208" height="72" rx="8" fill="#ffffff" stroke="#d0d7de"/>
+  <text x="284" y="630" font-size="13" font-weight="600" fill="#1f2328">Lovelace card</text>
+  <text x="284" y="649" font-size="11.5" fill="#57606a">active notifications,</text>
+  <text x="284" y="665" font-size="11.5" fill="#57606a">today's history behind a link</text>
+
+  <rect x="524" y="564" width="228" height="132" rx="10" fill="#fbfcfd" stroke="#d0d7de" stroke-width="1.5"/>
+  <text x="544" y="592" font-size="15" font-weight="600" fill="#1f2328">Automations</text>
+  <rect x="544" y="606" width="188" height="72" rx="8" fill="#ffffff" stroke="#d0d7de"/>
+  <text x="560" y="630" font-size="12.5" fill="#1f2328">Own notifications</text>
+  <text x="560" y="649" font-size="11.5" fill="#57606a">owner and ID form</text>
+  <text x="560" y="665" font-size="11.5" fill="#57606a">the unique key</text>
+
+  <rect x="780" y="564" width="236" height="132" rx="10" fill="#fbfcfd" stroke="#d0d7de" stroke-width="1.5"/>
+  <text x="800" y="592" font-size="15" font-weight="600" fill="#1f2328">Sensors</text>
+  <rect x="800" y="606" width="196" height="72" rx="8" fill="#ffffff" stroke="#d0d7de"/>
+  <text x="816" y="630" font-size="12.5" fill="#1f2328">Five counters</text>
+  <text x="816" y="649" font-size="11.5" fill="#57606a">alarms, warnings, info,</text>
+  <text x="816" y="665" font-size="11.5" fill="#57606a">active, events today</text>
+
+  <!-- Verbindungen -->
+  <g stroke="#57606a" stroke-width="1.6" fill="none" marker-end="url(#pfeil)">
+    <path d="M 160 108 L 160 228"/>
+    <path d="M 499 108 L 499 152 L 812 152 L 812 228"/>
+    <path d="M 900 108 L 900 228"/>
+    <path d="M 344 287 L 370 287"/>
+    <path d="M 430 346 L 336 376"/>
+    <path d="M 846 346 L 846 376"/>
+    <path d="M 470 488 L 380 564"/>
+    <path d="M 636 564 L 660 488"/>
+    <path d="M 900 488 L 900 564"/>
+  </g>
+
+  <g stroke="#8c959f" stroke-width="1.4" fill="none" marker-end="url(#pfeilhell)" stroke-dasharray="5 4">
+    <path d="M 683 376 L 683 132 L 640 132 L 640 108"/>
+  </g>
+
+  <g font-size="11.5" fill="#57606a">
+    <text x="170" y="150">state changes</text>
+    <text x="910" y="150">history on request</text>
+    <text x="357" y="278" text-anchor="middle" font-size="11">intents</text>
+    <text x="326" y="374" text-anchor="end">active set, history</text>
+    <text x="856" y="368">suggestions</text>
+    <text x="386" y="536">WebSocket</text>
+    <text x="646" y="536">services</text>
+    <text x="906" y="536">counters</text>
+    <text x="694" y="168" fill="#8c959f">notification_center_event</text>
+  </g>
+
+  <text x="24" y="714" font-size="11" fill="#8c959f">Event-based throughout: only adopted entities are watched, no polling, no loop over all entities.</text>
+</svg>

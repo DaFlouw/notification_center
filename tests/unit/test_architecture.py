@@ -9,6 +9,7 @@ sie hier geprueft statt nur dokumentiert.
 from __future__ import annotations
 
 import ast
+import json
 import re
 from pathlib import Path
 
@@ -126,4 +127,48 @@ def test_typauswahl_deckt_alle_ueberwachbaren_domaenen_ab() -> None:
     assert auswahl == backend, (
         f"Nur im Backend: {sorted(backend - auswahl)}; "
         f"nur im Auswahlfeld: {sorted(auswahl - backend)}"
+    )
+
+
+def _json_schluessel(daten, praefix: str = "") -> set[str]:
+    """Alle Pfade eines verschachtelten JSON-Dokuments."""
+    schluessel = set()
+    for name, wert in daten.items():
+        schluessel.add(praefix + name)
+        if isinstance(wert, dict):
+            schluessel |= _json_schluessel(wert, f"{praefix}{name}.")
+    return schluessel
+
+
+def test_uebersetzungen_von_home_assistant_haben_denselben_aufbau() -> None:
+    """Jede Sprachdatei der Integration deckt dieselben Schluessel ab.
+
+    Fehlt einer, zeigt Home Assistant an dieser Stelle nichts Sinnvolles --
+    einen Rueckfall je Schluessel gibt es dort nicht.
+    """
+    verzeichnis = _PACKAGE / "translations"
+    englisch = _json_schluessel(json.loads((verzeichnis / "en.json").read_text(encoding="utf-8")))
+
+    for pfad in sorted(verzeichnis.glob("*.json")):
+        schluessel = _json_schluessel(json.loads(pfad.read_text(encoding="utf-8")))
+        assert schluessel == englisch, (
+            f"{pfad.name}: fehlt {sorted(englisch - schluessel)}, "
+            f"zusaetzlich {sorted(schluessel - englisch)}"
+        )
+
+
+def test_strings_json_entspricht_der_englischen_fassung() -> None:
+    """strings.json ist die Quelle in der Grundsprache (Konvention von HA)."""
+    quelle = (_PACKAGE / "strings.json").read_text(encoding="utf-8")
+    englisch = (_PACKAGE / "translations" / "en.json").read_text(encoding="utf-8")
+    assert json.loads(quelle) == json.loads(englisch)
+
+
+def test_jede_frontend_sprache_hat_eine_datei_fuer_home_assistant() -> None:
+    """Sonst ist die Oberflaeche uebersetzt und die Einrichtung nicht."""
+    frontend = {pfad.stem for pfad in (_PACKAGE / "frontend" / "translations").glob("*.js")}
+    backend = {pfad.stem for pfad in (_PACKAGE / "translations").glob("*.json")}
+    assert frontend == backend, (
+        f"nur im Frontend: {sorted(frontend - backend)}, "
+        f"nur im Backend: {sorted(backend - frontend)}"
     )

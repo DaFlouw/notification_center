@@ -171,7 +171,7 @@ Each level carries its own state so that its hysteresis works independently of t
 
 The card ships with the integration and registers itself as a Lovelace resource.
 
-![The card: list, counts, and with today's history](docs/img/karte.png)
+![The card: list, counts, and today's history unfolded](docs/img/karte.png)
 
 ```yaml
 type: custom:notification-center-card
@@ -179,7 +179,7 @@ mode: list             # list | counts, default list
 title: Notifications   # optional
 max: 10                # optional, at most this many per category
 show_events_today: true
-show_history: false    # optional, today's events underneath
+show_history: false    # optional, a link to today's events
 history_max: 5         # optional, at most this many of them
 ```
 
@@ -189,8 +189,8 @@ history_max: 5         # optional, at most this many of them
 | `title` | text | — | Heading of the card |
 | `max` | number | — | At most this many notifications per category |
 | `show_events_today` | boolean | `true` | Footer with the number of events today |
-| `show_history` | boolean | `false` | Extra section with today's events, closed ones included |
-| `history_max` | number | `5` | At most this many entries in that section |
+| `show_history` | boolean | `false` | Adds a link in the footer that unfolds today's events, closed ones included |
+| `history_max` | number | `5` | At most this many entries behind that link |
 
 The looks can be adjusted through CSS variables, in a theme or with `card_mod`; every building block also carries a `part` name for `::part()`.
 
@@ -289,6 +289,8 @@ While paused, running notifications stay untouched; on resume the current states
 
 A single integration with logically separated modules. All business logic lives in the backend; the frontend displays and calls the backend API.
 
+![Architecture of the Notification Center](docs/img/architektur.svg)
+
 ```
 custom_components/notification_center/
   api/            WebSocket commands and services
@@ -309,7 +311,7 @@ The history analysis prefers Home Assistant's long-term statistics — for seven
 
 ## Languages
 
-The interface speaks **English** and **German**. It follows the language Home Assistant reports for the signed-in user; a regional variant such as `de-CH` falls back to `de`, anything else to English. The notifications themselves stay exactly as your rules wrote them.
+The interface speaks **English**, **German** and **Spanish**. It follows the language Home Assistant reports for the signed-in user; a regional variant such as `de-CH` falls back to `de`, anything else to English. The notifications themselves stay exactly as your rules wrote them.
 
 Translated are the panel and the card, the integration's texts inside Home Assistant, and the suggestions from Discovery.
 

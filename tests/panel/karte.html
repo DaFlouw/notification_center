@@ -79,6 +79,14 @@ historie.setConfig({
 });
 historie.hass = hass;
 
+/* Fuer die Bilder der Dokumentation: ?historie zeigt die Tageshistorie
+   aufgeklappt, sonst steht dort nur der Link. */
+if (new URLSearchParams(location.search).has("historie")) {
+  setTimeout(() => {
+    historie.shadowRoot.querySelector('[data-action="toggle-history"]')?.click();
+  }, 300);
+}
+
 /* Fuer die Bilder der Dokumentation: ?zoom=2 rendert alles doppelt so gross,
    damit die Aufnahme scharf bleibt statt hochskaliert zu werden. */
 (() => {

@@ -172,6 +172,8 @@ export default {
   "card.more_one": "und {count} weiteres",
   "card.more_other": "und {count} weitere",
   "card.historyTitle": "Heute",
+  "card.historyShow": "Heute →",
+  "card.historyHide": "Ausblenden",
   "card.historyEmpty": "Heute noch keine Ereignisse",
   "card.historyActive": "aktiv",
   "card.backendOutdated": "Home Assistant führt einen älteren Stand aus. Bitte neu starten.",

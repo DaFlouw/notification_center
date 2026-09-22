@@ -1,0 +1,132 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Notification Center",
+        "description": "El Notification Center se configura como una única instancia global. Las entidades que se supervisan se eligen después en el panel del Notification Center."
+      }
+    },
+    "abort": {
+      "single_instance_allowed": "Ya hay una instancia del Notification Center configurada."
+    }
+  },
+  "entity": {
+    "sensor": {
+      "info_count": {
+        "name": "Información"
+      },
+      "warning_count": {
+        "name": "Avisos"
+      },
+      "alarm_count": {
+        "name": "Alarmas"
+      },
+      "active_count": {
+        "name": "Notificaciones activas"
+      },
+      "events_today": {
+        "name": "Eventos de hoy"
+      }
+    }
+  },
+  "services": {
+    "create": {
+      "name": "Crear notificación",
+      "description": "Crea una notificación. Llamarla de nuevo con el mismo propietario e ID sobrescribe la notificación existente en lugar de añadir una segunda.",
+      "fields": {
+        "message": {
+          "name": "Mensaje",
+          "description": "El texto que se muestra. Obligatorio."
+        },
+        "notification_id": {
+          "name": "ID",
+          "description": "Identificador dentro del propietario."
+        },
+        "type": {
+          "name": "Tipo",
+          "description": "Información, aviso o alarma."
+        },
+        "title": {
+          "name": "Título",
+          "description": "Encabezado opcional."
+        },
+        "entity_id": {
+          "name": "Entidad",
+          "description": "Entidad opcional que se abre al pulsar."
+        },
+        "duration": {
+          "name": "Duración",
+          "description": "Opcional. La notificación termina por sí sola."
+        },
+        "owner": {
+          "name": "Propietario",
+          "description": "Opcional. Por defecto, la automatización que llama."
+        }
+      }
+    },
+    "update": {
+      "name": "Actualizar notificación",
+      "description": "Cambia una notificación en curso sin añadir una entrada al historial.",
+      "fields": {
+        "notification_id": {
+          "name": "ID",
+          "description": "Identificador de la notificación."
+        },
+        "type": {
+          "name": "Tipo",
+          "description": "Nuevo tipo."
+        },
+        "message": {
+          "name": "Mensaje",
+          "description": "Nuevo texto."
+        },
+        "title": {
+          "name": "Título",
+          "description": "Nuevo encabezado."
+        },
+        "entity_id": {
+          "name": "Entidad",
+          "description": "Nueva entidad vinculada."
+        },
+        "owner": {
+          "name": "Propietario",
+          "description": "Opcional."
+        }
+      }
+    },
+    "dismiss": {
+      "name": "Descartar notificación",
+      "description": "Termina una notificación de automatización en curso.",
+      "fields": {
+        "notification_id": {
+          "name": "ID",
+          "description": "Identificador de la notificación."
+        },
+        "owner": {
+          "name": "Propietario",
+          "description": "Opcional."
+        }
+      }
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Ajustes",
+        "description": "Estos ajustes valen para todo el Notification Center.",
+        "data": {
+          "retention_days": "Conservación del historial",
+          "max_events": "Número máximo de eventos",
+          "analysis_days": "Periodo de análisis para las sugerencias (días)",
+          "paused": "En pausa"
+        },
+        "data_description": {
+          "retention_days": "Los eventos más antiguos se eliminan. Ambos límites se aplican a la vez.",
+          "max_events": "Al superarlo se eliminan primero los eventos terminados más antiguos.",
+          "analysis_days": "Cuánto mira hacia atrás el análisis del historial para las sugerencias de reglas.",
+          "paused": "En pausa no se crean notificaciones nuevas. Las que están en curso se mantienen."
+        }
+      }
+    }
+  }
+}

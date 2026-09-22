@@ -16,7 +16,7 @@
  *   title: Meldungen         (optional)
  *   max: 10                  (optional, hoechstens so viele je Kategorie)
  *   show_events_today: true  (optional)
- *   show_history: false      (optional, Ereignisse des Tages darunter)
+ *   show_history: false      (optional, Link zu den Ereignissen des Tages)
  *   history_max: 5           (optional, hoechstens so viele davon)
  *
  * Die Texte richten sich nach der Sprache des angemeldeten Anwenders; die
@@ -134,6 +134,17 @@ const STYLES = `
     margin-top: 12px;
   }
 
+  .link {
+    background: none;
+    border: 0;
+    padding: 0;
+    font: inherit;
+    color: var(--primary-color, #03a9f4);
+    cursor: pointer;
+  }
+
+  .link:hover { text-decoration: underline; }
+
   .pausiert { color: var(--nc-heading); font-size: 13px; padding-bottom: 8px; }
   .fehler { color: var(--nc-alarm); }
 `;
@@ -144,6 +155,7 @@ class NotificationCenterCard extends HTMLElement {
   #state = { counts: {}, active: [], paused: false };
   #historie = { events: [], geladen: false, fehler: null };
   #historieLaeuft = false;
+  #historieOffen = false;
   #unsubscribe = null;
   #verbunden = false;
   #fehler = null;
@@ -161,13 +173,14 @@ class NotificationCenterCard extends HTMLElement {
     // die naheliegendste Frage nicht.
     this.#config = { mode: "list", show_events_today: true, show_history: false, ...config };
     this.#historie = { events: [], geladen: false, fehler: null };
+    this.#historieOffen = false;
     this.#render();
-    if (this.#hass && this.#config.show_history) this.#ladeHistorie();
   }
 
   getCardSize() {
+    // Zugeklappt ist die Karte so gross wie zuvor; der Link kostet nichts.
     const grund = this.#config.mode === "list" ? 3 : 1;
-    return this.#config.show_history ? grund + 2 : grund;
+    return this.#historieOffen ? grund + 2 : grund;
   }
 
   set hass(hass) {
@@ -204,14 +217,31 @@ class NotificationCenterCard extends HTMLElement {
         };
         // Der Abonnementstrom meldet nur den aktiven Bestand. Was heute
         // schon vorbei ist, steht allein in der Historie -- die muss also
-        // erneut geholt werden, sobald sich etwas geruehrt hat.
-        if (this.#config.show_history) this.#ladeHistorie();
+        // erneut geholt werden, sobald sich etwas geruehrt hat. Nur wenn sie
+        // gerade offen ist: zugeklappt sieht sie ohnehin niemand.
+        if (this.#historieOffen) this.#ladeHistorie();
         this.#render();
       });
     } catch (fehler) {
       this.#fehler = fehler.message || String(fehler);
       this.#render();
     }
+  }
+
+  /**
+   * Klappt die Ereignisse des Tages auf oder wieder zu.
+   *
+   * Geholt werden sie erst beim Aufklappen: wer den Link nicht benutzt,
+   * soll die Abfrage auch nicht ausloesen.
+   */
+  #historieUmschalten() {
+    this.#historieOffen = !this.#historieOffen;
+    if (this.#historieOffen && !this.#historie.geladen) {
+      this.#ladeHistorie();
+      return;
+    }
+    if (this.#historieOffen) this.#ladeHistorie();
+    this.#render();
   }
 
   /**
@@ -265,9 +295,14 @@ class NotificationCenterCard extends HTMLElement {
         }
         ${this.#hinweis()}
         ${this.#inhalt(locale)}
-        ${this.#config.show_history ? this.#historieBlock(locale) : ""}
+        ${this.#historieOffen ? this.#historieBlock(locale) : ""}
       </ha-card>
     `;
+
+    const schalter = this.shadowRoot.querySelector('[data-action="toggle-history"]');
+    if (schalter) {
+      schalter.addEventListener("click", () => this.#historieUmschalten());
+    }
 
     this.shadowRoot.querySelectorAll("[data-entity]").forEach((element) => {
       element.addEventListener("click", () => {
@@ -380,9 +415,25 @@ class NotificationCenterCard extends HTMLElement {
     `;
   }
 
+  /**
+   * Die Fusszeile: die Zahl des Tages und, auf Wunsch, der Link dahinter.
+   *
+   * Wie im Panel, wo unter dem Dashboard der Verweis auf die Historie steht.
+   */
   #fuss() {
     const text = this.#ereignisText();
-    return text ? `<div class="fuss" part="footer">${text}</div>` : "";
+    const link = this.#historieLink();
+    if (!text && !link) return "";
+
+    return `<div class="fuss" part="footer">${[text, link].filter(Boolean).join(" · ")}</div>`;
+  }
+
+  #historieLink() {
+    if (!this.#config.show_history) return "";
+
+    return `<button class="link" part="history-link" data-action="toggle-history">${
+      this.#historieOffen ? t("card.historyHide") : t("card.historyShow")
+    }</button>`;
   }
 
   #ereignisText() {
@@ -401,7 +452,6 @@ class NotificationCenterCard extends HTMLElement {
     if (this.#historie.fehler) {
       return `<div class="fehler" part="error">${escapeHtml(this.#historie.fehler)}</div>`;
     }
-    if (!this.#historie.geladen) return "";
 
     const eintraege = this.#historie.events.slice(0, this.#historieGrenze());
 

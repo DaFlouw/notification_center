@@ -171,7 +171,7 @@ Jede Stufe fuehrt ihren eigenen Zustand mit, damit ihre Hysterese unabhaengig vo
 
 Die Card kommt mit der Integration und traegt sich selbst in die Lovelace-Ressourcen ein.
 
-![Die Card: Liste, Zaehler und mit der Tageshistorie](docs/img/karte.png)
+![Die Card: Liste, Zaehler und die aufgeklappte Tageshistorie](docs/img/karte.png)
 
 ```yaml
 type: custom:notification-center-card
@@ -179,7 +179,7 @@ mode: list             # list | counts, Vorgabe list
 title: Meldungen       # optional
 max: 10                # optional, hoechstens so viele je Kategorie
 show_events_today: true
-show_history: false    # optional, Ereignisse des Tages darunter
+show_history: false    # optional, Link zu den Ereignissen des Tages
 history_max: 5         # optional, hoechstens so viele davon
 ```
 
@@ -189,8 +189,8 @@ history_max: 5         # optional, hoechstens so viele davon
 | `title` | Text | — | Ueberschrift der Karte |
 | `max` | Zahl | — | Hoechstens so viele Meldungen je Kategorie |
 | `show_events_today` | Boolean | `true` | Fusszeile mit den Ereignissen des Tages |
-| `show_history` | Boolean | `false` | Zusaetzlicher Abschnitt mit den Ereignissen des Tages, auch den abgeschlossenen |
-| `history_max` | Zahl | `5` | Hoechstens so viele Eintraege in diesem Abschnitt |
+| `show_history` | Boolean | `false` | Setzt in die Fusszeile einen Link, der die Ereignisse des Tages aufklappt, auch die abgeschlossenen |
+| `history_max` | Zahl | `5` | Hoechstens so viele Eintraege hinter diesem Link |
 
 Das Aussehen laesst sich ueber CSS-Variablen anpassen, im Theme oder per `card_mod`; alle Bausteine tragen zusaetzlich einen `part`-Namen fuer `::part()`.
 
@@ -289,6 +289,10 @@ Waehrend einer Pause bleiben laufende Meldungen unberuehrt; beim Fortsetzen werd
 
 Eine einzige Integration mit logisch getrennten Modulen. Die gesamte Geschaeftslogik liegt im Backend; das Frontend stellt dar und ruft die Backend-API auf.
 
+![Aufbau des Notification Centers](docs/img/architektur.svg)
+
+Die Beschriftung des Diagramms ist englisch; es ist dasselbe Bild wie in der englischen Fassung.
+
 ```
 custom_components/notification_center/
   api/            WebSocket-Kommandos und Services
@@ -309,7 +313,7 @@ Die Historienanalyse nutzt bevorzugt die Langzeitstatistiken von Home Assistant 
 
 ## Sprachen
 
-Die Oberflaeche spricht **Englisch** und **Deutsch**. Gewaehlt wird die Sprache, die Home Assistant fuer den angemeldeten Anwender meldet; eine regionale Variante wie `de-CH` faellt auf `de` zurueck, alles Uebrige auf Englisch. Die Meldungen selbst bleiben so, wie deine Regeln sie erzeugt haben.
+Die Oberflaeche spricht **Englisch**, **Deutsch** und **Spanisch**. Gewaehlt wird die Sprache, die Home Assistant fuer den angemeldeten Anwender meldet; eine regionale Variante wie `de-CH` faellt auf `de` zurueck, alles Uebrige auf Englisch. Die Meldungen selbst bleiben so, wie deine Regeln sie erzeugt haben.
 
 Uebersetzt sind Panel und Card, die Texte der Integration in Home Assistant sowie die Vorschlaege der Discovery.
 
