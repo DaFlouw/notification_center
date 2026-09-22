@@ -171,7 +171,7 @@ Each level carries its own state so that its hysteresis works independently of t
 
 The card ships with the integration and registers itself as a Lovelace resource.
 
-![The card in both modes](docs/img/karte.png)
+![The card: list, counts, and with today's history](docs/img/karte.png)
 
 ```yaml
 type: custom:notification-center-card

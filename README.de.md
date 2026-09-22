@@ -171,7 +171,7 @@ Jede Stufe fuehrt ihren eigenen Zustand mit, damit ihre Hysterese unabhaengig vo
 
 Die Card kommt mit der Integration und traegt sich selbst in die Lovelace-Ressourcen ein.
 
-![Die Card in beiden Betriebsarten](docs/img/karte.png)
+![Die Card: Liste, Zaehler und mit der Tageshistorie](docs/img/karte.png)
 
 ```yaml
 type: custom:notification-center-card
