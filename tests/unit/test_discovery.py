@@ -19,13 +19,26 @@ from custom_components.notification_center.discovery.analyzer import (
 from custom_components.notification_center.discovery.suggestions import (
     Confidence,
     EntityMetadata,
-    build_suggestions,
+)
+from custom_components.notification_center.discovery.suggestions import (
+    build_suggestions as _build_suggestions,
 )
 from custom_components.notification_center.notifications.models import NotificationType
 from custom_components.notification_center.rules.models import (
     ConditionKind,
     NumericOperator,
 )
+
+#: Die Erwartungen dieser Tests sind deutsch formuliert. Grundsprache der
+#: Vorschlaege ist Englisch; die englischen Texte prueft test_texte.py.
+SPRACHE = "de"
+
+
+def build_suggestions(*args, **kwargs):
+    """Wie das Original, nur mit fest gewaehlter Sprache."""
+    kwargs.setdefault("sprache", SPRACHE)
+    return _build_suggestions(*args, **kwargs)
+
 
 # Ein ruhiger Wohnzimmerverlauf: ueblich 19 bis 24 Grad.
 WOHNZIMMER = [

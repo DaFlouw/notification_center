@@ -11,7 +11,17 @@
  * den Bildern plausibel bleiben statt zu veralten.
  */
 
+import { MODULE_VERSION } from "../../custom_components/notification_center/frontend/api.js";
+
 const JETZT = Date.now();
+
+/**
+ * Die Version, die das Frontend erwartet.
+ *
+ * Fest eingetragen war sie mit jeder Freigabe veraltet, und der Pruefstand
+ * zeigte dann einen Versionshinweis, den es gar nicht gab.
+ */
+export const VERSION = MODULE_VERSION;
 
 /** ISO-Zeitpunkt, der so viele Minuten zurueckliegt. */
 const vor = (minuten) => new Date(JETZT - minuten * 60_000).toISOString();
@@ -21,7 +31,7 @@ const seit = (minuten) => minuten * 60;
 
 export const GET_CONFIG = {
   api_version: 1,
-  version: "1.1.4",
+  version: VERSION,
   entities: [
     { entity_id: "binary_sensor.wohnzimmer_terrassentuer", device_id: "dev_kontakt_1", area_id: "wohnzimmer", name: "Terrassentür", area_name: "Wohnzimmer", floor_id: "erdgeschoss", floor_name: "Erdgeschoss" },
     { entity_id: "binary_sensor.flur_haustuer", device_id: "dev_kontakt_2", area_id: "flur", name: "Haustür", area_name: "Flur", floor_id: "erdgeschoss", floor_name: "Erdgeschoss" },
@@ -54,7 +64,7 @@ export const GET_CONFIG = {
 
 export const GET_ACTIVE = {
   api_version: 1,
-  version: "1.1.4",
+  version: VERSION,
   counts: { info: 3, warning: 2, alarm: 2, active: 7, events_today: 23 },
   paused: false,
   active: [
@@ -70,13 +80,13 @@ export const GET_ACTIVE = {
 
 export const GET_COUNTS = {
   api_version: 1,
-  version: "1.1.4",
+  version: VERSION,
   counts: { info: 3, warning: 2, alarm: 2, active: 7, events_today: 23 },
 };
 
 export const GET_HISTORY = {
   api_version: 1,
-  version: "1.1.4",
+  version: VERSION,
   total: 214,
   offset: 0,
   has_more: true,
@@ -95,7 +105,7 @@ export const GET_HISTORY = {
 
 export const DISCOVER = {
   api_version: 1,
-  version: "1.1.4",
+  version: VERSION,
   entities: [
     { entity_id: "sensor.bad_luftfeuchte", name: "Luftfeuchte Bad", domain: "sensor", state: "74", device_class: "humidity", unit: "%", device_id: "dev_klima_1", device_name: "Klimasensor Bad", area_id: "bad", area_name: "Bad", monitored: true, rule_count: 1, has_suggestions: false },
     { entity_id: "binary_sensor.bad_fenster", name: "Badfenster", domain: "binary_sensor", state: "off", device_class: "window", unit: null, device_id: "dev_kontakt_4", device_name: "Fensterkontakt Bad", area_id: "bad", area_name: "Bad", monitored: false, rule_count: 0, has_suggestions: true },
@@ -106,7 +116,7 @@ export const DISCOVER = {
 
 export const GET_SUGGESTIONS = {
   api_version: 1,
-  version: "1.1.4",
+  version: VERSION,
   entity_id: "binary_sensor.bad_fenster",
   suggestions: [
     {

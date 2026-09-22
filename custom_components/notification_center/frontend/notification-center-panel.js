@@ -10,6 +10,7 @@
  */
 
 import { MODULE_VERSION, api, backendZuAlt, versionsKonflikt } from "./api.js";
+import { t, waehleSprache } from "./i18n.js";
 import { adoptStyles } from "./styles.js";
 import { renderDashboard } from "./views/dashboard.js";
 import { LEERER_FILTER, buildQuery, renderHistory } from "./views/history.js";
@@ -22,12 +23,7 @@ import {
   uebersichtAusKonfiguration,
 } from "./views/rules.js";
 
-const SEITEN = [
-  { id: "dashboard", titel: "Dashboard" },
-  { id: "history", titel: "Historie" },
-  { id: "rules", titel: "Regeln" },
-  { id: "discovery", titel: "Discovery" },
-];
+const SEITEN = ["dashboard", "history", "rules", "discovery"];
 
 /** Wartezeit, bis eine Eingabe als fertig gilt. */
 const ENTPRELLUNG = 500;
@@ -392,7 +388,7 @@ class NotificationCenterPanel extends HTMLElement {
       }
 
       if (aktion === "delete-rule") {
-        if (!confirm("Regel löschen? Eine laufende Meldung dazu endet sofort.")) return;
+        if (!confirm(t("panel.confirmDeleteRule"))) return;
         await api.deleteRule(this.#hass, daten.rule);
         if (this.#seite === "rules") await this.#ladeRegeluebersicht();
         else await this.#ladeRegeln(this.#rules.entityId);
@@ -403,10 +399,7 @@ class NotificationCenterPanel extends HTMLElement {
         // Die aktuelle Kennung steht im Text und als Vorgabe im Feld: beim
         // Geraetetausch unterscheidet sich die neue oft nur in einem Wort,
         // und aus dem Kopf getippt trifft man sie selten.
-        const neu = prompt(
-          `Entity-ID der neuen Entity.\n\nAktuell: ${daten.entity}`,
-          daten.entity
-        );
+        const neu = prompt(t("panel.replacePrompt", { entity: daten.entity }), daten.entity);
         if (!neu) return;
         const kennung = neu.trim();
         if (!kennung || kennung === daten.entity) return;
@@ -437,7 +430,7 @@ class NotificationCenterPanel extends HTMLElement {
 
       if (aktion === "clear-history") {
         // Ausdrueckliche Bestaetigung (Spezifikation 39).
-        if (!confirm("Alle abgeschlossenen Einträge löschen? Aktive bleiben erhalten.")) return;
+        if (!confirm(t("panel.confirmClearHistory"))) return;
         await api.clearHistory(this.#hass);
         await this.#ladeHistorie();
         return;
@@ -450,7 +443,7 @@ class NotificationCenterPanel extends HTMLElement {
       }
 
       if (aktion === "remove-entity") {
-        if (!confirm("Entity aus der Überwachung entfernen? Die Historie bleibt erhalten.")) return;
+        if (!confirm(t("panel.confirmRemoveEntity"))) return;
         await api.removeEntity(this.#hass, daten.entity);
         await this.#ladeDiscovery();
         return;
@@ -527,16 +520,19 @@ class NotificationCenterPanel extends HTMLElement {
 
   #render() {
     const locale = this.#hass?.locale?.language || navigator.language;
+    // Die Sprache vor jedem Zeichnen setzen: sie kann sich im laufenden
+    // Betrieb aendern, wenn der Anwender sie in Home Assistant umstellt.
+    waehleSprache(this.#hass);
     const fokus = this.#merkeFokus();
 
     this.shadowRoot.innerHTML = `
-      <header><h1>Notification Center</h1></header>
+      <header><h1>${t("app.title")}</h1></header>
       <nav ${this.#seite === "welcome" ? 'hidden=""' : ""}>
         ${SEITEN.map(
           (seite) =>
-            `<button data-page="${seite.id}" ${
-              this.#seite === seite.id ? 'aria-current="page"' : ""
-            }>${seite.titel}</button>`
+            `<button data-page="${seite}" ${
+              this.#seite === seite ? 'aria-current="page"' : ""
+            }>${t(`nav.${seite}`)}</button>`
         ).join("")}
       </nav>
       <main>
@@ -590,15 +586,15 @@ class NotificationCenterPanel extends HTMLElement {
   #versionshinweis() {
     if (this.#backendZuAlt) {
       return `<div class="error">
-        Die Dateien stammen aus Version ${MODULE_VERSION}, Home Assistant führt
-        aber noch einen älteren Stand aus. Bitte Home Assistant neu starten.
+        ${t("panel.backendOutdated", { version: MODULE_VERSION })}
       </div>`;
     }
     if (versionsKonflikt.erkannt) {
       return `<div class="error">
-        Diese Seite stammt aus Version ${versionsKonflikt.frontend}, das
-        Notification Center läuft in Version ${versionsKonflikt.backend}.
-        Bitte Home Assistant neu starten und die Seite neu laden.
+        ${t("panel.versionMismatch", {
+          frontend: versionsKonflikt.frontend,
+          backend: versionsKonflikt.backend,
+        })}
       </div>`;
     }
     return "";
@@ -616,14 +612,11 @@ class NotificationCenterPanel extends HTMLElement {
   #willkommen() {
     return `
       <div class="empty">
-        <strong>Willkommen im Notification Center</strong>
-        <span>
-          Wähle aus, welche Entities überwacht werden sollen. Vorschläge für
-          Regeln entstehen dabei automatisch.
-        </span>
+        <strong>${t("panel.welcomeTitle")}</strong>
+        <span>${t("panel.welcomeText")}</span>
         <div style="margin-top: 24px; display: flex; gap: 8px; justify-content: center">
-          <button class="action" data-action="start-setup">Einrichtung starten</button>
-          <button class="action secondary" data-action="skip-setup">Überspringen</button>
+          <button class="action" data-action="start-setup">${t("panel.startSetup")}</button>
+          <button class="action secondary" data-action="skip-setup">${t("panel.skipSetup")}</button>
         </div>
       </div>
     `;

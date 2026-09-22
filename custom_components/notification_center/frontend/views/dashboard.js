@@ -6,15 +6,10 @@
  * jeder Kategorie stehen die neuesten oben.
  */
 
-import { eventDuration, escapeHtml, formatTime } from "../format.js";
+import { categoryLabel, eventDuration, escapeHtml, formatTime } from "../format.js";
+import { t } from "../i18n.js";
 
 const KATEGORIEN = ["alarm", "warning", "info"];
-
-const TITEL = {
-  alarm: "Alarme",
-  warning: "Warnungen",
-  info: "Infos",
-};
 
 export function renderDashboard(state, locale) {
   const { active = [], counts = {}, paused = false } = state;
@@ -31,7 +26,7 @@ export function renderDashboard(state, locale) {
     if (!eintraege.length) return "";
 
     return `
-      <h2>${TITEL[kategorie]}</h2>
+      <h2>${categoryLabel(kategorie)}</h2>
       <ul>
         ${eintraege.map((event) => zeile(event, locale)).join("")}
       </ul>
@@ -39,7 +34,7 @@ export function renderDashboard(state, locale) {
   }).join("");
 
   return `
-    ${paused ? '<div class="paused">Pausiert</div>' : ""}
+    ${paused ? `<div class="paused">${t("common.paused")}</div>` : ""}
     ${abschnitte}
     ${fusszeile(counts)}
   `;
@@ -62,10 +57,10 @@ function zeile(event, locale) {
 
 function leerZustand(counts, paused) {
   return `
-    ${paused ? '<div class="paused">Pausiert</div>' : ""}
+    ${paused ? `<div class="paused">${t("common.paused")}</div>` : ""}
     <div class="empty">
-      <strong>Alles ruhig</strong>
-      <span>${ereignisText(counts)} · <button class="link" data-nav="history">Historie →</button></span>
+      <strong>${t("dashboard.quiet")}</strong>
+      <span>${ereignisText(counts)} · <button class="link" data-nav="history">${t("dashboard.historyLink")}</button></span>
     </div>
   `;
 }
@@ -73,12 +68,11 @@ function leerZustand(counts, paused) {
 function fusszeile(counts) {
   return `
     <div class="footer-link">
-      ${ereignisText(counts)} · <button class="link" data-nav="history">Historie →</button>
+      ${ereignisText(counts)} · <button class="link" data-nav="history">${t("dashboard.historyLink")}</button>
     </div>
   `;
 }
 
 function ereignisText(counts) {
-  const anzahl = counts.events_today ?? 0;
-  return `${anzahl} ${anzahl === 1 ? "Ereignis" : "Ereignisse"} heute`;
+  return t("events.today", { count: counts.events_today ?? 0 });
 }

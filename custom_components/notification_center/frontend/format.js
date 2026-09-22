@@ -5,25 +5,18 @@
  * Home Assistant an die Oberflaeche durchreicht (Spezifikation 36).
  */
 
-const TYPE_LABELS = {
-  info: "Info",
-  warning: "Warnung",
-  alarm: "Alarm",
-};
-
-const CATEGORY_LABELS = {
-  alarm: "Alarme",
-  warning: "Warnungen",
-  info: "Infos",
-};
+import { t } from "./i18n.js";
 
 export function typeLabel(type) {
-  return TYPE_LABELS[type] || type;
+  return TYPE_TYPEN.includes(type) ? t(`type.${type}`) : type;
 }
 
 export function categoryLabel(type) {
-  return CATEGORY_LABELS[type] || type;
+  return TYPE_TYPEN.includes(type) ? t(`category.${type}`) : type;
 }
+
+/** Die bekannten Typen; alles andere wird unveraendert durchgereicht. */
+const TYPE_TYPEN = ["info", "warning", "alarm"];
 
 /** Uhrzeit eines Ereignisses, etwa "14:30". */
 export function formatTime(iso, locale) {

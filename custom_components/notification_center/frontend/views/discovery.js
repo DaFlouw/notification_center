@@ -8,6 +8,7 @@
  */
 
 import { escapeHtml } from "../format.js";
+import { t } from "../i18n.js";
 
 /**
  * Die auswaehlbaren Typen, nach Herkunft getrennt.
@@ -19,36 +20,36 @@ import { escapeHtml } from "../format.js";
  */
 const TYP_GRUPPEN = [
   {
-    titel: "Geräte",
-    typen: [
-      { wert: "binary_sensor", text: "Binärsensor" },
-      { wert: "sensor", text: "Sensor" },
-      { wert: "cover", text: "Abdeckung" },
-      { wert: "lock", text: "Schloss" },
-      { wert: "climate", text: "Klima" },
-      { wert: "water_heater", text: "Warmwasser" },
-      { wert: "switch", text: "Schalter" },
-      { wert: "light", text: "Licht" },
-      { wert: "fan", text: "Lüftung" },
-      { wert: "humidifier", text: "Luftbefeuchter" },
-      { wert: "vacuum", text: "Staubsauger" },
-      { wert: "device_tracker", text: "Anwesenheit" },
-      { wert: "person", text: "Person" },
-      { wert: "alarm_control_panel", text: "Alarmanlage" },
-      { wert: "update", text: "Aktualisierung" },
+    schluessel: "discovery.groupDevices",
+    domains: [
+      "binary_sensor",
+      "sensor",
+      "cover",
+      "lock",
+      "climate",
+      "water_heater",
+      "switch",
+      "light",
+      "fan",
+      "humidifier",
+      "vacuum",
+      "device_tracker",
+      "person",
+      "alarm_control_panel",
+      "update",
     ],
   },
   {
-    titel: "Helfer",
-    typen: [
-      { wert: "input_boolean", text: "Schalter" },
-      { wert: "input_number", text: "Zahl" },
-      { wert: "input_select", text: "Auswahl" },
-      { wert: "input_text", text: "Text" },
-      { wert: "input_datetime", text: "Datum und Zeit" },
-      { wert: "counter", text: "Zähler" },
-      { wert: "timer", text: "Timer" },
-      { wert: "schedule", text: "Zeitplan" },
+    schluessel: "discovery.groupHelpers",
+    domains: [
+      "input_boolean",
+      "input_number",
+      "input_select",
+      "input_text",
+      "input_datetime",
+      "counter",
+      "timer",
+      "schedule",
     ],
   },
 ];
@@ -58,35 +59,35 @@ export function renderDiscovery(state) {
 
   return `
     <div class="filters">
-      <select data-discovery="domain" aria-label="Entity-Typ">
-        <option value="" ${domain === "" ? "selected" : ""}>Alle Typen</option>
+      <select data-discovery="domain" aria-label="${t("discovery.entityType")}">
+        <option value="" ${domain === "" ? "selected" : ""}>${t("discovery.allTypes")}</option>
         ${TYP_GRUPPEN.map(
           (gruppe) => `
-            <optgroup label="${escapeHtml(gruppe.titel)}">
-              ${gruppe.typen
+            <optgroup label="${escapeHtml(t(gruppe.schluessel))}">
+              ${gruppe.domains
                 .map(
-                  (typ) =>
-                    `<option value="${typ.wert}" ${
-                      domain === typ.wert ? "selected" : ""
-                    }>${typ.text}</option>`
+                  (domaene) =>
+                    `<option value="${domaene}" ${
+                      domain === domaene ? "selected" : ""
+                    }>${escapeHtml(t(`discovery.domain.${domaene}`))}</option>`
                 )
                 .join("")}
             </optgroup>
           `
         ).join("")}
       </select>
-      <input type="search" data-discovery="search" placeholder="Name oder Entity-ID"
-             value="${escapeHtml(search)}" aria-label="Suchen">
+      <input type="search" data-discovery="search" placeholder="${t("discovery.searchPlaceholder")}"
+             value="${escapeHtml(search)}" aria-label="${t("history.search")}">
     </div>
 
-    ${loading ? '<div class="loading">Wird geladen …</div>' : ""}
+    ${loading ? `<div class="loading">${t("common.loading")}</div>` : ""}
 
     ${
       entities.length
         ? `<ul>${entities.map((eintrag) => entityZeile(eintrag, suggestions[eintrag.entity_id])).join("")}</ul>`
         : loading
           ? ""
-          : '<div class="empty"><strong>Nichts gefunden</strong><span>Andere Suche oder anderen Typ probieren.</span></div>'
+          : `<div class="empty"><strong>${t("discovery.empty")}</strong><span>${t("discovery.emptyHint")}</span></div>`
     }
   `;
 }
@@ -106,22 +107,22 @@ function entityZeile(eintrag, vorschlaege) {
 
         ${
           eintrag.monitored
-            ? `<span class="badge monitored">überwacht · ${eintrag.rule_count} ${
-                eintrag.rule_count === 1 ? "Regel" : "Regeln"
-              }</span>
+            ? `<span class="badge monitored">${t("discovery.monitored")} · ${t("discovery.rules", {
+                count: eintrag.rule_count,
+              })}</span>
                <button class="action secondary" data-action="show-rules"
                        data-entity="${escapeHtml(eintrag.entity_id)}"
-                       data-name="${escapeHtml(eintrag.name)}">Regeln</button>
+                       data-name="${escapeHtml(eintrag.name)}">${t("discovery.rulesButton")}</button>
                <button class="action secondary" data-action="remove-entity"
-                       data-entity="${escapeHtml(eintrag.entity_id)}">Entfernen</button>`
-            : `${eintrag.has_suggestions ? '<span class="badge">Vorschläge verfügbar</span>' : ""}
+                       data-entity="${escapeHtml(eintrag.entity_id)}">${t("discovery.remove")}</button>`
+            : `${eintrag.has_suggestions ? `<span class="badge">${t("discovery.suggestionsAvailable")}</span>` : ""}
                <button class="action secondary" data-action="show-suggestions"
                        data-entity="${escapeHtml(eintrag.entity_id)}">${
-                         vorschlaege ? "Vorschläge ausblenden" : "Vorschläge"
+                         vorschlaege ? t("discovery.hideSuggestions") : t("discovery.suggestions")
                        }</button>
                <button class="action" data-action="add-entity"
                        data-entity="${escapeHtml(eintrag.entity_id)}"
-                       data-name="${escapeHtml(eintrag.name)}">Übernehmen</button>`
+                       data-name="${escapeHtml(eintrag.name)}">${t("common.adopt")}</button>`
         }
       </div>
 
@@ -133,18 +134,13 @@ function entityZeile(eintrag, vorschlaege) {
 function vorschlagsBlock(entityId, vorschlaege) {
   if (!vorschlaege.length) {
     return `<div class="suggestions">
-      <div class="entity-meta">
-        Keine belastbaren Vorschläge. Eine eigene Regel ist trotzdem möglich:
-        Entity übernehmen und dann unter Regeln anlegen.
-      </div>
+      <div class="entity-meta">${t("discovery.noSuggestions")}</div>
     </div>`;
   }
 
   return `
     <div class="suggestions">
-      <div class="entity-meta">${vorschlaege.length} ${
-        vorschlaege.length === 1 ? "Vorschlag" : "Vorschläge"
-      }</div>
+      <div class="entity-meta">${t("discovery.suggestionCount", { count: vorschlaege.length })}</div>
       ${vorschlaege.map((vorschlag) => vorschlagZeile(entityId, vorschlag)).join("")}
     </div>
   `;
@@ -155,10 +151,10 @@ function vorschlagZeile(entityId, vorschlag) {
     <div class="suggestion">
       <div class="suggestion-head">
         <span class="message">${escapeHtml(vorschlag.title)}</span>
-        ${vorschlag.uncertain ? '<span class="badge uncertain">unsicher</span>' : ""}
+        ${vorschlag.uncertain ? `<span class="badge uncertain">${t("discovery.uncertain")}</span>` : ""}
         <button class="action secondary" data-action="accept-suggestion"
                 data-entity="${escapeHtml(entityId)}"
-                data-suggestion="${escapeHtml(vorschlag.key)}">Übernehmen</button>
+                data-suggestion="${escapeHtml(vorschlag.key)}">${t("common.adopt")}</button>
       </div>
       ${begruendung(vorschlag)}
     </div>
@@ -170,7 +166,7 @@ function begruendung(vorschlag) {
 
   return `
     <details>
-      <summary>Warum dieser Vorschlag?</summary>
+      <summary>${t("discovery.why")}</summary>
       <dl>
         ${vorschlag.reasons
           .map(

@@ -16,6 +16,11 @@
  *   title: Meldungen         (optional)
  *   max: 10                  (optional, hoechstens so viele je Kategorie)
  *   show_events_today: true  (optional)
+ *   show_history: false      (optional, Ereignisse des Tages darunter)
+ *   history_max: 5           (optional, hoechstens so viele davon)
+ *
+ * Die Texte richten sich nach der Sprache des angemeldeten Anwenders; die
+ * Meldungen selbst stehen so da, wie die Regel sie erzeugt hat.
  *
  * Aussehen: die Karte ist ueber CSS-Variablen anpassbar, im Theme oder per
  * card_mod. Alle Bausteine tragen ausserdem einen ``part``-Namen, sodass sie
@@ -37,13 +42,13 @@
  */
 
 import { api, backendZuAlt, versionsKonflikt } from "./api.js";
-import { escapeHtml, formatTime } from "./format.js";
+import { categoryLabel, escapeHtml, eventDuration, formatTime, typeLabel } from "./format.js";
+import { t, waehleSprache } from "./i18n.js";
 
-const KATEGORIEN = [
-  { schluessel: "alarm", titel: "Alarme", einzahl: "Alarm" },
-  { schluessel: "warning", titel: "Warnungen", einzahl: "Warnung" },
-  { schluessel: "info", titel: "Infos", einzahl: "Info" },
-];
+const KATEGORIEN = ["alarm", "warning", "info"];
+
+/** Wie viele Ereignisse des Tages die Karte hoechstens zeigt. */
+const HISTORIE_VORGABE = 5;
 
 const STYLES = `
   :host {
@@ -135,8 +140,10 @@ const STYLES = `
 
 class NotificationCenterCard extends HTMLElement {
   #hass = null;
-  #config = { mode: "list", show_events_today: true };
+  #config = { mode: "list", show_events_today: true, show_history: false };
   #state = { counts: {}, active: [], paused: false };
+  #historie = { events: [], geladen: false, fehler: null };
+  #historieLaeuft = false;
   #unsubscribe = null;
   #verbunden = false;
   #fehler = null;
@@ -152,12 +159,15 @@ class NotificationCenterCard extends HTMLElement {
     }
     // Vorgabe ist die Liste: eine Meldungskarte, die nur zaehlt, beantwortet
     // die naheliegendste Frage nicht.
-    this.#config = { mode: "list", show_events_today: true, ...config };
+    this.#config = { mode: "list", show_events_today: true, show_history: false, ...config };
+    this.#historie = { events: [], geladen: false, fehler: null };
     this.#render();
+    if (this.#hass && this.#config.show_history) this.#ladeHistorie();
   }
 
   getCardSize() {
-    return this.#config.mode === "list" ? 3 : 1;
+    const grund = this.#config.mode === "list" ? 3 : 1;
+    return this.#config.show_history ? grund + 2 : grund;
   }
 
   set hass(hass) {
@@ -192,6 +202,10 @@ class NotificationCenterCard extends HTMLElement {
           active: nachricht.active || [],
           paused: Boolean(nachricht.paused),
         };
+        // Der Abonnementstrom meldet nur den aktiven Bestand. Was heute
+        // schon vorbei ist, steht allein in der Historie -- die muss also
+        // erneut geholt werden, sobald sich etwas geruehrt hat.
+        if (this.#config.show_history) this.#ladeHistorie();
         this.#render();
       });
     } catch (fehler) {
@@ -200,12 +214,46 @@ class NotificationCenterCard extends HTMLElement {
     }
   }
 
+  /**
+   * Holt die Ereignisse des laufenden Tages.
+   *
+   * Beginn ist Mitternacht in der Zeitzone des Browsers, nicht die letzten
+   * 24 Stunden: gefragt ist, was heute war.
+   */
+  async #ladeHistorie() {
+    if (this.#historieLaeuft) return;
+    this.#historieLaeuft = true;
+
+    const beginn = new Date();
+    beginn.setHours(0, 0, 0, 0);
+
+    try {
+      const antwort = await api.getHistory(this.#hass, {
+        start: beginn.toISOString(),
+        limit: this.#historieGrenze(),
+        offset: 0,
+      });
+      this.#historie = { events: antwort.events || [], geladen: true, fehler: null };
+    } catch (fehler) {
+      this.#historie = { events: [], geladen: true, fehler: fehler.message || String(fehler) };
+    } finally {
+      this.#historieLaeuft = false;
+      this.#render();
+    }
+  }
+
+  #historieGrenze() {
+    const wert = Number(this.#config.history_max);
+    return Number.isFinite(wert) && wert > 0 ? Math.round(wert) : HISTORIE_VORGABE;
+  }
+
   // -- Darstellung -------------------------------------------------------
 
   #render() {
     if (!this.shadowRoot) this.attachShadow({ mode: "open" });
 
     const locale = this.#hass?.locale?.language || navigator.language;
+    waehleSprache(this.#hass);
 
     this.shadowRoot.innerHTML = `
       <style>${STYLES}</style>
@@ -217,6 +265,7 @@ class NotificationCenterCard extends HTMLElement {
         }
         ${this.#hinweis()}
         ${this.#inhalt(locale)}
+        ${this.#config.show_history ? this.#historieBlock(locale) : ""}
       </ha-card>
     `;
 
@@ -238,17 +287,17 @@ class NotificationCenterCard extends HTMLElement {
       return `<div class="fehler" part="error">${escapeHtml(this.#fehler)}</div>`;
     }
     if (this.#backendZuAlt) {
-      return `<div class="fehler" part="error">
-        Home Assistant führt einen älteren Stand aus. Bitte neu starten.
-      </div>`;
+      return `<div class="fehler" part="error">${t("card.backendOutdated")}</div>`;
     }
     if (versionsKonflikt.erkannt) {
-      return `<div class="fehler" part="error">
-        Version ${versionsKonflikt.frontend} gegen ${versionsKonflikt.backend}.
-        Bitte Home Assistant neu starten und die Seite neu laden.
-      </div>`;
+      return `<div class="fehler" part="error">${t("card.versionMismatch", {
+        frontend: versionsKonflikt.frontend,
+        backend: versionsKonflikt.backend,
+      })}</div>`;
     }
-    return this.#state.paused ? '<div class="pausiert" part="paused">Pausiert</div>' : "";
+    return this.#state.paused
+      ? `<div class="pausiert" part="paused">${t("common.paused")}</div>`
+      : "";
   }
 
   #inhalt(locale) {
@@ -264,7 +313,7 @@ class NotificationCenterCard extends HTMLElement {
     const grenze = this.#config.max;
     const abschnitte = KATEGORIEN.map((kategorie) => {
       let eintraege = aktive
-        .filter((event) => event.type === kategorie.schluessel)
+        .filter((event) => event.type === kategorie)
         .sort((a, b) => new Date(b.start_time) - new Date(a.start_time));
 
       if (!eintraege.length) return "";
@@ -273,10 +322,16 @@ class NotificationCenterCard extends HTMLElement {
       if (grenze) eintraege = eintraege.slice(0, grenze);
 
       return `
-        <h2 part="heading">${kategorie.titel}</h2>
+        <h2 part="heading">${categoryLabel(kategorie)}</h2>
         <ul part="list">
           ${eintraege.map((event) => this.#zeile(event, locale)).join("")}
-          ${rest ? `<li class="zeile"><span class="meldung">und ${rest} weitere</span></li>` : ""}
+          ${
+            rest
+              ? `<li class="zeile"><span class="meldung">${t("card.more", {
+                  count: rest,
+                })}</span></li>`
+              : ""
+          }
         </ul>
       `;
     }).join("");
@@ -299,14 +354,18 @@ class NotificationCenterCard extends HTMLElement {
 
   #zaehler() {
     const counts = this.#state.counts;
-    const zeilen = KATEGORIEN.filter((k) => (counts[k.schluessel] || 0) > 0).map((k) => {
-      const anzahl = counts[k.schluessel];
-      return `
-        <li class="zeile" part="row row-${k.schluessel}">
-          <span class="zahl ${k.schluessel}" part="count">${anzahl}</span>
-          <span class="meldung" part="message">${anzahl === 1 ? k.einzahl : k.titel}</span>
+    const zeilen = KATEGORIEN.filter((kategorie) => (counts[kategorie] || 0) > 0).map(
+      (kategorie) => {
+        const anzahl = counts[kategorie];
+        return `
+        <li class="zeile" part="row row-${kategorie}">
+          <span class="zahl ${kategorie}" part="count">${anzahl}</span>
+          <span class="meldung" part="message">${
+            anzahl === 1 ? typeLabel(kategorie) : categoryLabel(kategorie)
+          }</span>
         </li>`;
-    });
+      }
+    );
 
     if (!zeilen.length) return this.#ruhig();
     return `<ul part="list">${zeilen.join("")}</ul>${this.#fuss()}`;
@@ -315,7 +374,7 @@ class NotificationCenterCard extends HTMLElement {
   #ruhig() {
     return `
       <div class="ruhig" part="empty">
-        <strong>Alles ruhig</strong>
+        <strong>${t("card.quiet")}</strong>
         ${this.#ereignisText()}
       </div>
     `;
@@ -328,8 +387,50 @@ class NotificationCenterCard extends HTMLElement {
 
   #ereignisText() {
     if (this.#config.show_events_today === false) return "";
-    const anzahl = this.#state.counts.events_today ?? 0;
-    return `${anzahl} ${anzahl === 1 ? "Ereignis" : "Ereignisse"} heute`;
+    return t("events.today", { count: this.#state.counts.events_today ?? 0 });
+  }
+
+  /**
+   * Die Ereignisse des Tages, wie die Historie im Panel, nur kompakt.
+   *
+   * Gezeigt werden auch abgeschlossene Ereignisse -- genau darum geht es
+   * hier: der Blick zurueck auf den Tag, nicht nur auf das, was gerade
+   * anliegt.
+   */
+  #historieBlock(locale) {
+    if (this.#historie.fehler) {
+      return `<div class="fehler" part="error">${escapeHtml(this.#historie.fehler)}</div>`;
+    }
+    if (!this.#historie.geladen) return "";
+
+    const eintraege = this.#historie.events.slice(0, this.#historieGrenze());
+
+    return `
+      <h2 part="heading">${t("card.historyTitle")}</h2>
+      ${
+        eintraege.length
+          ? `<ul part="list">${eintraege
+              .map((event) => this.#historieZeile(event, locale))
+              .join("")}</ul>`
+          : `<div class="fuss" part="empty">${t("card.historyEmpty")}</div>`
+      }
+    `;
+  }
+
+  #historieZeile(event, locale) {
+    const klickbar = Boolean(event.entity_id);
+
+    return `
+      <li class="zeile ${klickbar ? "klickbar" : ""}" part="row row-${event.type}"
+          ${klickbar ? `data-entity="${escapeHtml(event.entity_id)}"` : ""}>
+        <span class="balken ${event.type}" part="bar"></span>
+        <span class="meldung" part="message">${escapeHtml(event.message)}</span>
+        <span class="zeit" part="time">${formatTime(event.start_time, locale)}</span>
+        <span class="zeit" part="duration">${
+          event.active ? t("card.historyActive") : eventDuration(event)
+        }</span>
+      </li>
+    `;
   }
 }
 
@@ -345,8 +446,8 @@ window.customCards = window.customCards || [];
 if (!window.customCards.some((karte) => karte.type === "notification-center-card")) {
   window.customCards.push({
     type: "notification-center-card",
-    name: "Notification Center",
-    description: "Aktive Meldungen des Notification Centers.",
+    name: t("card.name"),
+    description: t("card.description"),
     preview: true,
     documentationURL: "https://github.com/DaFlouw/notification_center#lovelace-card",
   });

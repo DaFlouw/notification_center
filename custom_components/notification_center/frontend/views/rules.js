@@ -6,28 +6,14 @@
  * aus der Entity, nicht als freies Textfeld (Spezifikation 14).
  */
 
-import { escapeHtml } from "../format.js";
+import { escapeHtml, typeLabel } from "../format.js";
+import { t } from "../i18n.js";
 
-const BEDINGUNGEN = [
-  { wert: "state_is", text: "Zustand ist" },
-  { wert: "state_is_not", text: "Zustand ist nicht" },
-  { wert: "state_changed_to", text: "Zustand ändert sich zu" },
-  { wert: "numeric", text: "Wert überschreitet oder unterschreitet" },
-];
+const BEDINGUNGEN = ["state_is", "state_is_not", "state_changed_to", "numeric"];
 
-const OPERATOREN = [
-  { wert: "gt", text: "größer als" },
-  { wert: "gte", text: "größer oder gleich" },
-  { wert: "lt", text: "kleiner als" },
-  { wert: "lte", text: "kleiner oder gleich" },
-  { wert: "eq", text: "gleich" },
-];
+const OPERATOREN = ["gt", "gte", "lt", "lte", "eq"];
 
-const TYPEN = [
-  { wert: "info", text: "Info" },
-  { wert: "warning", text: "Warnung" },
-  { wert: "alarm", text: "Alarm" },
-];
+const TYPEN = ["info", "warning", "alarm"];
 
 export function leereRegel(entityId) {
   return {
@@ -71,15 +57,16 @@ export function uebersichtAusKonfiguration(konfiguration) {
 export function renderRuleOverview(state) {
   const { entities = [], rules = [], loading } = state;
 
-  if (loading) return '<div class="loading">Wird geladen …</div>';
+  if (loading) return `<div class="loading">${t("common.loading")}</div>`;
 
   if (!rules.length) {
     return `
       <div class="empty">
-        <strong>Noch keine Regeln</strong>
+        <strong>${t("rules.overviewEmpty")}</strong>
         <span>
-          Unter <button class="link" data-nav="discovery">Discovery</button>
-          eine Entity übernehmen und ihr eine Regel geben.
+          ${t("rules.overviewEmptyHint", {
+            link: `<button class="link" data-nav="discovery">${t("nav.discovery")}</button>`,
+          })}
         </span>
       </div>
     `;
@@ -113,7 +100,7 @@ export function renderRuleOverview(state) {
 
   return `
     <div class="entity-meta" style="margin-bottom: 12px">
-      ${rules.length} ${rules.length === 1 ? "Regel" : "Regeln"}
+      ${t("rules.count", { count: rules.length })}
     </div>
     ${abschnitte.join("")}
   `;
@@ -125,8 +112,8 @@ function gruppiere(rules, platzierung) {
 
   for (const regel of rules) {
     const ort = platzierung.get(regel.entity_id) || {};
-    const geschoss = ort.floor_name || "Ohne Geschoss";
-    const raum = ort.area_name || "Ohne Raum";
+    const geschoss = ort.floor_name || t("rules.noFloor");
+    const raum = ort.area_name || t("rules.noArea");
 
     if (!baum.has(geschoss)) baum.set(geschoss, new Map());
     const raeume = baum.get(geschoss);
@@ -161,9 +148,14 @@ function entityBlock([entityId, eintraege], platzierung) {
   `;
 }
 
-/** Unsortierte Sammelgruppen ans Ende, sonst alphabetisch. */
+/**
+ * Unsortierte Sammelgruppen ans Ende, sonst alphabetisch.
+ *
+ * Erkannt werden sie am uebersetzten Text selbst und nicht an einem
+ * Wortanfang: im Englischen beginnt "No area" mit einem anderen Wort.
+ */
 function nachNamen([a], [b]) {
-  const sammel = (wert) => (wert.startsWith("Ohne ") ? 1 : 0);
+  const sammel = (wert) => (wert === t("rules.noFloor") || wert === t("rules.noArea") ? 1 : 0);
   return sammel(a) - sammel(b) || a.localeCompare(b);
 }
 
@@ -172,10 +164,10 @@ export function renderRules(state) {
 
   return `
     <div class="filters">
-      <button class="link" data-action="back-to-rules">← Alle Regeln</button>
+      <button class="link" data-action="back-to-rules">${t("rules.backToAll")}</button>
     </div>
 
-    <h2>Regeln für ${escapeHtml(entityName || entityId)}</h2>
+    <h2>${t("rules.forEntity", { name: escapeHtml(entityName || entityId) })}</h2>
 
     <!--
       Die Entity-ID gehoert auf diese Seite: von hier aus laesst sich die
@@ -189,16 +181,16 @@ export function renderRules(state) {
         ? `<ul>${rules
             .map((regel) => regelZeile(regel, entityId, entityName, entwurf?.rule_id))
             .join("")}</ul>`
-        : '<div class="entity-meta" style="padding: 8px 0">Noch keine Regeln.</div>'
+        : `<div class="entity-meta" style="padding: 8px 0">${t("rules.none")}</div>`
     }
 
     ${
       entwurf
         ? formular(entwurf, states, attributes)
         : `<div class="footer-link">
-             <button class="action" data-action="new-rule">Regel erstellen</button>
+             <button class="action" data-action="new-rule">${t("rules.create")}</button>
              <button class="action secondary" data-action="replace-entity"
-                     data-entity="${escapeHtml(entityId)}">Entity ersetzen</button>
+                     data-entity="${escapeHtml(entityId)}">${t("rules.replaceEntity")}</button>
            </div>`
     }
   `;
@@ -227,13 +219,13 @@ function regelZeile(regel, entityId = regel.entity_id, entityName = "", offeneRe
     <li class="row${wirdBearbeitet ? " editing" : ""}">
       <span class="bar ${regel.type}"></span>
       <span class="message">${escapeHtml(beschreibung(regel))}</span>
-      ${regel.enabled === false ? '<span class="badge">deaktiviert</span>' : ""}
+      ${regel.enabled === false ? `<span class="badge">${t("rules.disabled")}</span>` : ""}
       ${
         wirdBearbeitet
-          ? '<span class="badge">wird bearbeitet</span>'
-          : `<button class="link" data-action="edit-rule" ${ziel}>Bearbeiten</button>`
+          ? `<span class="badge">${t("rules.editing")}</span>`
+          : `<button class="link" data-action="edit-rule" ${ziel}>${t("common.edit")}</button>`
       }
-      <button class="link" data-action="delete-rule" ${ziel}>Löschen</button>
+      <button class="link" data-action="delete-rule" ${ziel}>${t("common.delete")}</button>
     </li>
   `;
 }
@@ -241,28 +233,34 @@ function regelZeile(regel, entityId = regel.entity_id, entityName = "", offeneRe
 /** Kurzbeschreibung einer Regel fuer die Liste. */
 export function beschreibung(regel) {
   const quelle =
-    regel.value_source?.kind === "attribute" ? `${regel.value_source.attribute}` : "Zustand";
+    regel.value_source?.kind === "attribute"
+      ? `${regel.value_source.attribute}`
+      : t("common.state");
 
   if (regel.kind === "numeric") {
-    const operator = OPERATOREN.find((o) => o.wert === regel.operator)?.text || regel.operator;
+    const operator = OPERATOREN.includes(regel.operator)
+      ? t(`rules.operator.${regel.operator}`)
+      : regel.operator;
     const hysterese =
-      regel.release_threshold != null ? `, zurück bei ${regel.release_threshold}` : "";
+      regel.release_threshold != null
+        ? t("rules.describe.back", { value: regel.release_threshold })
+        : "";
     return `${quelle} ${operator} ${regel.threshold}${hysterese}${dauerText(regel)}`;
   }
 
-  const zustaende = (regel.states || []).join(" oder ");
+  const zustaende = (regel.states || []).join(t("rules.describe.or"));
   const einleitung =
     regel.kind === "state_changed_to"
-      ? "wechselt zu"
+      ? t("rules.describe.changesTo")
       : regel.kind === "state_is_not"
-        ? "ist nicht"
-        : "ist";
+        ? t("rules.describe.isNot")
+        : t("rules.describe.is");
   return `${quelle} ${einleitung} ${zustaende}${dauerText(regel)}`;
 }
 
 function dauerText(regel) {
   if (!regel.duration_seconds) return "";
-  return ` · länger als ${Math.round(regel.duration_seconds / 60)} min`;
+  return t("rules.describe.longerThan", { minutes: Math.round(regel.duration_seconds / 60) });
 }
 
 function formular(entwurf, states, attributes) {
@@ -271,35 +269,35 @@ function formular(entwurf, states, attributes) {
   return `
     <div style="border-top: 1px solid var(--nc-border); margin-top: 16px; padding-top: 16px">
       <div class="filters">
-        <select data-rule-field="kind" aria-label="Bedingung">
-          ${auswahl(BEDINGUNGEN, entwurf.kind)}
+        <select data-rule-field="kind" aria-label="${t("rules.condition")}">
+          ${auswahl(BEDINGUNGEN, entwurf.kind, (wert) => t(`rules.kind.${wert}`))}
         </select>
 
-        <select data-rule-field="source" aria-label="Wertquelle">
-          <option value="">Zustand</option>
+        <select data-rule-field="source" aria-label="${t("rules.valueSource")}">
+          <option value="">${t("common.state")}</option>
           ${attributes
             .map(
               (attribut) =>
                 `<option value="${escapeHtml(attribut.name)}" ${
                   entwurf.value_source?.attribute === attribut.name ? "selected" : ""
-                }>Attribut: ${escapeHtml(attribut.name)}</option>`
+                }>${escapeHtml(t("rules.attribute", { name: attribut.name }))}</option>`
             )
             .join("")}
         </select>
 
-        <select data-rule-field="type" aria-label="Typ">
-          ${auswahl(TYPEN, entwurf.type)}
+        <select data-rule-field="type" aria-label="${t("history.type")}">
+          ${auswahl(TYPEN, entwurf.type, typeLabel)}
         </select>
       </div>
 
       <div class="filters">
         ${
           numerisch
-            ? `<select data-rule-field="operator" aria-label="Vergleich">
-                 ${auswahl(OPERATOREN, entwurf.operator)}
+            ? `<select data-rule-field="operator" aria-label="${t("rules.comparison")}">
+                 ${auswahl(OPERATOREN, entwurf.operator, (wert) => t(`rules.operator.${wert}`))}
                </select>
                <input type="number" step="any" data-rule-field="threshold"
-                      placeholder="Schwelle" aria-label="Schwelle"
+                      placeholder="${t("rules.threshold")}" aria-label="${t("rules.threshold")}"
                       value="${entwurf.threshold ?? ""}">`
             : zustandsauswahl(entwurf, states)
         }
@@ -307,31 +305,32 @@ function formular(entwurf, states, attributes) {
 
       <div class="filters">
         <input type="text" data-rule-field="message" style="flex: 1; min-width: 220px"
-               placeholder="Meldungstext, z. B. {name} zu warm ({value} {unit})"
-               aria-label="Meldungstext"
+               placeholder="${escapeHtml(t("rules.messagePlaceholder"))}"
+               aria-label="${t("rules.message")}"
                value="${escapeHtml(entwurf.message_template || "")}">
       </div>
 
       <details ${entwurf.release_threshold != null || entwurf.duration_seconds ? "open" : ""}>
-        <summary>Erweitert</summary>
+        <summary>${t("rules.advanced")}</summary>
         <div class="filters" style="margin-top: 8px">
           ${
             numerisch
               ? `<input type="number" step="any" data-rule-field="release"
-                        placeholder="Rückkehrschwelle (Hysterese)"
-                        aria-label="Rückkehrschwelle"
+                        placeholder="${t("rules.releasePlaceholder")}"
+                        aria-label="${t("rules.release")}"
                         value="${entwurf.release_threshold ?? ""}">`
               : ""
           }
           <input type="number" min="0" data-rule-field="duration"
-                 placeholder="Erst nach … Minuten" aria-label="Zeitbedingung in Minuten"
+                 placeholder="${t("rules.durationPlaceholder")}"
+                 aria-label="${t("rules.duration")}"
                  value="${entwurf.duration_seconds ? Math.round(entwurf.duration_seconds / 60) : ""}">
         </div>
       </details>
 
       <div class="footer-link">
-        <button class="action" data-action="save-rule">Speichern</button>
-        <button class="action secondary" data-action="cancel-rule">Abbrechen</button>
+        <button class="action" data-action="save-rule">${t("common.save")}</button>
+        <button class="action secondary" data-action="cancel-rule">${t("common.cancel")}</button>
       </div>
     </div>
   `;
@@ -339,13 +338,15 @@ function formular(entwurf, states, attributes) {
 
 function zustandsauswahl(entwurf, states) {
   if (!states.length) {
-    return `<input type="text" data-rule-field="states" placeholder="Zustand"
-                   aria-label="Zustand" value="${escapeHtml((entwurf.states || []).join(", "))}">`;
+    return `<input type="text" data-rule-field="states"
+                   placeholder="${t("rules.statePlaceholder")}" aria-label="${t("common.state")}"
+                   value="${escapeHtml((entwurf.states || []).join(", "))}">`;
   }
 
   // Auswahlfeld statt Textfeld: die Werte stammen aus der Entity selbst.
   return `
-    <select data-rule-field="states" aria-label="Zustand" multiple size="${Math.min(states.length, 4)}">
+    <select data-rule-field="states" aria-label="${t("common.state")}" multiple
+            size="${Math.min(states.length, 4)}">
       ${states
         .map(
           (zustand) =>
@@ -358,11 +359,13 @@ function zustandsauswahl(entwurf, states) {
   `;
 }
 
-function auswahl(optionen, aktiv) {
-  return optionen
+function auswahl(werte, aktiv, beschriftung) {
+  return werte
     .map(
-      (option) =>
-        `<option value="${option.wert}" ${aktiv === option.wert ? "selected" : ""}>${option.text}</option>`
+      (wert) =>
+        `<option value="${wert}" ${aktiv === wert ? "selected" : ""}>${escapeHtml(
+          beschriftung(wert)
+        )}</option>`
     )
     .join("");
 }

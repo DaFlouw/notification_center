@@ -34,7 +34,7 @@
 <notification-center-panel id="panel"></notification-center-panel>
 
 <script type="module">
-import { GET_CONFIG, GET_ACTIVE, GET_COUNTS, GET_HISTORY, DISCOVER, GET_SUGGESTIONS, AREAS } from "./daten.js";
+import { GET_CONFIG, GET_ACTIVE, GET_COUNTS, GET_HISTORY, DISCOVER, GET_SUGGESTIONS, AREAS, VERSION } from "./daten.js";
 import "../../custom_components/notification_center/frontend/notification-center-panel.js";
 import { lauf } from "./interaktion.js";
 
@@ -55,14 +55,14 @@ const ANTWORTEN = {
   get_history: () => GET_HISTORY,
   discover: () => DISCOVER,
   get_suggestions: () => GET_SUGGESTIONS,
-  save_rule: (n) => ({ api_version: 1, version: "1.1.3", rule: n.rule }),
-  delete_rule: (n) => ({ api_version: 1, version: "1.1.3", deleted: n.rule_id }),
-  add_entities: (n) => ({ api_version: 1, version: "1.1.3", added: n.entity_ids }),
-  remove_entity: (n) => ({ api_version: 1, version: "1.1.3", removed: n.entity_id }),
-  replace_entity: (n) => ({ api_version: 1, version: "1.1.3", replaced: n.old_entity_id }),
-  delete_event: () => ({ api_version: 1, version: "1.1.3", deleted: true }),
-  clear_history: () => ({ api_version: 1, version: "1.1.3", cleared: true }),
-  set_settings: () => ({ api_version: 1, version: "1.1.3", settings: GET_CONFIG.settings }),
+  save_rule: (n) => ({ api_version: 1, version: VERSION, rule: n.rule }),
+  delete_rule: (n) => ({ api_version: 1, version: VERSION, deleted: n.rule_id }),
+  add_entities: (n) => ({ api_version: 1, version: VERSION, added: n.entity_ids }),
+  remove_entity: (n) => ({ api_version: 1, version: VERSION, removed: n.entity_id }),
+  replace_entity: (n) => ({ api_version: 1, version: VERSION, replaced: n.old_entity_id }),
+  delete_event: () => ({ api_version: 1, version: VERSION, deleted: true }),
+  clear_history: () => ({ api_version: 1, version: VERSION, cleared: true }),
+  set_settings: () => ({ api_version: 1, version: VERSION, settings: GET_CONFIG.settings }),
 };
 
 /** Jedes abgesetzte Kommando samt Parametern. */
@@ -87,7 +87,8 @@ window.prompt = (text, vorgabe) => {
 window.__naechsterFehler = null;
 
 const hass = {
-  locale: { language: "de" },
+  // ?sprache=en zeigt dasselbe Panel in der Grundsprache.
+  locale: { language: new URLSearchParams(location.search).get("sprache") || "de" },
   areas: AREAS,
   states: {},
   connection: {

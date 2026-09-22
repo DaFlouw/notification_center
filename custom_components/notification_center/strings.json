@@ -3,11 +3,11 @@
     "step": {
       "user": {
         "title": "Notification Center",
-        "description": "Das Notification Center wird als einzelne, globale Instanz eingerichtet. Die Auswahl der zu ueberwachenden Entities erfolgt anschliessend im Notification-Center-Panel."
+        "description": "The Notification Center is set up as a single, global instance. Entities to monitor are selected afterwards in the Notification Center panel."
       }
     },
     "abort": {
-      "single_instance_allowed": "Es ist bereits eine Instanz des Notification Centers eingerichtet."
+      "single_instance_allowed": "A Notification Center instance is already configured."
     }
   },
   "entity": {

@@ -33,19 +33,27 @@
 <div class="buehne">
   <div class="spalte"><notification-center-card id="liste"></notification-center-card></div>
   <div class="spalte"><notification-center-card id="zaehler"></notification-center-card></div>
+  <div class="spalte"><notification-center-card id="historie"></notification-center-card></div>
 </div>
 
 <script type="module">
-import { GET_ACTIVE, AREAS } from "./daten.js";
+import { GET_ACTIVE, GET_HISTORY, AREAS } from "./daten.js";
 import "../../custom_components/notification_center/frontend/notification-center-card.js";
 
+/* ?sprache=en zeigt dieselben Karten in der Grundsprache. */
+const sprache = new URLSearchParams(location.search).get("sprache") || "de";
+
 const hass = {
-  locale: { language: "de" },
+  locale: { language: sprache },
   areas: AREAS,
   states: {},
   connection: {
     async sendMessagePromise(nachricht) {
       if (String(nachricht.type).endsWith("get_active")) return GET_ACTIVE;
+      if (String(nachricht.type).endsWith("get_history")) {
+        window.__letzteHistorienabfrage = nachricht;
+        return GET_HISTORY;
+      }
       return { api_version: 1, version: GET_ACTIVE.version };
     },
     async subscribeMessage() {
@@ -61,6 +69,15 @@ liste.hass = hass;
 const zaehler = document.getElementById("zaehler");
 zaehler.setConfig({ type: "custom:notification-center-card", mode: "counts", title: "Überblick" });
 zaehler.hass = hass;
+
+const historie = document.getElementById("historie");
+historie.setConfig({
+  type: "custom:notification-center-card",
+  title: "Heute",
+  show_history: true,
+  history_max: 4,
+});
+historie.hass = hass;
 
 /* Fuer die Bilder der Dokumentation: ?zoom=2 rendert alles doppelt so gross,
    damit die Aufnahme scharf bleibt statt hochskaliert zu werden. */

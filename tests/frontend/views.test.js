@@ -13,8 +13,9 @@
  */
 
 import assert from "node:assert/strict";
-import { describe, it } from "node:test";
+import { before, describe, it } from "node:test";
 
+import { setzeSprache } from "../../custom_components/notification_center/frontend/i18n.js";
 import { escapeHtml, formatDuration, typeLabel } from "../../custom_components/notification_center/frontend/format.js";
 import { renderDashboard } from "../../custom_components/notification_center/frontend/views/dashboard.js";
 import { renderDiscovery } from "../../custom_components/notification_center/frontend/views/discovery.js";
@@ -29,6 +30,11 @@ import {
   renderHistory,
   seitengroesse,
 } from "../../custom_components/notification_center/frontend/views/history.js";
+
+// Die vorhandenen Erwartungen sind deutsch formuliert; die Grundsprache der
+// Oberflaeche ist Englisch. Beides wird geprueft: hier Deutsch, in
+// i18n.test.js zusaetzlich Englisch und der Rueckfall.
+before(() => setzeSprache("de"));
 
 /** Aufbau wie eine Antwort von get_config, Werte frei erfunden. */
 const ENTITIES = [

@@ -37,6 +37,7 @@ from .analyzer import (
 )
 from .states import available_states
 from .suggestions import Confidence, EntityMetadata, Suggestion, build_suggestions
+from .texte import sprache_von
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -106,6 +107,15 @@ STATE_LOOKBACK_DAYS = 30
 
 class DiscoveryEngine:
     """Findet Entities und erzeugt Vorschlaege fuer sie."""
+
+    @property
+    def _sprache(self) -> str:
+        """Die Sprache der Installation, bei jedem Zugriff neu gelesen.
+
+        Sie laesst sich im laufenden Betrieb umstellen; ein einmal gemerkter
+        Wert waere danach falsch.
+        """
+        return sprache_von(self._hass)
 
     def __init__(self, hass: HomeAssistant, config_store: ConfigStore) -> None:
         self._hass = hass
@@ -177,7 +187,7 @@ class DiscoveryEngine:
         eintrag["has_suggestions"] = bool(
             not ueberwacht
             and metadata is not None
-            and _ohne_unsichere(build_suggestions(metadata), False)
+            and _ohne_unsichere(build_suggestions(metadata, sprache=self._sprache), False)
         )
 
         return eintrag
@@ -337,6 +347,7 @@ class DiscoveryEngine:
             numeric_profile=numerisch,
             state_profile=zustaende,
             analysis_days=tage,
+            sprache=self._sprache,
         )
         return _ohne_unsichere(vorschlaege, include_uncertain)
 

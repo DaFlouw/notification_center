@@ -30,6 +30,7 @@ from .analyzer import (
     suggest_lower_threshold,
     suggest_upper_threshold,
 )
+from .texte import GRUNDSPRACHE, text, zahl
 
 
 class Confidence(StrEnum):
@@ -138,40 +139,22 @@ class Suggestion:
 # ---------------------------------------------------------------------------
 
 #: Binaersensoren, deren aktiver Zustand fuer sich genommen ein Alarm ist.
-_ALARM_CLASSES = {
-    "smoke": "Rauch erkannt",
-    "gas": "Gas erkannt",
-    "carbon_monoxide": "Kohlenmonoxid erkannt",
-    "moisture": "Feuchtigkeit erkannt",
-    "safety": "Sicherheitsmeldung",
-}
+#: Die Beschriftung steht unter ``class.<kennung>`` in texte.py.
+_ALARM_CLASSES = frozenset({"smoke", "gas", "carbon_monoxide", "moisture", "safety"})
 
 #: Binaersensoren, deren aktiver Zustand eine Warnung wert ist.
-_WARNING_CLASSES = {
-    "problem": "Stoerung gemeldet",
-    "battery": "Batterie schwach",
-    "tamper": "Manipulation erkannt",
-}
+_WARNING_CLASSES = frozenset({"problem", "battery", "tamper"})
 
 #: Oeffnungen: erst nach einer Weile meldenswert, sonst nervt jede Tuer.
-_OPENING_CLASSES = {
-    "door": "Tuer",
-    "window": "Fenster",
-    "garage_door": "Garagentor",
-    "opening": "Oeffnung",
-}
+_OPENING_CLASSES = frozenset({"door", "window", "garage_door", "opening"})
 
 #: Fuer diese Messgroessen gibt es allgemein anerkannte Schwellen, die
 #: unabhaengig von der Historie gelten.
-_ABSOLUTE_THRESHOLDS: dict[str, tuple[NumericOperator, float, NotificationType, str]] = {
-    "battery": (NumericOperator.LT, 20.0, NotificationType.WARNING, "Batterie unter 20 %"),
-    "carbon_dioxide": (
-        NumericOperator.GT,
-        1200.0,
-        NotificationType.WARNING,
-        "CO2 ueber 1200 ppm",
-    ),
-    "humidity": (NumericOperator.GT, 65.0, NotificationType.WARNING, "Luftfeuchte ueber 65 %"),
+#: Die Beschreibung steht unter ``absolute.<kennung>`` in texte.py.
+_ABSOLUTE_THRESHOLDS: dict[str, tuple[NumericOperator, float, NotificationType]] = {
+    "battery": (NumericOperator.LT, 20.0, NotificationType.WARNING),
+    "carbon_dioxide": (NumericOperator.GT, 1200.0, NotificationType.WARNING),
+    "humidity": (NumericOperator.GT, 65.0, NotificationType.WARNING),
 }
 
 #: Nur als letzter Ausweg, wenn keine Metadaten vorliegen.
@@ -210,8 +193,13 @@ def build_suggestions(
     numeric_profile: NumericProfile | None = None,
     state_profile: StateProfile | None = None,
     analysis_days: int = 7,
+    sprache: str = GRUNDSPRACHE,
 ) -> list[Suggestion]:
-    """Erzeugt alle Vorschlaege fuer eine Entity, beste Sicherheit zuerst."""
+    """Erzeugt alle Vorschlaege fuer eine Entity, beste Sicherheit zuerst.
+
+    ``sprache`` bestimmt Titel, Begruendung und Meldungsvorlage. Die Vorlage
+    wird beim Uebernehmen zur Regel und bleibt dann stehen, wie sie war.
+    """
     device_class = metadata.device_class
     aus_namen = False
 
@@ -222,14 +210,16 @@ def build_suggestions(
     vorschlaege: list[Suggestion] = []
 
     if metadata.domain in _ON_OFF_DOMAINS:
-        vorschlaege.extend(_binary_suggestions(metadata, device_class, aus_namen))
-        vorschlaege.extend(_on_off_suggestions(metadata))
+        vorschlaege.extend(_binary_suggestions(metadata, device_class, aus_namen, sprache))
+        vorschlaege.extend(_on_off_suggestions(metadata, sprache))
     elif metadata.is_numeric or (aus_namen and device_class in _ABSOLUTE_THRESHOLDS):
         vorschlaege.extend(
-            _numeric_suggestions(metadata, device_class, aus_namen, numeric_profile, analysis_days)
+            _numeric_suggestions(
+                metadata, device_class, aus_namen, numeric_profile, analysis_days, sprache
+            )
         )
     else:
-        vorschlaege.extend(_state_suggestions(metadata, state_profile, analysis_days))
+        vorschlaege.extend(_state_suggestions(metadata, state_profile, analysis_days, sprache))
 
     return sorted(vorschlaege, key=lambda v: _RANG[v.confidence])
 
@@ -243,7 +233,7 @@ _RANG = {Confidence.HIGH: 0, Confidence.MEDIUM: 1, Confidence.LOW: 2}
 
 
 def _binary_suggestions(
-    metadata: EntityMetadata, device_class: str | None, aus_namen: bool
+    metadata: EntityMetadata, device_class: str | None, aus_namen: bool, sprache: str
 ) -> list[Suggestion]:
     if device_class in _ALARM_CLASSES:
         return [
@@ -251,7 +241,8 @@ def _binary_suggestions(
                 metadata,
                 device_class,
                 aus_namen,
-                titel=f"Alarm bei {_ALARM_CLASSES[device_class]}",
+                sprache,
+                titel=text(sprache, "title.alarm", text=text(sprache, f"class.{device_class}")),
                 typ=NotificationType.ALARM,
             )
         ]
@@ -262,19 +253,25 @@ def _binary_suggestions(
                 metadata,
                 device_class,
                 aus_namen,
-                titel=f"Warnung bei {_WARNING_CLASSES[device_class]}",
+                sprache,
+                titel=text(sprache, "title.warning", text=text(sprache, f"class.{device_class}")),
                 typ=NotificationType.WARNING,
             )
         ]
 
     if device_class in _OPENING_CLASSES:
-        bezeichnung = _OPENING_CLASSES[device_class]
         return [
             _zustandsvorschlag(
                 metadata,
                 device_class,
                 aus_namen,
-                titel=f"Warnung, wenn {bezeichnung} laenger als 15 Minuten offen ist",
+                sprache,
+                titel=text(
+                    sprache,
+                    "title.openingOpen",
+                    thing=text(sprache, f"opening.{device_class}"),
+                    minutes=int(DEFAULT_OPENING_DURATION / 60),
+                ),
                 typ=NotificationType.WARNING,
                 dauer=DEFAULT_OPENING_DURATION,
             )
@@ -283,7 +280,7 @@ def _binary_suggestions(
     return []
 
 
-def _on_off_suggestions(metadata: EntityMetadata) -> list[Suggestion]:
+def _on_off_suggestions(metadata: EntityMetadata, sprache: str) -> list[Suggestion]:
     """Die immer gueltigen Vorschlaege fuer an und aus.
 
     Ohne sie stehen Anwender bei einem Schalter oder einem Binaersensor ohne
@@ -295,18 +292,21 @@ def _on_off_suggestions(metadata: EntityMetadata) -> list[Suggestion]:
     return [
         Suggestion(
             key=f"on_off_{zustand}",
-            title=f"Information, wenn {name} {beschriftung} ist",
+            title=text(sprache, "title.onOff", name=name, state=beschriftung),
             confidence=Confidence.MEDIUM,
             kind=ConditionKind.STATE_IS,
             type=NotificationType.INFO,
             states=(zustand,),
             message_template=f"{{name}}: {beschriftung}",
             reasons=(
-                Reason("Domaene", metadata.domain),
-                Reason("Grundlage", "der Zustandsraum dieser Domaene steht fest"),
+                Reason(text(sprache, "reason.domain"), metadata.domain),
+                Reason(text(sprache, "reason.basis"), text(sprache, "reason.fixedStates")),
             ),
         )
-        for zustand, beschriftung in (("on", "an"), ("off", "aus"))
+        for zustand, beschriftung in (
+            ("on", text(sprache, "state.on")),
+            ("off", text(sprache, "state.off")),
+        )
     ]
 
 
@@ -314,16 +314,22 @@ def _zustandsvorschlag(
     metadata: EntityMetadata,
     device_class: str | None,
     aus_namen: bool,
+    sprache: str,
     *,
     titel: str,
     typ: NotificationType,
     dauer: float | None = None,
 ) -> Suggestion:
-    begruendung = [Reason("Geraeteklasse", device_class or "unbekannt")]
+    begruendung = [_geraeteklasse(sprache, device_class)]
     if aus_namen:
-        begruendung.append(Reason("Hinweis", f"aus dem Namen '{metadata.display_name}'"))
+        begruendung.append(_namenshinweis(sprache, metadata))
     if dauer:
-        begruendung.append(Reason("Zeitbedingung", f"{int(dauer / 60)} Minuten ununterbrochen"))
+        begruendung.append(
+            Reason(
+                text(sprache, "reason.duration"),
+                text(sprache, "reason.minutes", minutes=int(dauer / 60)),
+            )
+        )
 
     return Suggestion(
         key=f"{device_class}_state",
@@ -349,6 +355,7 @@ def _numeric_suggestions(
     aus_namen: bool,
     profile: NumericProfile | None,
     analysis_days: int,
+    sprache: str,
 ) -> list[Suggestion]:
     vorschlaege: list[Suggestion] = []
     einheit = f" {metadata.unit}" if metadata.unit else ""
@@ -356,17 +363,21 @@ def _numeric_suggestions(
     # 1. Anerkannte absolute Schwellen haben Vorrang: sie gelten unabhaengig
     #    davon, was die letzten Tage gezeigt haben.
     if device_class in _ABSOLUTE_THRESHOLDS:
-        operator, schwelle, typ, beschreibung = _ABSOLUTE_THRESHOLDS[device_class]
+        operator, schwelle, typ = _ABSOLUTE_THRESHOLDS[device_class]
         begruendung = [
-            Reason("Geraeteklasse", device_class or "unbekannt"),
-            Reason("Grundlage", "allgemein uebliche Schwelle"),
+            _geraeteklasse(sprache, device_class),
+            Reason(text(sprache, "reason.basis"), text(sprache, "reason.commonThreshold")),
         ]
         if aus_namen:
-            begruendung.append(Reason("Hinweis", f"aus dem Namen '{metadata.display_name}'"))
+            begruendung.append(_namenshinweis(sprache, metadata))
         vorschlaege.append(
             Suggestion(
                 key=f"{device_class}_absolute",
-                title=f"Warnung bei {beschreibung}",
+                title=text(
+                    sprache,
+                    "title.absolute",
+                    text=text(sprache, f"absolute.{device_class}"),
+                ),
                 confidence=Confidence.LOW if aus_namen else Confidence.HIGH,
                 kind=ConditionKind.NUMERIC,
                 type=typ,
@@ -385,7 +396,13 @@ def _numeric_suggestions(
             vorschlaege.append(
                 Suggestion(
                     key=f"{device_class or 'wert'}_upper",
-                    title=(f"Warnung bei {_beschriftung(metadata)} ueber {_zahl(obere)}{einheit}"),
+                    title=text(
+                        sprache,
+                        "title.above",
+                        label=_beschriftung(metadata, sprache),
+                        value=zahl(sprache, obere),
+                        unit=einheit,
+                    ),
                     confidence=_history_confidence(metadata, device_class, aus_namen),
                     kind=ConditionKind.NUMERIC,
                     type=NotificationType.WARNING,
@@ -394,14 +411,17 @@ def _numeric_suggestions(
                     release_threshold=hysterese,
                     message_template="{name}: {value}" + einheit,
                     reasons=(
-                        Reason("Geraeteklasse", device_class or "unbekannt"),
-                        Reason("Historie", f"letzte {analysis_days} Tage"),
+                        _geraeteklasse(sprache, device_class),
+                        _historie(sprache, analysis_days),
+                        _bereich(sprache, profile, einheit),
                         Reason(
-                            "typischer Bereich",
-                            f"{_zahl(profile.p05)} bis {_zahl(profile.p95)}{einheit}",
+                            text(sprache, "reason.suggestedThreshold"),
+                            f"{zahl(sprache, obere)}{einheit}",
                         ),
-                        Reason("vorgeschlagene Schwelle", f"{_zahl(obere)}{einheit}"),
-                        Reason("Rueckkehr unter", f"{_zahl(hysterese)}{einheit}"),
+                        Reason(
+                            text(sprache, "reason.returnBelow"),
+                            f"{zahl(sprache, hysterese)}{einheit}",
+                        ),
                     ),
                 )
             )
@@ -411,7 +431,13 @@ def _numeric_suggestions(
             vorschlaege.append(
                 Suggestion(
                     key=f"{device_class}_lower",
-                    title=(f"Warnung bei {_beschriftung(metadata)} unter {_zahl(untere)}{einheit}"),
+                    title=text(
+                        sprache,
+                        "title.below",
+                        label=_beschriftung(metadata, sprache),
+                        value=zahl(sprache, untere),
+                        unit=einheit,
+                    ),
                     confidence=_history_confidence(metadata, device_class, aus_namen),
                     kind=ConditionKind.NUMERIC,
                     type=NotificationType.WARNING,
@@ -420,12 +446,9 @@ def _numeric_suggestions(
                     release_threshold=suggest_hysteresis(untere, profile, upper=False),
                     message_template="{name}: {value}" + einheit,
                     reasons=(
-                        Reason("Geraeteklasse", device_class or "unbekannt"),
-                        Reason("Historie", f"letzte {analysis_days} Tage"),
-                        Reason(
-                            "typischer Bereich",
-                            f"{_zahl(profile.p05)} bis {_zahl(profile.p95)}{einheit}",
-                        ),
+                        _geraeteklasse(sprache, device_class),
+                        _historie(sprache, analysis_days),
+                        _bereich(sprache, profile, einheit),
                     ),
                 )
             )
@@ -450,7 +473,7 @@ def _history_confidence(
 
 
 def _state_suggestions(
-    metadata: EntityMetadata, profile: StateProfile | None, analysis_days: int
+    metadata: EntityMetadata, profile: StateProfile | None, analysis_days: int, sprache: str
 ) -> list[Suggestion]:
     """Vorschlag aus beobachteten Zustaenden, etwa fuer Geraetestatus.
 
@@ -471,16 +494,24 @@ def _state_suggestions(
     return [
         Suggestion(
             key="rare_state",
-            title=f"Information, wenn der Zustand '{seltenster}' eintritt",
+            title=text(sprache, "title.rareState", state=seltenster),
             confidence=Confidence.LOW,
             kind=ConditionKind.STATE_IS,
             type=NotificationType.INFO,
             states=(seltenster,),
             message_template="{name}: {state}",
             reasons=(
-                Reason("Historie", f"letzte {analysis_days} Tage"),
-                Reason("beobachtete Zustaende", ", ".join(profile.distinct_states)),
-                Reason("Anteil", f"{seltenster} in {anteil * 100:.0f} % der Faelle"),
+                _historie(sprache, analysis_days),
+                Reason(text(sprache, "reason.observedStates"), ", ".join(profile.distinct_states)),
+                Reason(
+                    text(sprache, "reason.share"),
+                    text(
+                        sprache,
+                        "reason.shareValue",
+                        state=seltenster,
+                        percent=f"{anteil * 100:.0f}",
+                    ),
+                ),
             ),
         )
     ]
@@ -500,14 +531,40 @@ def _guess_from_name(metadata: EntityMetadata) -> str | None:
     return None
 
 
-def _beschriftung(metadata: EntityMetadata) -> str:
-    return metadata.device_class or "Wert"
+def _beschriftung(metadata: EntityMetadata, sprache: str) -> str:
+    return metadata.device_class or text(sprache, "label.value")
 
 
-def _zahl(wert: float) -> str:
-    if float(wert).is_integer():
-        return str(int(wert))
-    return f"{wert:g}".replace(".", ",")
+def _geraeteklasse(sprache: str, device_class: str | None) -> Reason:
+    return Reason(
+        text(sprache, "reason.deviceClass"), device_class or text(sprache, "reason.unknown")
+    )
+
+
+def _namenshinweis(sprache: str, metadata: EntityMetadata) -> Reason:
+    return Reason(
+        text(sprache, "reason.hint"),
+        text(sprache, "reason.fromName", name=metadata.display_name),
+    )
+
+
+def _historie(sprache: str, analysis_days: int) -> Reason:
+    return Reason(
+        text(sprache, "reason.history"), text(sprache, "reason.lastDays", days=analysis_days)
+    )
+
+
+def _bereich(sprache: str, profile: NumericProfile, einheit: str) -> Reason:
+    return Reason(
+        text(sprache, "reason.typicalRange"),
+        text(
+            sprache,
+            "reason.range",
+            low=zahl(sprache, profile.p05),
+            high=zahl(sprache, profile.p95),
+            unit=einheit,
+        ),
+    )
 
 
 def suggestions_to_list(suggestions: Sequence[Suggestion]) -> list[dict[str, Any]]:

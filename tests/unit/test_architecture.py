@@ -89,7 +89,27 @@ def _domains_der_typauswahl() -> set[str]:
 
     anfang = quelle.index("const TYP_GRUPPEN")
     ende = quelle.index("export function renderDiscovery")
-    return set(re.findall(r'wert:\s*"([^"]+)"', quelle[anfang:ende]))
+    return set(re.findall(r'^\s*"([a-z_]+)",\s*$', quelle[anfang:ende], re.MULTILINE))
+
+
+def _uebersetzte_domaenen(sprache: str) -> set[str]:
+    """Die Domaenen, fuer die es eine Beschriftung gibt."""
+    pfad = _PACKAGE / "frontend" / "translations" / f"{sprache}.js"
+    quelle = pfad.read_text(encoding="utf-8")
+    return set(re.findall(r'"discovery\.domain\.([a-z_]+)"', quelle))
+
+
+def test_jede_domaene_der_typauswahl_ist_uebersetzt() -> None:
+    """Ohne Beschriftung stuende im Auswahlfeld der nackte Schluessel.
+
+    Der Rueckfall der Uebersetzung zeigt den Schluessel selbst, damit eine
+    Luecke auffaellt. Hier faellt sie schon vorher auf.
+    """
+    auswahl = _domains_der_typauswahl()
+
+    for sprache in ("en", "de"):
+        fehlend = auswahl - _uebersetzte_domaenen(sprache)
+        assert not fehlend, f"{sprache}: keine Beschriftung fuer {sorted(fehlend)}"
 
 
 def test_typauswahl_deckt_alle_ueberwachbaren_domaenen_ab() -> None:
