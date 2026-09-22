@@ -23,8 +23,14 @@ from pytest_homeassistant_custom_component.common import (
 )
 
 from custom_components.notification_center.coordinator import NotificationCenterRuntime
+from custom_components.notification_center.notifications.models import NotificationType
 from custom_components.notification_center.rules import engine
-from custom_components.notification_center.rules.models import ConditionKind, Rule
+from custom_components.notification_center.rules.models import (
+    ConditionKind,
+    NumericOperator,
+    Rule,
+    RuleGroup,
+)
 from custom_components.notification_center.storage.config_models import WatchedEntity
 
 FENSTER = "binary_sensor.fenster_wz"
@@ -494,3 +500,189 @@ async def test_ein_unavailable_beim_start_beendet_die_meldung_nicht(
     hass.states.async_set(FENSTER, "off")
     await hass.async_block_till_done()
     assert aktive(laufzeit) == 0
+
+
+# -- Gespeicherte Regeln sofort auswerten (Issue 11) ------------------------
+
+
+async def test_neue_regel_meldet_sofort_wenn_die_bedingung_schon_anliegt(
+    hass: HomeAssistant, runtime: NotificationCenterRuntime
+) -> None:
+    """Issue 11: die Regel wartete auf den naechsten Zustandswechsel.
+
+    Beobachtet an einem Dock, dessen Wassertank schon leer war, als die Regel
+    angelegt wurde. Gemeldet wurde es erst Stunden spaeter, beim naechsten
+    Neustart.
+    """
+    hass.states.async_set(FENSTER, "on")
+    await hass.async_block_till_done()
+
+    await runtime.async_save_rule(fensterregel(rule_id="rule_neu", message_template="neue Regel"))
+    await hass.async_block_till_done()
+
+    assert len(_ereignisse_von(runtime, "rule_neu")) == 1
+
+
+async def test_bearbeitete_regel_meldet_weiter_wenn_die_bedingung_anliegt(
+    hass: HomeAssistant, runtime: NotificationCenterRuntime
+) -> None:
+    """Beim Bearbeiten endet die alte Meldung -- die neue muss sofort folgen.
+
+    Vorher blieb der Regelzustand auf *erfuellt* stehen. Die Auswertung sah
+    deshalb keinen Anlass fuer eine neue Meldung, obwohl die alte gerade
+    beendet worden war.
+    """
+    hass.states.async_set(FENSTER, "on")
+    await hass.async_block_till_done()
+    assert len(_ereignisse_von(runtime, "rule_fenster")) == 1
+
+    await runtime.async_save_rule(
+        fensterregel(rule_id="rule_fenster", message_template="neuer Text")
+    )
+    await hass.async_block_till_done()
+
+    laufend = _ereignisse_von(runtime, "rule_fenster")
+    assert len(laufend) == 1
+    assert laufend[0].message == "neuer Text"
+
+
+async def test_bearbeitete_regel_endet_wenn_die_bedingung_nicht_mehr_passt(
+    hass: HomeAssistant, runtime: NotificationCenterRuntime
+) -> None:
+    """Die Gegenprobe: passt die geaenderte Bedingung nicht, bleibt es still."""
+    hass.states.async_set(FENSTER, "on")
+    await hass.async_block_till_done()
+
+    await runtime.async_save_rule(fensterregel(rule_id="rule_fenster", states=("off",)))
+    await hass.async_block_till_done()
+
+    assert _ereignisse_von(runtime, "rule_fenster") == []
+
+
+async def test_deaktiviert_gespeicherte_regel_meldet_nicht(
+    hass: HomeAssistant, runtime: NotificationCenterRuntime
+) -> None:
+    hass.states.async_set(FENSTER, "on")
+    await hass.async_block_till_done()
+
+    await runtime.async_save_rule(
+        fensterregel(rule_id="rule_neu", enabled=False, message_template="aus")
+    )
+    await hass.async_block_till_done()
+
+    assert _ereignisse_von(runtime, "rule_neu") == []
+
+
+async def test_zeitbedingung_rechnet_ab_dem_beginn_der_bedingung(
+    hass: HomeAssistant, runtime: NotificationCenterRuntime, freezer: FrozenDateTimeFactory
+) -> None:
+    """Wie nach einem Neustart zaehlt die Zeit, seit der Zustand anliegt.
+
+    Ein seit 10 Minuten offenes Fenster mit einer 15-Minuten-Regel meldet
+    nach weiteren 5 Minuten, nicht erst nach 15.
+    """
+    hass.states.async_set(FENSTER, "on")
+    await hass.async_block_till_done()
+    freezer.move_to(dt_util.utcnow() + timedelta(minutes=10))
+
+    await runtime.async_save_rule(
+        fensterregel(rule_id="rule_neu", duration_seconds=900, message_template="lange offen")
+    )
+    await hass.async_block_till_done()
+    assert _ereignisse_von(runtime, "rule_neu") == []
+
+    freezer.move_to(dt_util.utcnow() + timedelta(minutes=6))
+    async_fire_time_changed(hass)
+    await hass.async_block_till_done()
+
+    assert len(_ereignisse_von(runtime, "rule_neu")) == 1
+
+
+async def test_abgelaufene_zeitbedingung_meldet_sofort(
+    hass: HomeAssistant, runtime: NotificationCenterRuntime, freezer: FrozenDateTimeFactory
+) -> None:
+    hass.states.async_set(FENSTER, "on")
+    await hass.async_block_till_done()
+    freezer.move_to(dt_util.utcnow() + timedelta(minutes=20))
+
+    await runtime.async_save_rule(
+        fensterregel(rule_id="rule_neu", duration_seconds=900, message_template="lange offen")
+    )
+    await hass.async_block_till_done()
+
+    assert len(_ereignisse_von(runtime, "rule_neu")) == 1
+
+
+async def test_flankenregel_mit_zeitbedingung_meldet_nicht_bei_anlage(
+    hass: HomeAssistant, runtime: NotificationCenterRuntime, freezer: FrozenDateTimeFactory
+) -> None:
+    """Die Zeitrechnung ab dem Beginn darf keine Flanke erfinden."""
+    hass.states.async_set(FENSTER, "on")
+    await hass.async_block_till_done()
+    freezer.move_to(dt_util.utcnow() + timedelta(minutes=20))
+
+    await runtime.async_save_rule(
+        fensterregel(
+            rule_id="rule_flanke",
+            kind=ConditionKind.STATE_CHANGED_TO,
+            duration_seconds=900,
+            message_template="Wechsel",
+        )
+    )
+    await hass.async_block_till_done()
+    freezer.move_to(dt_util.utcnow() + timedelta(minutes=20))
+    async_fire_time_changed(hass)
+    await hass.async_block_till_done()
+
+    assert _ereignisse_von(runtime, "rule_flanke") == []
+
+
+def _temperaturgruppe() -> RuleGroup:
+    stufen = tuple(
+        Rule(
+            rule_id=f"rule_temp_{level}",
+            entity_id=TEMPERATUR,
+            kind=ConditionKind.NUMERIC,
+            operator=NumericOperator.GT,
+            threshold=schwelle,
+            type=typ,
+            group_id="group_temp",
+            level=level,
+            message_template="Temperatur hoch",
+        )
+        for level, schwelle, typ in (
+            (1, 25.0, NotificationType.INFO),
+            (2, 28.0, NotificationType.WARNING),
+        )
+    )
+    return RuleGroup(group_id="group_temp", entity_id=TEMPERATUR, name="Temperatur", rules=stufen)
+
+
+async def test_neue_gruppe_meldet_sofort_die_passende_stufe(
+    hass: HomeAssistant, runtime: NotificationCenterRuntime
+) -> None:
+    runtime.config.add_entity(WatchedEntity(entity_id=TEMPERATUR))
+    hass.states.async_set(TEMPERATUR, "29", {"unit_of_measurement": "°C"})
+    await hass.async_block_till_done()
+
+    await runtime.async_save_group(_temperaturgruppe())
+    await hass.async_block_till_done()
+
+    laufend = [e for e in runtime.notification_engine.active_events() if e.rule_group_id]
+    assert [e.level for e in laufend] == [2]
+
+
+async def test_bearbeitete_gruppe_meldet_weiter_ohne_doppelte_stufe(
+    hass: HomeAssistant, runtime: NotificationCenterRuntime
+) -> None:
+    runtime.config.add_entity(WatchedEntity(entity_id=TEMPERATUR))
+    hass.states.async_set(TEMPERATUR, "29", {"unit_of_measurement": "°C"})
+    await hass.async_block_till_done()
+    await runtime.async_save_group(_temperaturgruppe())
+    await hass.async_block_till_done()
+
+    await runtime.async_save_group(_temperaturgruppe())
+    await hass.async_block_till_done()
+
+    laufend = [e for e in runtime.notification_engine.active_events() if e.rule_group_id]
+    assert [e.level for e in laufend] == [2]

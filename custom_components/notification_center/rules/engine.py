@@ -38,7 +38,7 @@ from .evaluator import (
     hold_met,
 )
 from .intents import IntentKind, NotificationIntent, intents_for_group, intents_for_rule
-from .models import EntitySnapshot, Rule, RuleGroup
+from .models import ConditionKind, EntitySnapshot, Rule, RuleGroup
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -209,9 +209,9 @@ class RuleEngine:
         und die Flanke, die sie ausgeloest hat, ging dabei verloren. Wer eine
         Regel anlegte und sie gleich ausprobierte, sah nichts.
 
-        Gesetzt wird ausschliesslich ``last_state``. Phase und Beginn bleiben
-        unberuehrt, damit eine Regel, deren Bedingung schon anliegt,
-        weiterhin sofort meldet.
+        Gesetzt wird ausschliesslich ``last_state``. Ausgewertet wird hier
+        nicht; das uebernimmt ``async_evaluate_saved`` fuer die Regeln, die
+        gerade gespeichert wurden.
 
         Liegt der Zustand bereits im Zielzustand, entsteht *keine* Meldung --
         richtig so: es hat kein Wechsel stattgefunden.
@@ -227,6 +227,75 @@ class RuleEngine:
                     if snapshot is None:
                         break
                 zustand.last_state = snapshot.state
+
+    @callback
+    def async_evaluate_saved(
+        self, *, rule_ids: Iterable[str] = (), group_ids: Iterable[str] = ()
+    ) -> None:
+        """Wertet gerade gespeicherte Regeln sofort gegen den Ist-Zustand aus.
+
+        Bisher wartete eine neue Regel auf den naechsten Zustandswechsel ihrer
+        Entity. Lag die Bedingung beim Speichern schon an und blieb sie
+        stehen, entstand keine Meldung -- beobachtet an einem Dock, dessen
+        leerer Wassertank erst beim naechsten Neustart gemeldet wurde, Stunden
+        spaeter.
+
+        Beim Bearbeiten beendet der Aufrufer die laufende Meldung. Der
+        mitgefuehrte Zustand stand danach aber weiter auf *erfuellt*, und die
+        Auswertung sah keinen Anlass fuer eine neue. Er wird deshalb
+        verworfen und neu aufgebaut.
+
+        Eine Zeitbedingung zaehlt wie nach einem Neustart ab ``last_changed``
+        der Entity (Spezifikation 37): ein seit zehn Minuten offenes Fenster
+        meldet mit einer 15-Minuten-Regel nach fuenf weiteren Minuten.
+        Ausgenommen sind Flankenregeln. Bei ihnen hat kein Wechsel
+        stattgefunden, seit es die Regel gibt.
+
+        Gruppenmitglieder werden ueber ihre Gruppe ausgewertet; fuer sie sind
+        ``group_ids`` zu uebergeben, nachdem die Gruppe vergessen wurde.
+        """
+        betroffen: set[str] = set()
+        entity_ids: set[str] = set()
+
+        for rule_id in rule_ids:
+            regel = self._config.rules.get(rule_id)
+            if regel is None or regel.group_id is not None:
+                continue
+            self._cancel_timer(rule_id)
+            self._rule_states.pop(rule_id, None)
+            betroffen.add(rule_id)
+            entity_ids.add(regel.entity_id)
+
+        for group_id in group_ids:
+            gruppe = self._config.groups.get(group_id)
+            if gruppe is None:
+                continue
+            self._cancel_timer(group_id)
+            self._group_states.pop(group_id, None)
+            betroffen.update(regel.rule_id for regel in gruppe.rules)
+            entity_ids.add(gruppe.entity_id)
+
+        jetzt = dt_util.utcnow()
+        for entity_id in entity_ids:
+            snapshot = self._snapshot(entity_id)
+            if snapshot is None:
+                continue
+
+            for regel in self._all_rules_for(entity_id):
+                if regel.rule_id not in betroffen:
+                    continue
+                zustand = self._state_for(regel)
+                zustand.last_state = snapshot.state
+                if (
+                    regel.enabled
+                    and regel.duration_seconds
+                    and regel.kind is not ConditionKind.STATE_CHANGED_TO
+                    and hold_met(regel, snapshot)
+                ):
+                    zustand.condition_since = snapshot.last_changed
+                    zustand.phase = Phase.PENDING
+
+            self._evaluate_entity(entity_id, jetzt)
 
     def _all_rules_for(self, entity_id: str) -> list[Rule]:
         """Alle Regeln einer Entity, auch die aus Gruppen."""

@@ -166,6 +166,9 @@ class NotificationCenterRuntime:
             )
 
         await self.async_config_changed()
+        # Die Regel wartet nicht auf den naechsten Zustandswechsel: liegt ihre
+        # Bedingung schon an, meldet sie jetzt (Issue 11).
+        self.rule_engine.async_evaluate_saved(rule_ids=[rule.rule_id])
 
     async def async_delete_rule(self, rule_id: str) -> None:
         """Entfernt eine Regel und beendet ihre Notification."""
@@ -184,6 +187,7 @@ class NotificationCenterRuntime:
 
         self.config.add_group(group)
         await self.async_config_changed()
+        self.rule_engine.async_evaluate_saved(group_ids=[group.group_id])
 
     async def async_disable_rule(self, rule_id: str) -> None:
         """Deaktiviert eine Regel und beendet ihre Notification (Spez. 77)."""
