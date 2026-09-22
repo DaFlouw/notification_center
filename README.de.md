@@ -192,6 +192,23 @@ history_max: 5         # optional, hoechstens so viele davon
 | `show_history` | Boolean | `false` | Setzt in die Fusszeile einen Link, der die Ereignisse des Tages aufklappt, auch die abgeschlossenen |
 | `history_max` | Zahl | `5` | Hoechstens so viele Eintraege hinter diesem Link |
 
+### Die Ereignisse des Tages
+
+Die Card selbst zeigt, was **gerade** anliegt. Was heute schon war, liegt hinter einem Verweis -- so wie im Panel das Dashboard auf die Historie verweist:
+
+```yaml
+type: custom:notification-center-card
+show_history: true
+history_max: 5
+```
+
+In der Fusszeile steht dann *23 Ereignisse heute · Heute →*. Ein Klick klappt die Liste auf, ein zweiter wieder zu. Gezeigt werden auch abgeschlossene Ereignisse -- genau darum geht es beim Blick zurueck auf den Tag -- jeweils mit Uhrzeit und Dauer; noch laufende sind als aktiv gekennzeichnet. Eine Zeile mit verknuepfter Entity oeffnet diese, wie die Zeilen darueber.
+
+Geholt wird erst beim Aufklappen: zugeklappt fragt die Card nichts ab und braucht keinen Platz mehr als zuvor. Solange sie offen ist, wird die Liste bei jeder Aenderung neu geholt. Der Tag beginnt um Mitternacht in der Zeitzone des Browsers -- "heute" heisst also heute und nicht "die letzten 24 Stunden".
+
+> [!NOTE]
+> `history_max` begrenzt nur die Anzeige in der Card. Die vollstaendige Historie bleibt im Panel, mit Filtern, Suche und Blaettern.
+
 Das Aussehen laesst sich ueber CSS-Variablen anpassen, im Theme oder per `card_mod`; alle Bausteine tragen zusaetzlich einen `part`-Namen fuer `::part()`.
 
 ```yaml

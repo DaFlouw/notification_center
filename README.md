@@ -192,6 +192,23 @@ history_max: 5         # optional, at most this many of them
 | `show_history` | boolean | `false` | Adds a link in the footer that unfolds today's events, closed ones included |
 | `history_max` | number | `5` | At most this many entries behind that link |
 
+### Today's history
+
+The card itself shows what is **active** right now. What already happened today sits behind a link, the same way the panel's dashboard links to its history:
+
+```yaml
+type: custom:notification-center-card
+show_history: true
+history_max: 5
+```
+
+The footer then reads *23 events today · Today →*. One click unfolds the list, another hides it again. It shows closed events too — that is the point of looking back at the day — each with its time and how long it lasted; still running ones are marked as active. A row with a linked entity opens that entity, just like the rows above it.
+
+Nothing is fetched until you use the link: folded up, the card asks the backend for nothing and takes no more room than before. While it is open, the list is refreshed whenever something changes. The day starts at midnight in the timezone of the browser, so "today" means today, not the last 24 hours.
+
+> [!NOTE]
+> `history_max` only limits what the card displays. The full history stays in the panel, with filters, search and paging.
+
 The looks can be adjusted through CSS variables, in a theme or with `card_mod`; every building block also carries a `part` name for `::part()`.
 
 ```yaml
