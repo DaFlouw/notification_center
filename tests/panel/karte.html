@@ -34,6 +34,7 @@
   <div class="spalte"><notification-center-card id="liste"></notification-center-card></div>
   <div class="spalte"><notification-center-card id="zaehler"></notification-center-card></div>
   <div class="spalte"><notification-center-card id="historie"></notification-center-card></div>
+  <div class="spalte"><notification-center-card id="leer"></notification-center-card></div>
 </div>
 
 <script type="module">
@@ -78,6 +79,28 @@ historie.setConfig({
   history_max: 4,
 });
 historie.hass = hass;
+
+/* Der Leerzustand: keine aktive Meldung, aber der Verweis auf den Tag muss
+   trotzdem dastehen (Issue 12). */
+const leer = document.getElementById("leer");
+leer.setConfig({
+  type: "custom:notification-center-card",
+  title: "Ohne Meldungen",
+  show_history: true,
+  history_max: 3,
+});
+leer.hass = {
+  ...hass,
+  connection: {
+    ...hass.connection,
+    async sendMessagePromise(nachricht) {
+      if (String(nachricht.type).endsWith("get_active")) {
+        return { ...GET_ACTIVE, active: [], counts: { ...GET_ACTIVE.counts, active: 0 } };
+      }
+      return hass.connection.sendMessagePromise(nachricht);
+    },
+  },
+};
 
 /* Fuer die Bilder der Dokumentation: ?historie zeigt die Tageshistorie
    aufgeklappt, sonst steht dort nur der Link. */

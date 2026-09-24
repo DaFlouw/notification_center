@@ -406,12 +406,19 @@ class NotificationCenterCard extends HTMLElement {
     return `<ul part="list">${zeilen.join("")}</ul>${this.#fuss()}`;
   }
 
+  /**
+   * Der Leerzustand.
+   *
+   * Auch hier gehoert die Fusszeile hin: der Verweis auf die Ereignisse des
+   * Tages fehlte sonst ausgerechnet dann, wenn die Card nichts anderes zu
+   * zeigen hat -- und dann ist der Blick zurueck am interessantesten.
+   */
   #ruhig() {
     return `
       <div class="ruhig" part="empty">
         <strong>${t("card.quiet")}</strong>
-        ${this.#ereignisText()}
       </div>
+      ${this.#fuss()}
     `;
   }
 

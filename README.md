@@ -117,6 +117,8 @@ Suggestions that rest on nothing but a word in the name are not offered: they co
 
 Besides devices you can watch **helpers** too — toggle, number, dropdown, text, date and time, counter, timer and schedule. They often hold exactly the state a notification is about.
 
+Anything carrying a state that holds and falls away again can be watched: sensors and binary sensors, covers and valves, locks, climate and water heaters, vacuums and lawn mowers, switches, lights, fans, humidifiers, sirens, media players, remotes, presence and persons, alarm panels, updates, and the number, selection, text, date, time and to-do entities an integration provides. Buttons and events are left out on purpose: their state is the moment they last fired, so no condition on them could ever hold or end.
+
 ---
 
 ## Rules

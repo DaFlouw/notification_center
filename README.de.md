@@ -117,6 +117,8 @@ Vorschlaege, die bloss auf einem Wort im Namen beruhen, werden nicht angeboten: 
 
 Neben Geraeten lassen sich auch **Helfer** ueberwachen — Schalter, Zahl, Auswahl, Text, Datum und Zeit, Zaehler, Timer und Zeitplan. Sie halten oft genau den Zustand, um den es beim Melden geht.
 
+Ueberwachbar ist alles, was einen Zustand traegt, der anliegt und wieder abfaellt: Sensoren und Binaersensoren, Abdeckungen und Ventile, Schloesser, Klima und Warmwasser, Staubsauger und Maehroboter, Schalter, Licht, Lueftung, Luftbefeuchter, Sirenen, Medienspieler, Fernbedienungen, Anwesenheit und Personen, Alarmanlagen, Aktualisierungen sowie die Zahl-, Auswahl-, Text-, Datums-, Zeit- und Aufgabenlisten-Entities, die Integrationen stellen. Knoepfe und Ereignisse bleiben bewusst draussen: Ihr Zustand ist der Zeitpunkt der letzten Ausloesung, darauf kann keine Bedingung dauerhaft zutreffen oder enden.
+
 ---
 
 ## Regeln

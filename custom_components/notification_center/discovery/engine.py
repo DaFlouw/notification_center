@@ -48,17 +48,20 @@ _LOGGER = logging.getLogger(__name__)
 #: Urlaubsmodus, ein Zaehler fuer Fehlversuche, ein Timer, der ablaufen soll.
 #: Dass sie keine Geraete sind, macht sie nicht weniger meldenswert.
 #:
-#: ``input_button`` fehlt mit Absicht: sein Zustand ist der Zeitpunkt des
-#: letzten Drucks und damit bei jedem Druck ein neuer Wert. Darauf laesst sich
-#: keine Bedingung formulieren, die dauerhaft zutrifft oder wieder abfaellt.
+#: ``input_button``, ``button`` und ``event`` fehlen mit Absicht: ihr Zustand
+#: ist der Zeitpunkt der letzten Ausloesung und damit jedes Mal ein neuer
+#: Wert. Darauf laesst sich keine Bedingung formulieren, die dauerhaft
+#: zutrifft oder wieder abfaellt.
 SUPPORTED_DOMAINS = (
     "binary_sensor",
     "sensor",
     "cover",
+    "valve",
     "lock",
     "climate",
     "water_heater",
     "vacuum",
+    "lawn_mower",
     "device_tracker",
     "person",
     "alarm_control_panel",
@@ -66,7 +69,18 @@ SUPPORTED_DOMAINS = (
     "light",
     "fan",
     "humidifier",
+    "siren",
+    "media_player",
+    "remote",
     "update",
+    # Von Integrationen gestellte Werte, die Helfern entsprechen
+    "number",
+    "select",
+    "text",
+    "date",
+    "datetime",
+    "time",
+    "todo",
     # Helfer
     "input_boolean",
     "input_number",

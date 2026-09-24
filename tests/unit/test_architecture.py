@@ -172,3 +172,40 @@ def test_jede_frontend_sprache_hat_eine_datei_fuer_home_assistant() -> None:
         f"nur im Frontend: {sorted(frontend - backend)}, "
         f"nur im Backend: {sorted(backend - frontend)}"
     )
+
+
+def test_domaenen_mit_dauerhaftem_zustand_sind_ueberwachbar() -> None:
+    """Issue 13: ein Maehroboter liess sich nicht uebernehmen.
+
+    Aufgenommen wird, was einen Zustand traegt, der anliegt und wieder
+    abfaellt. Die Liste steht hier zweitens, damit ein Streichen auffaellt.
+    """
+    backend = _supported_domains()
+
+    for domaene in (
+        "lawn_mower",
+        "valve",
+        "siren",
+        "media_player",
+        "remote",
+        "number",
+        "select",
+        "text",
+        "date",
+        "datetime",
+        "time",
+        "todo",
+    ):
+        assert domaene in backend, f"{domaene} fehlt in SUPPORTED_DOMAINS"
+
+
+def test_ausloeser_ohne_dauerhaften_zustand_bleiben_draussen() -> None:
+    """Ihr Zustand ist der Zeitpunkt der letzten Ausloesung.
+
+    Darauf laesst sich keine Bedingung formulieren, die dauerhaft zutrifft
+    oder wieder abfaellt -- eine Regel darauf melde entweder nie oder immer.
+    """
+    backend = _supported_domains()
+
+    for domaene in ("button", "input_button", "event"):
+        assert domaene not in backend, f"{domaene} gehoert nicht in SUPPORTED_DOMAINS"
