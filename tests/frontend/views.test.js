@@ -394,6 +394,79 @@ describe("Regel-Editor", () => {
   });
 });
 
+describe("Attribut als Wertquelle (Issue 14)", () => {
+  // Ein Maehroboter mit einem Attribut, das ebenfalls "state" heisst: der
+  // Zustand der Entity ist klein geschrieben, der Attributwert gross. Eine
+  // Regel aus der Zustandsliste konnte deshalb nie zutreffen.
+  const ATTRIBUTE = [
+    { name: "state", kind: "text", value: "ERROR" },
+    { name: "battery_level", kind: "numeric", value: 100 },
+  ];
+
+  const zustand = (entwurf) => ({
+    entityId: "lawn_mower.rasen",
+    entityName: "Rasen",
+    rules: [],
+    entwurf,
+    states: ["mowing", "docked", "paused", "returning", "error"],
+    attributes: ATTRIBUTE,
+  });
+
+  const entwurfMitAttribut = (states) => ({
+    entity_id: "lawn_mower.rasen",
+    kind: "state_is",
+    type: "warning",
+    states,
+    value_source: { kind: "attribute", attribute: "state" },
+  });
+
+  it("bietet die Zustaende der Entity nicht an, wenn ein Attribut gewaehlt ist", () => {
+    const html = renderRules(zustand(entwurfMitAttribut([])));
+
+    assert.doesNotMatch(html, /<option value="mowing"/);
+    assert.match(html, /data-rule-field="states"[^>]*type="text"|type="text"[^>]*data-rule-field="states"/);
+  });
+
+  it("zeigt den aktuellen Wert des Attributs", () => {
+    const html = renderRules(zustand(entwurfMitAttribut([])));
+    assert.match(html, /Aktueller Wert: ERROR/);
+  });
+
+  it("warnt, wenn sich der Wert nur in der Schreibweise unterscheidet", () => {
+    const html = renderRules(zustand(entwurfMitAttribut(["error"])));
+    assert.match(html, /Gross- und Kleinschreibung/);
+  });
+
+  it("schweigt, wenn die Schreibweise stimmt", () => {
+    const html = renderRules(zustand(entwurfMitAttribut(["ERROR"])));
+
+    assert.match(html, /Aktueller Wert: ERROR/);
+    assert.doesNotMatch(html, /Gross- und Kleinschreibung/);
+  });
+
+  it("schweigt bei einem ganz anderen Wert", () => {
+    // Ein Attribut kann Werte annehmen, die gerade nicht anliegen; davor
+    // zu warnen waere falsch.
+    const html = renderRules(zustand(entwurfMitAttribut(["OFFLINE"])));
+    assert.doesNotMatch(html, /Gross- und Kleinschreibung/);
+  });
+
+  it("bietet die Zustandsliste weiterhin an, wenn der Zustand die Quelle ist", () => {
+    const html = renderRules(
+      zustand({
+        entity_id: "lawn_mower.rasen",
+        kind: "state_is",
+        type: "warning",
+        states: ["error"],
+        value_source: { kind: "state", attribute: null },
+      })
+    );
+
+    assert.match(html, /<option value="mowing"/);
+    assert.doesNotMatch(html, /Aktueller Wert/);
+  });
+});
+
 describe("Seitengroesse der Historie (Issue 5)", () => {
   const ZUSTAND = { events: [], total: 0, filter: { ...LEERER_FILTER }, areas: [] };
 

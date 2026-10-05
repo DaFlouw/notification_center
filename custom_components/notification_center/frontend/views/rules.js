@@ -299,9 +299,11 @@ function formular(entwurf, states, attributes) {
                <input type="number" step="any" data-rule-field="threshold"
                       placeholder="${t("rules.threshold")}" aria-label="${t("rules.threshold")}"
                       value="${entwurf.threshold ?? ""}">`
-            : zustandsauswahl(entwurf, states)
+            : zustandsauswahl(entwurf, states, attributes)
         }
       </div>
+
+      ${numerisch ? "" : wertHinweis(entwurf, attributes)}
 
       <div class="filters">
         <input type="text" data-rule-field="message" style="flex: 1; min-width: 220px"
@@ -336,7 +338,24 @@ function formular(entwurf, states, attributes) {
   `;
 }
 
-function zustandsauswahl(entwurf, states) {
+/**
+ * Das Feld fuer den Zielwert.
+ *
+ * Die Auswahlliste gilt nur fuer den Zustand der Entity. Ist ein Attribut
+ * die Wertquelle, passt sie nicht: ihre Werte gehoeren zu einer anderen
+ * Groesse. Genau daran scheiterte eine Regel auf ein Attribut ``state``,
+ * dessen Werte gross geschrieben sind, waehrend die Liste die klein
+ * geschriebenen Zustaende der Entity anbot (Issue 14). Welche Werte ein
+ * Attribut annehmen kann, weiss das Backend nicht -- deshalb ein Textfeld.
+ */
+function zustandsauswahl(entwurf, states, attributes = []) {
+  if (attributname(entwurf)) {
+    return `<input type="text" data-rule-field="states"
+                   placeholder="${escapeHtml(attributVorgabe(entwurf, attributes))}"
+                   aria-label="${t("common.state")}"
+                   value="${escapeHtml((entwurf.states || []).join(", "))}">`;
+  }
+
   if (!states.length) {
     return `<input type="text" data-rule-field="states"
                    placeholder="${t("rules.statePlaceholder")}" aria-label="${t("common.state")}"
@@ -356,6 +375,55 @@ function zustandsauswahl(entwurf, states) {
         )
         .join("")}
     </select>
+  `;
+}
+
+/** Der Name des Attributs, das als Wertquelle dient -- sonst ``null``. */
+function attributname(entwurf) {
+  return entwurf.value_source?.kind === "attribute" ? entwurf.value_source.attribute : null;
+}
+
+/** Der aktuelle Wert des gewaehlten Attributs, als Text. */
+function attributWert(entwurf, attributes) {
+  const name = attributname(entwurf);
+  if (!name) return null;
+  const attribut = (attributes || []).find((eintrag) => eintrag.name === name);
+  return attribut && attribut.value != null ? String(attribut.value) : null;
+}
+
+function attributVorgabe(entwurf, attributes) {
+  return attributWert(entwurf, attributes) ?? t("rules.statePlaceholder");
+}
+
+/**
+ * Hilfe unter dem Feld: der aktuelle Wert, und eine Warnung, wenn der
+ * eingetragene sich davon nur in der Gross- und Kleinschreibung
+ * unterscheidet.
+ *
+ * Der Vergleich im Backend bleibt zeichengenau -- Zustaende sind in Home
+ * Assistant gross- und kleinschreibungsempfindlich. Eine stillschweigend
+ * unscharfe Regel waere schlechter als eine, die man sieht.
+ */
+function wertHinweis(entwurf, attributes) {
+  const aktuell = attributWert(entwurf, attributes);
+  if (aktuell === null) return "";
+
+  const eingetragen = (entwurf.states || []).map((wert) => String(wert).trim()).filter(Boolean);
+  const schreibweise = eingetragen.some(
+    (wert) => wert !== aktuell && wert.toLowerCase() === aktuell.toLowerCase()
+  );
+
+  return `
+    <div class="entity-meta" style="margin: -4px 0 8px">
+      ${escapeHtml(t("rules.currentValue", { value: aktuell }))}
+      ${
+        schreibweise
+          ? `<span class="badge uncertain">${escapeHtml(
+              t("rules.caseMismatch", { value: aktuell })
+            )}</span>`
+          : ""
+      }
+    </div>
   `;
 }
 

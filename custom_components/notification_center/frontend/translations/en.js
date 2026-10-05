@@ -147,6 +147,8 @@ export default {
   "rules.durationPlaceholder": "Only after … minutes",
   "rules.duration": "Time condition in minutes",
   "rules.statePlaceholder": "State",
+  "rules.currentValue": "Current value: {value}",
+  "rules.caseMismatch": "differs in upper- and lower-case from {value}",
   "rules.kind.state_is": "State is",
   "rules.kind.state_is_not": "State is not",
   "rules.kind.state_changed_to": "State changes to",
