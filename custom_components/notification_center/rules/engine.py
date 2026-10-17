@@ -5,9 +5,14 @@ Auswertung auf und reicht deren Absichten weiter. Alle Entscheidungen liegen
 in ``evaluator.py`` und ``intents.py``.
 
 Die Ueberwachung ist vollstaendig ereignisbasiert (Spezifikation 6). Es wird
-ausschliesslich auf die explizit uebernommenen Entities gehoert; es gibt keine
-Schleife ueber alle Entities und kein Polling. Zeitgesteuerte Auswertungen
-entstehen nur fuer Regeln, deren Bedingung bereits anliegt.
+ausschliesslich auf die explizit uebernommenen Entities und auf die gehoert,
+die eine Teilbedingung heranzieht; es gibt keine Schleife ueber alle Entities
+und kein Polling. Zeitgesteuerte Auswertungen entstehen nur fuer Regeln, deren
+Bedingung bereits anliegt.
+
+Eine verknuepfte Regel wird ausgewertet, sobald sich *irgendeine* ihrer
+beteiligten Entities aendert -- bewertet wird dabei immer die Regel als
+Ganzes, gegen die Entity, der sie gehoert.
 """
 
 from __future__ import annotations
@@ -99,13 +104,16 @@ class RuleEngine:
 
     @callback
     def async_refresh_tracking(self) -> None:
-        """Abonniert genau die ueberwachten Entities.
+        """Abonniert genau die Entities, von denen Regeln abhaengen.
 
         Wird nach jeder Konfigurationsaenderung aufgerufen. Bleibt die Menge
         gleich, passiert nichts: ein unnoetiges Neuabonnieren wuerde nur
         Arbeit erzeugen.
+
+        Dazu gehoeren auch Entities, die nur in einer Teilbedingung vorkommen
+        und selbst nicht uebernommen sind.
         """
-        gewuenscht = self._config.monitored_entity_ids
+        gewuenscht = self._config.tracked_entity_ids
         if gewuenscht == self._tracked:
             return
 
@@ -159,7 +167,7 @@ class RuleEngine:
 
             snapshot = self._snapshot(rule.entity_id)
             if snapshot is not None:
-                zustand.last_state = snapshot.state
+                self._seed_states(rule, snapshot, zustand)
 
             # Bei einer Gruppe muss auch die sichtbare Stufe wieder stimmen,
             # sonst gilt der naechste Stufenwechsel als erster und die alte
@@ -190,13 +198,13 @@ class RuleEngine:
             for rule in self._all_rules_for(entity_id):
                 if not rule.enabled or not rule.duration_seconds:
                     continue
-                if not hold_met(rule, snapshot):
+                if not hold_met(rule, snapshot, snapshots=self._snapshots_for(rule)):
                     continue
 
                 zustand = self._state_for(rule)
                 if zustand.condition_since is None:
                     zustand.condition_since = snapshot.last_changed
-                    zustand.last_state = snapshot.state
+                    self._seed_states(rule, snapshot, zustand)
                     zustand.phase = Phase.PENDING
 
     @callback
@@ -226,7 +234,7 @@ class RuleEngine:
                     snapshot = self._snapshot(entity_id)
                     if snapshot is None:
                         break
-                zustand.last_state = snapshot.state
+                self._seed_states(rule, snapshot, zustand)
 
     @callback
     def async_evaluate_saved(
@@ -285,12 +293,12 @@ class RuleEngine:
                 if regel.rule_id not in betroffen:
                     continue
                 zustand = self._state_for(regel)
-                zustand.last_state = snapshot.state
+                self._seed_states(regel, snapshot, zustand)
                 if (
                     regel.enabled
                     and regel.duration_seconds
                     and regel.kind is not ConditionKind.STATE_CHANGED_TO
-                    and hold_met(regel, snapshot)
+                    and hold_met(regel, snapshot, snapshots=self._snapshots_for(regel))
                 ):
                     zustand.condition_since = snapshot.last_changed
                     zustand.phase = Phase.PENDING
@@ -300,6 +308,23 @@ class RuleEngine:
     def _all_rules_for(self, entity_id: str) -> list[Rule]:
         """Alle Regeln einer Entity, auch die aus Gruppen."""
         return [rule for rule in self._config.rules.values() if rule.entity_id == entity_id]
+
+    def _seed_states(self, rule: Rule, snapshot: EntitySnapshot, state: RuleState) -> None:
+        """Setzt den Ausgangspunkt der Flankenerkennung, auch fuer Partner.
+
+        Eine Flankenbedingung vergleicht den neuen mit dem zuletzt gesehenen
+        Zustand. Ohne Ausgangspunkt gibt es keinen Vergleich -- und zwar fuer
+        jede beteiligte Entity einzeln, nicht nur fuer die der Regel.
+        """
+        state.last_state = snapshot.state
+        state.last_states[snapshot.entity_id] = snapshot.state
+
+        for bedingung in rule.extra_conditions:
+            if bedingung.entity_id is None or bedingung.entity_id == snapshot.entity_id:
+                continue
+            weitere = self._snapshot(bedingung.entity_id)
+            if weitere is not None:
+                state.last_states[bedingung.entity_id] = weitere.state
 
     def _state_for(self, rule: Rule) -> RuleState:
         """Der mitgefuehrte Zustand einer Regel, egal ob einzeln oder in Gruppe."""
@@ -318,7 +343,24 @@ class RuleEngine:
         if event.data["new_state"] is None:
             # Entity wurde entfernt; das behandelt die Konfigurationsebene.
             return
-        self._evaluate_entity(entity_id, dt_util.utcnow())
+
+        jetzt = dt_util.utcnow()
+        for betroffen in self._affected_entities(entity_id):
+            self._evaluate_entity(betroffen, jetzt)
+
+    def _affected_entities(self, entity_id: str) -> set[str]:
+        """Die Entities, deren Regeln dieser Wechsel beruehrt.
+
+        Meist genau die gewechselte selbst. Kommt sie aber in der
+        Teilbedingung einer Regel vor, die einer anderen Entity gehoert, muss
+        auch diese neu bewertet werden -- sonst entstuende die Meldung erst,
+        wenn sich zufaellig auch die eigene Entity wieder aendert.
+        """
+        return {
+            rule.entity_id
+            for rule in self._config.rules.values()
+            if entity_id in rule.referenced_entity_ids
+        }
 
     @callback
     def _handle_timer(self, key: str, entity_id: str) -> None:
@@ -404,7 +446,9 @@ class RuleEngine:
 
         for rule in self._single_rules_for(entity_id):
             try:
-                ergebnis = evaluate_rule(rule, snapshot, self._state_for(rule), now)
+                ergebnis = evaluate_rule(
+                    rule, snapshot, self._state_for(rule), now, snapshots=self._snapshots_for(rule)
+                )
                 absichten.extend(intents_for_rule(rule, snapshot, ergebnis))
                 self._schedule(rule.rule_id, entity_id, ergebnis.fire_at)
             except Exception:
@@ -468,6 +512,23 @@ class RuleEngine:
             for rule in self._config.rules.values()
             if rule.entity_id == entity_id and rule.group_id is None
         ]
+
+    def _snapshots_for(self, rule: Rule) -> dict[str, EntitySnapshot] | None:
+        """Die Momentaufnahmen der weiteren Entities einer Regel.
+
+        Nur fuer verknuepfte Regeln: eine Regel mit einer einzigen Bedingung
+        braucht ausser ihrer eigenen Entity nichts und soll auch keine
+        Registry-Abfrage ausloesen.
+        """
+        if not rule.is_combined:
+            return None
+
+        mappe: dict[str, EntitySnapshot] = {}
+        for entity_id in rule.referenced_entity_ids:
+            schnappschuss = self._snapshot(entity_id)
+            if schnappschuss is not None:
+                mappe[entity_id] = schnappschuss
+        return mappe
 
     def _snapshot(self, entity_id: str) -> EntitySnapshot | None:
         """Baut die HA-freie Momentaufnahme fuer die Auswertung."""

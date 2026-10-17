@@ -21,7 +21,7 @@ export const EXPECTED_API_VERSION = 1;
  * hinterlegte Version deckt diesen Fall auf. Die CI prueft, dass sie zum
  * Manifest passt.
  */
-export const MODULE_VERSION = "1.2.4";
+export const MODULE_VERSION = "1.3.0";
 
 /**
  * Die Version dieses Frontends, abgelesen am eigenen Pfad.
@@ -86,6 +86,7 @@ export const api = {
   getHistory: (hass, query) => call(hass, "get_history", query),
   discover: (hass, query) => call(hass, "discover", query),
   getSuggestions: (hass, entityId) => call(hass, "get_suggestions", { entity_id: entityId }),
+  getEntityOptions: (hass, entityId) => call(hass, "get_entity_options", { entity_id: entityId }),
   getDevice: (hass, deviceId) => call(hass, "get_device", { device_id: deviceId }),
   addEntities: (hass, entityIds) => call(hass, "add_entities", { entity_ids: entityIds }),
   removeEntity: (hass, entityId) => call(hass, "remove_entity", { entity_id: entityId }),

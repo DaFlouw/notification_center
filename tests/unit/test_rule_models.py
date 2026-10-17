@@ -6,8 +6,10 @@ import pytest
 
 from custom_components.notification_center.notifications.models import NotificationType
 from custom_components.notification_center.rules.models import (
+    Condition,
     ConditionKind,
     EntitySnapshot,
+    LogicOperator,
     NumericOperator,
     Rule,
     RuleGroup,
@@ -385,3 +387,142 @@ def test_mehrere_regeln_derselben_entity_bleiben_nebeneinander() -> None:
     ]
     treffer = rules_for_entity(regeln, "sensor.temperatur_wz")
     assert [rule.rule_id for rule in treffer] == ["rule_1", "rule_2"]
+
+
+# -- Verknuepfte Bedingungen ------------------------------------------------
+
+
+def test_regel_ohne_weitere_bedingungen_bleibt_wie_sie_war() -> None:
+    """Die Erweiterung darf an bestehenden Regeln nichts aendern."""
+    rule = make_numeric_rule()
+    assert rule.is_combined is False
+    assert rule.logic is LogicOperator.ALL
+    assert rule.conditions == (rule.primary_condition,)
+    assert rule.referenced_entity_ids == frozenset({"sensor.temperatur_wz"})
+
+
+def test_erste_bedingung_stammt_aus_den_feldern_der_regel() -> None:
+    rule = make_numeric_rule(threshold=28.0, release_threshold=27.0)
+    erste = rule.primary_condition
+
+    assert erste.kind is ConditionKind.NUMERIC
+    assert (erste.operator, erste.threshold, erste.release_threshold) == (
+        NumericOperator.GT,
+        28.0,
+        27.0,
+    )
+    # Ohne eigene Kennung: die Bedingung betrachtet die Entity der Regel.
+    assert erste.entity_id is None
+
+
+def test_weitere_bedingung_darf_eine_andere_entity_betrachten() -> None:
+    rule = make_numeric_rule(
+        extra_conditions=(
+            Condition(
+                kind=ConditionKind.STATE_IS,
+                entity_id="climate.wohnzimmer",
+                states=("heat",),
+            ),
+        )
+    )
+
+    assert rule.is_combined is True
+    assert len(rule.conditions) == 2
+    assert rule.entity_for(rule.extra_conditions[0]) == "climate.wohnzimmer"
+    assert rule.referenced_entity_ids == frozenset({"sensor.temperatur_wz", "climate.wohnzimmer"})
+
+
+def test_bedingung_ohne_kennung_folgt_der_entity_der_regel() -> None:
+    """Eine zweite Bedingung auf dieselbe Entity braucht keine Kennung."""
+    rule = make_numeric_rule(
+        extra_conditions=(
+            Condition(
+                kind=ConditionKind.STATE_IS_NOT,
+                value_source=ValueSource(kind=ValueSourceKind.ATTRIBUTE, attribute="mode"),
+                states=("off",),
+            ),
+        )
+    )
+
+    assert rule.entity_for(rule.extra_conditions[0]) == "sensor.temperatur_wz"
+    assert rule.referenced_entity_ids == frozenset({"sensor.temperatur_wz"})
+
+
+def test_bedingungen_werden_vollstaendig_serialisiert() -> None:
+    rule = make_numeric_rule(
+        logic=LogicOperator.ANY,
+        extra_conditions=(
+            Condition(kind=ConditionKind.STATE_IS, entity_id="person.alex", states=("home",)),
+            Condition(
+                kind=ConditionKind.NUMERIC,
+                entity_id="sensor.luftfeuchte",
+                operator=NumericOperator.GTE,
+                threshold=70.0,
+                release_threshold=65.0,
+                negate=True,
+            ),
+        ),
+    )
+
+    wieder = Rule.from_dict(rule.to_dict())
+    assert wieder == rule
+    assert wieder.logic is LogicOperator.ANY
+    assert wieder.extra_conditions[1].negate is True
+    assert wieder.extra_conditions[1].release_threshold == 65.0
+
+
+def test_alte_gespeicherte_regel_laedt_ohne_bedingungsfelder() -> None:
+    """Eine Konfiguration von vor der Erweiterung bleibt lesbar."""
+    daten = make_numeric_rule().to_dict()
+    del daten["logic"]
+    del daten["extra_conditions"]
+
+    rule = Rule.from_dict(daten)
+    assert rule.logic is LogicOperator.ALL
+    assert rule.extra_conditions == ()
+
+
+def test_teilbedingung_wird_wie_eine_regel_geprueft() -> None:
+    with pytest.raises(ValueError, match="mindestens einen Zustand"):
+        Condition(kind=ConditionKind.STATE_IS)
+
+    with pytest.raises(ValueError, match="Operator und Schwelle"):
+        Condition(kind=ConditionKind.NUMERIC)
+
+    with pytest.raises(ValueError, match="kleiner"):
+        Condition(
+            kind=ConditionKind.NUMERIC,
+            operator=NumericOperator.GT,
+            threshold=20.0,
+            release_threshold=25.0,
+        )
+
+
+def test_eine_flanke_laesst_sich_nicht_verneinen() -> None:
+    """Die Verneinung eines Augenblicks waere fast immer wahr."""
+    with pytest.raises(ValueError, match="verneinen"):
+        Condition(kind=ConditionKind.STATE_CHANGED_TO, states=("on",), negate=True)
+
+
+def test_stufen_einer_gruppe_tragen_keine_weiteren_bedingungen() -> None:
+    with pytest.raises(ValueError, match="keine weiteren Bedingungen"):
+        make_numeric_rule(
+            group_id="group_1",
+            level=1,
+            extra_conditions=(Condition(kind=ConditionKind.STATE_IS, states=("on",)),),
+        )
+
+
+def test_entitytausch_haengt_auch_teilbedingungen_um() -> None:
+    rule = make_numeric_rule(
+        extra_conditions=(
+            Condition(kind=ConditionKind.STATE_IS, entity_id="climate.alt", states=("heat",)),
+            Condition(kind=ConditionKind.STATE_IS, entity_id="person.alex", states=("home",)),
+        )
+    )
+
+    neu = rule.with_partner_replaced("climate.alt", "climate.neu")
+    assert [bed.entity_id for bed in neu.extra_conditions] == ["climate.neu", "person.alex"]
+
+    # Ohne Treffer bleibt die Regel dieselbe und wird nicht kopiert.
+    assert rule.with_partner_replaced("light.irgendwas", "light.anders") is rule

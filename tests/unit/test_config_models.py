@@ -6,6 +6,7 @@ import pytest
 
 from custom_components.notification_center.notifications.models import NotificationType
 from custom_components.notification_center.rules.models import (
+    Condition,
     ConditionKind,
     NumericOperator,
     Rule,
@@ -278,3 +279,67 @@ def test_entities_from_ids_uebernimmt_geraet_und_bereich() -> None:
     assert entities[0].device_id == "dev-1"
     assert entities[0].area_id == "keller"
     assert entities[1].device_id is None
+
+
+# -- Verknuepfte Bedingungen ------------------------------------------------
+
+
+def test_beobachtet_werden_auch_entities_aus_teilbedingungen(document: ConfigDocument) -> None:
+    """Sonst bemerkte eine verknuepfte Regel den Wechsel des Partners nicht."""
+    document.add_rule(
+        make_rule(
+            "binary_sensor.fenster_wz",
+            kind=ConditionKind.STATE_IS,
+            operator=None,
+            threshold=None,
+            states=("on",),
+            extra_conditions=(
+                Condition(
+                    kind=ConditionKind.STATE_IS,
+                    entity_id="climate.wohnzimmer",
+                    states=("heat",),
+                ),
+            ),
+        )
+    )
+
+    # Uebernommen ist die Heizung nicht -- beobachtet wird sie trotzdem.
+    assert "climate.wohnzimmer" not in document.monitored_entity_ids
+    assert "climate.wohnzimmer" in document.tracked_entity_ids
+    assert document.monitored_entity_ids <= document.tracked_entity_ids
+
+
+def test_teilbedingung_braucht_keine_uebernommene_entity(document: ConfigDocument) -> None:
+    """Fuer ein "waehrend die Heizung laeuft" soll man die Heizung nicht uebernehmen muessen."""
+    document.add_rule(
+        make_rule(
+            extra_conditions=(
+                Condition(
+                    kind=ConditionKind.STATE_IS,
+                    entity_id="climate.nicht_uebernommen",
+                    states=("heat",),
+                ),
+            )
+        )
+    )
+    assert len(document.rules) == 1
+
+
+def test_ersetzen_haengt_auch_fremde_teilbedingungen_um(document: ConfigDocument) -> None:
+    document.add_entity(WatchedEntity(entity_id="climate.alt"))
+    eigene = make_rule("climate.alt")
+    fremde = make_rule(
+        "sensor.temperatur_wz",
+        extra_conditions=(
+            Condition(kind=ConditionKind.STATE_IS, entity_id="climate.alt", states=("heat",)),
+        ),
+    )
+    document.add_rule(eigene)
+    document.add_rule(fremde)
+
+    umgehaengt = document.replace_entity("climate.alt", WatchedEntity(entity_id="climate.neu"))
+
+    assert set(umgehaengt) == {eigene.rule_id, fremde.rule_id}
+    assert document.rules[eigene.rule_id].entity_id == "climate.neu"
+    assert document.rules[fremde.rule_id].extra_conditions[0].entity_id == "climate.neu"
+    assert document.rules[fremde.rule_id].entity_id == "sensor.temperatur_wz"

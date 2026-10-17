@@ -150,6 +150,33 @@ Placeholders are available in the message:
 
 Several rules on the same entity may hold at once and then produce parallel notifications.
 
+### Combining conditions
+
+A rule may ask for more than one condition at a time. Every further condition is a condition in its own right — state, attribute or numeric comparison — and it may look at **another entity** than the one the rule belongs to. That is the point of it: *window open while the heating is running* is a statement about two entities, but a notification about the window.
+
+| Combination | Logic |
+|-------------|-------|
+| **All conditions must apply** | AND |
+| **One condition is enough** | OR |
+| **not**, per condition | NOT |
+
+What stays as it was:
+
+- The rule still belongs to exactly one entity. It is the subject of the notification, it provides the placeholders of the message, and it decides area and floor in the history.
+- The time condition counts for the combination as a whole: everything has to hold without interruption for that long.
+- A release threshold belongs to the single numeric condition that carries it, and the editor offers it for the first one.
+
+What is new:
+
+- An entity that only appears in a condition does **not** have to be adopted. It is watched, but it produces no notifications of its own and gets no suggestions.
+- The rule is evaluated again whenever *any* of its entities changes — not only its own.
+- Leave the entity field of a condition empty and it refers to the rule's own entity. Useful for a second attribute of the same thing.
+
+> [!NOTE]
+> An entity that is missing or `unavailable` makes its condition *undecidable*, not false. With **All conditions** the rule then does not hold; with **One condition** the others still count. This matters for a negated condition: "nobody is home" must not become true just because presence detection dropped out.
+
+Mixed precedence — `A and (B or C)` — is deliberately not offered: it cannot be shown honestly in the editor without brackets. Levels of a rule group carry no further conditions either; their order is defined by their thresholds alone.
+
 > [!NOTE]
 > Entity-based notifications cannot be dismissed by hand. They end when their condition no longer holds, when their rule is deleted, or when their entity is removed from monitoring.
 

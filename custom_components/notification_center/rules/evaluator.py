@@ -18,22 +18,42 @@ Notification wird: innerhalb einer Regelgruppe zeigt nur die hoechste erfuellte
 Stufe eine Notification (Spezifikation 20). Die uebrigen Stufen fuehren
 trotzdem ihren eigenen Zustand mit, damit ihre Hysterese unabhaengig wirkt
 (Spezifikation 21).
+
+Eine Regel kann mehrere Bedingungen verknuepfen, auch ueber verschiedene
+Entities hinweg. Jede Bedingung wird einzeln beantwortet und das Ergebnis
+anschliessend nach dem Operator der Regel zusammengefasst. Die Antwort ist
+dabei dreiwertig: *erfuellt*, *nicht erfuellt* oder *nicht entscheidbar*.
+Letzteres gilt, wenn die betrachtete Entity fehlt oder keinen auswertbaren
+Wert tragt -- ``unavailable`` ist keine Aussage ueber die Welt, sondern das
+Eingestaendnis, gerade keine zu haben.
+
+Der Unterschied ist bei einer verneinten Bedingung entscheidend: "niemand ist
+zuhause" darf nicht wahr werden, nur weil die Anwesenheitserkennung
+ausgefallen ist. Verneint wird deshalb nur ein entscheidbares Ergebnis; ein
+unentscheidbares bleibt unentscheidbar und laesst eine UND-Verknuepfung
+scheitern.
 """
 
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from enum import StrEnum
 from typing import Any
 
 from .models import (
+    Condition,
     ConditionKind,
     EntitySnapshot,
+    LogicOperator,
     NumericOperator,
     Rule,
     RuleGroup,
 )
+
+#: Mitgefuehrte Momentaufnahmen aller Entities, von denen eine Regel abhaengt.
+Snapshots = Mapping[str, EntitySnapshot]
 
 #: Zustaende, die keinen auswertbaren Wert tragen.
 UNAVAILABLE_STATES = frozenset({"unknown", "unavailable", "none", ""})
@@ -60,8 +80,14 @@ class RuleState:
     condition_since: datetime | None = None
     #: Wann die Regel zuletzt in ``SATISFIED`` gewechselt ist.
     satisfied_at: datetime | None = None
-    #: Letzter gesehener Zustandswert, fuer die Flankenerkennung.
+    #: Letzter gesehener Zustandswert der Entity der Regel, fuer die
+    #: Flankenerkennung.
     last_state: str | None = None
+    #: Dasselbe je beteiligter Entity, fuer Flanken in Teilbedingungen. Die
+    #: Entity der Regel steht auch hier; ``last_state`` bleibt daneben
+    #: bestehen, weil die Engine ihn beim Anlegen einer Regel und nach einem
+    #: Neustart setzt.
+    last_states: dict[str, str] = field(default_factory=dict)
 
     @property
     def is_satisfied(self) -> bool:
@@ -140,59 +166,160 @@ def evaluate_value(rule: Rule, snapshot: EntitySnapshot) -> Any:
     return rule.value_source.extract(snapshot)
 
 
-def trigger_met(rule: Rule, snapshot: EntitySnapshot, previous_state: str | None) -> bool:
-    """Greift die Bedingung neu?"""
-    raw = evaluate_value(rule, snapshot)
+def condition_trigger(
+    condition: Condition, snapshot: EntitySnapshot | None, previous_state: str | None
+) -> bool | None:
+    """Greift eine einzelne Bedingung neu? ``None`` heisst: nicht entscheidbar."""
+    raw = _raw_value(condition, snapshot)
 
-    if rule.kind is ConditionKind.NUMERIC:
+    if condition.kind is ConditionKind.NUMERIC:
         number = coerce_number(raw)
         if number is None:
-            return False
-        assert rule.operator is not None and rule.threshold is not None
-        return _compare(rule.operator, number, rule.threshold)
+            return None
+        assert condition.operator is not None and condition.threshold is not None
+        return _negiere(condition, _compare(condition.operator, number, condition.threshold))
 
     if raw is None or str(raw).lower() in UNAVAILABLE_STATES:
-        return False
+        return None
 
-    im_zielzustand = str(raw) in rule.states
-    if rule.kind is ConditionKind.STATE_IS:
-        return im_zielzustand
-    if rule.kind is ConditionKind.STATE_IS_NOT:
-        return not im_zielzustand
+    im_zielzustand = str(raw) in condition.states
+    if condition.kind is ConditionKind.STATE_IS:
+        return _negiere(condition, im_zielzustand)
+    if condition.kind is ConditionKind.STATE_IS_NOT:
+        return _negiere(condition, not im_zielzustand)
 
     # STATE_CHANGED_TO: nur der Wechsel *in* den Zielzustand loest aus. Lag der
     # Zustand schon vorher an, ist das kein neues Ereignis.
     if previous_state is None:
         return False
-    return im_zielzustand and str(previous_state) not in rule.states
+    return im_zielzustand and str(previous_state) not in condition.states
 
 
-def hold_met(rule: Rule, snapshot: EntitySnapshot) -> bool:
-    """Greift die Bedingung weiterhin?
+def condition_hold(condition: Condition, snapshot: EntitySnapshot | None) -> bool | None:
+    """Greift eine einzelne Bedingung weiterhin?
 
-    Bei numerischen Regeln mit Hysterese gilt hier die Rueckkehrschwelle: die
-    Notification bleibt bestehen, bis der Wert sie wieder passiert
-    (Spezifikation 18).
+    Bei numerischen Bedingungen mit Hysterese gilt hier die
+    Rueckkehrschwelle: die Notification bleibt bestehen, bis der Wert sie
+    wieder passiert (Spezifikation 18).
     """
-    raw = evaluate_value(rule, snapshot)
+    raw = _raw_value(condition, snapshot)
 
-    if rule.kind is ConditionKind.NUMERIC:
+    if condition.kind is ConditionKind.NUMERIC:
         number = coerce_number(raw)
         if number is None:
-            return False
-        assert rule.operator is not None and rule.threshold is not None
-        schwelle = rule.release_threshold if rule.release_threshold is not None else rule.threshold
-        return _compare(rule.operator, number, schwelle)
+            return None
+        assert condition.operator is not None and condition.threshold is not None
+        schwelle = (
+            condition.release_threshold
+            if condition.release_threshold is not None
+            else condition.threshold
+        )
+        return _negiere(condition, _compare(condition.operator, number, schwelle))
 
     if raw is None or str(raw).lower() in UNAVAILABLE_STATES:
-        return False
+        return None
 
-    if rule.kind is ConditionKind.STATE_IS_NOT:
-        return str(raw) not in rule.states
+    if condition.kind is ConditionKind.STATE_IS_NOT:
+        return _negiere(condition, str(raw) not in condition.states)
 
     # Auch "Zustand aendert sich zu" bleibt bestehen, solange der Zielzustand
     # anliegt, und endet beim Verlassen.
-    return str(raw) in rule.states
+    return _negiere(condition, str(raw) in condition.states)
+
+
+def _raw_value(condition: Condition, snapshot: EntitySnapshot | None) -> Any:
+    """Der Rohwert einer Bedingung; ``None``, wenn die Entity fehlt."""
+    if snapshot is None:
+        return None
+    return condition.value_source.extract(snapshot)
+
+
+def _negiere(condition: Condition, ergebnis: bool) -> bool:
+    return not ergebnis if condition.negate else ergebnis
+
+
+def combine(operator: LogicOperator, ergebnisse: Sequence[bool | None]) -> bool:
+    """Fasst die Ergebnisse der Bedingungen zu einer Entscheidung zusammen.
+
+    Ein unentscheidbares Ergebnis laesst eine UND-Verknuepfung scheitern und
+    wird von einer ODER-Verknuepfung uebergangen: dort genuegt *eine*
+    zutreffende Bedingung, und die kann eine andere sein.
+    """
+    entscheidbar = [wert for wert in ergebnisse if wert is not None]
+
+    if operator is LogicOperator.ALL:
+        return len(entscheidbar) == len(ergebnisse) and all(entscheidbar)
+    return any(entscheidbar)
+
+
+def trigger_met(
+    rule: Rule,
+    snapshot: EntitySnapshot,
+    previous_state: str | None,
+    *,
+    snapshots: Snapshots | None = None,
+    previous_states: Mapping[str, str] | None = None,
+) -> bool:
+    """Greift die Bedingung der Regel neu?
+
+    ``snapshots`` und ``previous_states`` sind nur fuer Regeln mit mehreren
+    Bedingungen noetig; fehlen sie, gelten deren Entities als nicht
+    entscheidbar.
+    """
+    return combine(
+        rule.logic,
+        [
+            condition_trigger(
+                bedingung,
+                _snapshot_for(bedingung, snapshot, snapshots),
+                _previous_for(bedingung, snapshot, previous_state, previous_states),
+            )
+            for bedingung in rule.conditions
+        ],
+    )
+
+
+def hold_met(rule: Rule, snapshot: EntitySnapshot, *, snapshots: Snapshots | None = None) -> bool:
+    """Greift die Bedingung der Regel weiterhin?"""
+    return combine(
+        rule.logic,
+        [
+            condition_hold(bedingung, _snapshot_for(bedingung, snapshot, snapshots))
+            for bedingung in rule.conditions
+        ],
+    )
+
+
+def _snapshot_for(
+    condition: Condition,
+    snapshot: EntitySnapshot,
+    snapshots: Snapshots | None,
+) -> EntitySnapshot | None:
+    """Die Momentaufnahme, die eine Bedingung betrachtet.
+
+    ``snapshot`` ist immer die Entity der Regel; eine Bedingung ohne eigene
+    Kennung betrachtet genau diese. Fuer die uebrigen schaut die Auswertung in
+    der mitgelieferten Mappe nach. Fehlt dort eine, bleibt die Bedingung
+    unentscheidbar -- und damit wirkungslos statt zufaellig wahr.
+    """
+    if condition.entity_id is None or condition.entity_id == snapshot.entity_id:
+        return snapshot
+    if snapshots is None:
+        return None
+    return snapshots.get(condition.entity_id)
+
+
+def _previous_for(
+    condition: Condition,
+    snapshot: EntitySnapshot,
+    previous_state: str | None,
+    previous_states: Mapping[str, str] | None,
+) -> str | None:
+    if condition.entity_id is None or condition.entity_id == snapshot.entity_id:
+        return previous_state
+    if previous_states is None:
+        return None
+    return previous_states.get(condition.entity_id)
 
 
 # ---------------------------------------------------------------------------
@@ -205,22 +332,34 @@ def evaluate_rule(
     snapshot: EntitySnapshot,
     state: RuleState,
     now: datetime,
+    *,
+    snapshots: Snapshots | None = None,
 ) -> Evaluation:
     """Wertet eine Regel aus und schreibt ``state`` fort.
 
     ``state`` wird an Ort und Stelle veraendert; das Ergebnis beschreibt, was
     sich dadurch geaendert hat.
+
+    ``snapshot`` ist immer die Entity der Regel: aus ihr entstehen der
+    Meldungstext und der Wert. ``snapshots`` traegt die uebrigen Entities bei,
+    auf die sich Teilbedingungen beziehen.
     """
     previous_state = state.last_state
     war_erfuellt = state.is_satisfied
 
     if not rule.enabled:
-        state.last_state = snapshot.state
+        _merke(rule, snapshot, state, snapshots)
         return _reset(state, war_erfuellt, rule.rule_id)
 
-    weiterhin = hold_met(rule, snapshot)
-    neu = trigger_met(rule, snapshot, previous_state)
-    state.last_state = snapshot.state
+    weiterhin = hold_met(rule, snapshot, snapshots=snapshots)
+    neu = trigger_met(
+        rule,
+        snapshot,
+        previous_state,
+        snapshots=snapshots,
+        previous_states=state.last_states,
+    )
+    _merke(rule, snapshot, state, snapshots)
 
     aktiv_gueltig = weiterhin if state.phase is not Phase.IDLE else neu
 
@@ -272,6 +411,25 @@ def evaluate_rule(
         value=wert,
         since=state.condition_since,
     )
+
+
+def _merke(
+    rule: Rule,
+    snapshot: EntitySnapshot,
+    state: RuleState,
+    snapshots: Snapshots | None,
+) -> None:
+    """Haelt die gesehenen Zustaende fuer die naechste Flankenerkennung fest."""
+    state.last_state = snapshot.state
+    state.last_states[snapshot.entity_id] = snapshot.state
+
+    for bedingung in rule.extra_conditions:
+        entity_id = bedingung.entity_id
+        if entity_id is None or entity_id == snapshot.entity_id:
+            continue
+        weitere = (snapshots or {}).get(entity_id)
+        if weitere is not None:
+            state.last_states[entity_id] = weitere.state
 
 
 def _reset(state: RuleState, war_erfuellt: bool, rule_id: str) -> Evaluation:
@@ -351,6 +509,9 @@ def evaluate_group(
     Jede Stufe fuehrt ihren eigenen Zustand mit, auch wenn sie gerade nicht
     sichtbar ist. Nur so wirkt die Hysterese einer Stufe unabhaengig von den
     anderen (Spezifikation 21).
+
+    Stufen tragen keine zusaetzlichen Bedingungen (siehe
+    :class:`~.models.Rule`), deshalb genuegt hier die Entity der Gruppe.
     """
     auswertungen: dict[int, Evaluation] = {}
     erfuellte: list[int] = []

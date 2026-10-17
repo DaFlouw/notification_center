@@ -141,6 +141,148 @@ class NumericOperator(StrEnum):
 
 
 # ---------------------------------------------------------------------------
+# Logische Verknuepfung
+# ---------------------------------------------------------------------------
+
+
+class LogicOperator(StrEnum):
+    """Wie die Bedingungen einer Regel zusammenwirken.
+
+    Bewusst nur zwei Operatoren und eine Ebene: eine Regel verknuepft ihre
+    Bedingungen entweder alle oder beliebig eine. Gemischte Vorrang-Ketten
+    (``A und (B oder C)``) sind nicht vorgesehen -- sie liessen sich im
+    Regel-Editor nicht ohne Klammern darstellen, und wer sie braucht, ist mit
+    einer Automation besser bedient. Die Verneinung einer einzelnen Bedingung
+    ist dagegen moeglich (:attr:`Condition.negate`), womit die drei
+    klassischen Operatoren UND, ODER und NICHT abgedeckt sind.
+    """
+
+    #: Jede Bedingung muss zutreffen (UND).
+    ALL = "all"
+    #: Eine zutreffende Bedingung genuegt (ODER).
+    ANY = "any"
+
+
+def _validate_numeric_parts(
+    operator: NumericOperator | None,
+    threshold: float | None,
+    release_threshold: float | None,
+    states: tuple[str, ...],
+) -> None:
+    """Pruefung einer numerischen Bedingung, fuer Regel und Teilbedingung."""
+    if operator is None or threshold is None:
+        raise ValueError("Numerische Regel benoetigt Operator und Schwelle")
+    if states:
+        raise ValueError("Numerische Regel darf keine Zustandsliste haben")
+    if release_threshold is None:
+        return
+
+    # Die Rueckkehrschwelle muss auf der 'ruhigen' Seite der Schwelle
+    # liegen, sonst entsteht kein Hysteresefenster, sondern eine Luecke.
+    if operator.is_upper_bound and release_threshold >= threshold:
+        raise ValueError("Rueckkehrschwelle muss kleiner als die Ausloeseschwelle sein")
+    if operator.is_lower_bound and release_threshold <= threshold:
+        raise ValueError("Rueckkehrschwelle muss groesser als die Ausloeseschwelle sein")
+    if operator is NumericOperator.EQ:
+        raise ValueError("Gleichheitsregeln unterstuetzen keine Hysterese")
+
+
+def _validate_state_parts(
+    states: tuple[str, ...],
+    operator: NumericOperator | None,
+    threshold: float | None,
+    release_threshold: float | None,
+) -> None:
+    """Pruefung einer Zustandsbedingung, fuer Regel und Teilbedingung."""
+    if not states:
+        raise ValueError("Zustandsregel benoetigt mindestens einen Zustand")
+    if operator is not None or threshold is not None:
+        raise ValueError("Zustandsregel darf keinen numerischen Vergleich haben")
+    if release_threshold is not None:
+        raise ValueError("Zustandsregel unterstuetzt keine Hysterese")
+
+
+@dataclass(frozen=True, slots=True)
+class Condition:
+    """Eine weitere Bedingung einer Regel (Spezifikation 14).
+
+    Eine Regel gehoert weiterhin zu genau einer Entity: sie ist der Gegenstand
+    der Meldung, liefert die Platzhalter des Meldungstexts und bestimmt Raum
+    und Geschoss in der Historie. Eine Teilbedingung darf aber eine *andere*
+    Entity betrachten -- das ist der eigentliche Zweck der Verknuepfung:
+    "Fenster offen, waehrend die Heizung laeuft" ist eine Aussage ueber zwei
+    Entities, aber eine Meldung ueber das Fenster.
+
+    ``entity_id`` bleibt ``None``, solange sich die Bedingung auf die Entity
+    der Regel bezieht. So bleibt eine Regel beim Entitytausch
+    (Spezifikation 66) in einem Stueck: die Teilbedingung wandert mit, ohne
+    dass irgendwo eine alte Kennung stehen bleibt.
+
+    ``negate`` verneint das Ergebnis dieser einen Bedingung. Nicht verwendbar
+    bei "Zustand aendert sich zu": die Verneinung eines Augenblicks waere
+    praktisch immer wahr und damit nie das, was gemeint ist.
+    """
+
+    kind: ConditionKind
+    entity_id: str | None = None
+    value_source: ValueSource = STATE_SOURCE
+    negate: bool = False
+
+    # Zustandsbedingungen
+    states: tuple[str, ...] = ()
+
+    # Numerische Bedingungen
+    operator: NumericOperator | None = None
+    threshold: float | None = None
+    release_threshold: float | None = None
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "states", tuple(self.states))
+
+        if self.kind is ConditionKind.NUMERIC:
+            _validate_numeric_parts(
+                self.operator, self.threshold, self.release_threshold, self.states
+            )
+        else:
+            _validate_state_parts(
+                self.states, self.operator, self.threshold, self.release_threshold
+            )
+
+        if self.negate and self.kind is ConditionKind.STATE_CHANGED_TO:
+            raise ValueError(
+                "'Zustand aendert sich zu' laesst sich nicht verneinen: der Wechsel "
+                "ist ein Augenblick, seine Verneinung waere fast immer wahr. "
+                "Gemeint ist meist 'Zustand ist nicht'"
+            )
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "kind": str(self.kind),
+            "entity_id": self.entity_id,
+            "value_source": self.value_source.to_dict(),
+            "negate": self.negate,
+            "states": list(self.states),
+            "operator": str(self.operator) if self.operator else None,
+            "threshold": self.threshold,
+            "release_threshold": self.release_threshold,
+        }
+
+    @classmethod
+    def from_dict(cls, data: Mapping[str, Any]) -> Condition:
+        operator = data.get("operator")
+        return cls(
+            kind=ConditionKind(data["kind"]),
+            entity_id=data.get("entity_id"),
+            value_source=ValueSource.from_dict(data.get("value_source", {})),
+            negate=bool(data.get("negate", False)),
+            states=tuple(data.get("states", ())),
+            operator=NumericOperator(operator) if operator else None,
+            threshold=data.get("threshold"),
+            release_threshold=data.get("release_threshold"),
+        )
+
+
+# ---------------------------------------------------------------------------
 # Regel
 # ---------------------------------------------------------------------------
 
@@ -192,11 +334,61 @@ class Rule:
     group_id: str | None = None
     level: int | None = None
 
+    # Verknuepfung weiterer Bedingungen
+    logic: LogicOperator = LogicOperator.ALL
+    extra_conditions: tuple[Condition, ...] = ()
+
     schema_version: int = MODEL_SCHEMA_VERSION
 
     def __post_init__(self) -> None:
         self.states = tuple(self.states)
+        self.extra_conditions = tuple(self.extra_conditions)
         self._validate()
+
+    # -- Bedingungen -----------------------------------------------------
+
+    @property
+    def primary_condition(self) -> Condition:
+        """Die erste Bedingung, aus den Feldern der Regel selbst.
+
+        Die Regel traegt ihre erste Bedingung weiterhin direkt in ``kind``,
+        ``states``, ``operator`` und ``threshold``; weitere Bedingungen
+        kommen in ``extra_conditions`` hinzu. Das haelt jede bestehende
+        Regel, jede gespeicherte Konfiguration und jeden Vorschlag der
+        Discovery unveraendert gueltig -- eine einzelne Bedingung sieht nach
+        wie vor genauso aus wie vorher.
+        """
+        return Condition(
+            kind=self.kind,
+            value_source=self.value_source,
+            states=self.states,
+            operator=self.operator,
+            threshold=self.threshold,
+            release_threshold=self.release_threshold,
+        )
+
+    @property
+    def conditions(self) -> tuple[Condition, ...]:
+        """Alle Bedingungen der Regel, die erste zuerst."""
+        return (self.primary_condition, *self.extra_conditions)
+
+    @property
+    def is_combined(self) -> bool:
+        return bool(self.extra_conditions)
+
+    def entity_for(self, condition: Condition) -> str:
+        """Die Entity, die eine Bedingung betrachtet."""
+        return condition.entity_id or self.entity_id
+
+    @property
+    def referenced_entity_ids(self) -> frozenset[str]:
+        """Alle Entities, von denen die Regel abhaengt.
+
+        Grundlage der Ueberwachung: auch eine Entity, die nur in einer
+        Teilbedingung vorkommt, muss beobachtet werden -- sonst bemerkt die
+        Regel deren Wechsel nicht.
+        """
+        return frozenset({self.entity_id, *(self.entity_for(bed) for bed in self.extra_conditions)})
 
     # -- Gueltigkeit -----------------------------------------------------
 
@@ -222,30 +414,18 @@ class Rule:
         if (self.group_id is None) != (self.level is None):
             raise ValueError("group_id und level muessen gemeinsam gesetzt sein")
 
-    def _validate_numeric(self) -> None:
-        if self.operator is None or self.threshold is None:
-            raise ValueError("Numerische Regel benoetigt Operator und Schwelle")
-        if self.states:
-            raise ValueError("Numerische Regel darf keine Zustandsliste haben")
-        if self.release_threshold is None:
-            return
+        if self.extra_conditions and self.group_id is not None:
+            # Eine Eskalationsgruppe ordnet ihre Stufen allein nach der
+            # Schwelle (siehe RuleGroup). Eine Stufe mit zusaetzlichen
+            # Bedingungen koennte erfuellt sein, waehrend die niedrigere es
+            # nicht ist -- die Reihenfolge waere nicht mehr wohldefiniert.
+            raise ValueError("Stufen einer Regelgruppe tragen keine weiteren Bedingungen")
 
-        # Die Rueckkehrschwelle muss auf der 'ruhigen' Seite der Schwelle
-        # liegen, sonst entsteht kein Hysteresefenster, sondern eine Luecke.
-        if self.operator.is_upper_bound and self.release_threshold >= self.threshold:
-            raise ValueError("Rueckkehrschwelle muss kleiner als die Ausloeseschwelle sein")
-        if self.operator.is_lower_bound and self.release_threshold <= self.threshold:
-            raise ValueError("Rueckkehrschwelle muss groesser als die Ausloeseschwelle sein")
-        if self.operator is NumericOperator.EQ:
-            raise ValueError("Gleichheitsregeln unterstuetzen keine Hysterese")
+    def _validate_numeric(self) -> None:
+        _validate_numeric_parts(self.operator, self.threshold, self.release_threshold, self.states)
 
     def _validate_state(self) -> None:
-        if not self.states:
-            raise ValueError("Zustandsregel benoetigt mindestens einen Zustand")
-        if self.operator is not None or self.threshold is not None:
-            raise ValueError("Zustandsregel darf keinen numerischen Vergleich haben")
-        if self.release_threshold is not None:
-            raise ValueError("Zustandsregel unterstuetzt keine Hysterese")
+        _validate_state_parts(self.states, self.operator, self.threshold, self.release_threshold)
 
     # -- Serialisierung --------------------------------------------------
 
@@ -268,6 +448,8 @@ class Rule:
             "title": self.title,
             "group_id": self.group_id,
             "level": self.level,
+            "logic": str(self.logic),
+            "extra_conditions": [bedingung.to_dict() for bedingung in self.extra_conditions],
         }
 
     @classmethod
@@ -291,11 +473,37 @@ class Rule:
             title=data.get("title"),
             group_id=data.get("group_id"),
             level=data.get("level"),
+            logic=LogicOperator(data.get("logic", LogicOperator.ALL)),
+            extra_conditions=tuple(
+                Condition.from_dict(item) for item in data.get("extra_conditions", ())
+            ),
         )
 
     def with_entity(self, entity_id: str) -> Rule:
-        """Kopie der Regel fuer eine andere Entity (Spezifikation 66)."""
+        """Kopie der Regel fuer eine andere Entity (Spezifikation 66).
+
+        Teilbedingungen ohne eigene Kennung wandern dabei mit: sie beziehen
+        sich auf die Entity der Regel.
+        """
         return replace(self, entity_id=entity_id)
+
+    def with_partner_replaced(self, old_entity_id: str, new_entity_id: str) -> Rule:
+        """Haengt Teilbedingungen auf eine andere Entity um.
+
+        Wird beim Entitytausch gebraucht: wer eine Entity ersetzt, erwartet,
+        dass auch die Regeln *anderer* Entities, die sie als Bedingung
+        heranziehen, weiterhin greifen. Ohne das zeigten sie stumm nie wieder
+        etwas, weil die alte Kennung nirgends mehr existiert.
+        """
+        if not any(bed.entity_id == old_entity_id for bed in self.extra_conditions):
+            return self
+        return replace(
+            self,
+            extra_conditions=tuple(
+                replace(bed, entity_id=new_entity_id) if bed.entity_id == old_entity_id else bed
+                for bed in self.extra_conditions
+            ),
+        )
 
 
 # ---------------------------------------------------------------------------

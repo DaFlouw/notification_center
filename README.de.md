@@ -150,6 +150,33 @@ Im Meldungstext stehen Platzhalter zur Verfuegung:
 
 Mehrere Regeln derselben Entity duerfen gleichzeitig gelten und erzeugen dann parallele Meldungen.
 
+### Bedingungen verknuepfen
+
+Eine Regel darf mehrere Bedingungen gleichzeitig verlangen. Jede weitere ist eine vollwertige Bedingung — Zustand, Attribut oder numerischer Vergleich — und darf eine **andere Entity** betrachten als die, zu der die Regel gehoert. Genau darum geht es: *Fenster offen, waehrend die Heizung laeuft* ist eine Aussage ueber zwei Entities, aber eine Meldung ueber das Fenster.
+
+| Verknuepfung | Logik |
+|--------------|-------|
+| **Alle Bedingungen muessen zutreffen** | UND |
+| **Eine Bedingung genuegt** | ODER |
+| **nicht**, je Bedingung | NICHT |
+
+Was bleibt, wie es war:
+
+- Die Regel gehoert weiterhin zu genau einer Entity. Sie ist der Gegenstand der Meldung, liefert die Platzhalter des Meldungstexts und bestimmt Raum und Geschoss in der Historie.
+- Die Zeitbedingung gilt fuer die Verknuepfung als Ganzes: alles zusammen muss ununterbrochen so lange anliegen.
+- Eine Rueckkehrschwelle gehoert zu der numerischen Bedingung, die sie traegt; der Editor bietet sie fuer die erste an.
+
+Was neu ist:
+
+- Eine Entity, die nur in einer Bedingung vorkommt, muss **nicht** uebernommen sein. Sie wird beobachtet, erzeugt aber keine eigenen Meldungen und bekommt keine Vorschlaege.
+- Die Regel wird neu bewertet, sobald sich *irgendeine* ihrer Entities aendert — nicht nur ihre eigene.
+- Bleibt das Entity-Feld einer Bedingung leer, gilt sie fuer die Entity der Regel selbst. Praktisch fuer ein zweites Attribut derselben Sache.
+
+> [!NOTE]
+> Eine fehlende oder `unavailable` gemeldete Entity macht ihre Bedingung *unentscheidbar*, nicht falsch. Bei **Alle Bedingungen** gilt die Regel dann nicht, bei **Eine Bedingung** zaehlen die uebrigen weiter. Wichtig wird das bei einer verneinten Bedingung: "niemand ist zuhause" darf nicht wahr werden, nur weil die Anwesenheitserkennung ausgefallen ist.
+
+Gemischte Vorrang-Ketten — `A und (B oder C)` — sind bewusst nicht vorgesehen: ohne Klammern liessen sie sich im Editor nicht ehrlich darstellen. Auch die Stufen einer Regelgruppe tragen keine weiteren Bedingungen; ihre Reihenfolge ergibt sich allein aus den Schwellen.
+
 > [!NOTE]
 > Entity-basierte Meldungen lassen sich nicht von Hand beenden. Sie enden, wenn ihre Bedingung nicht mehr gilt, ihre Regel geloescht oder ihre Entity aus der Ueberwachung genommen wird.
 

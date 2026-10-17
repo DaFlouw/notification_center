@@ -34,7 +34,7 @@
 <notification-center-panel id="panel"></notification-center-panel>
 
 <script type="module">
-import { GET_CONFIG, GET_ACTIVE, GET_COUNTS, GET_HISTORY, DISCOVER, GET_SUGGESTIONS, AREAS, VERSION } from "./daten.js";
+import { GET_CONFIG, GET_ACTIVE, GET_COUNTS, GET_HISTORY, DISCOVER, GET_SUGGESTIONS, AREAS, HASS_STATES, VERSION } from "./daten.js";
 import "../../custom_components/notification_center/frontend/notification-center-panel.js";
 import { lauf } from "./interaktion.js";
 
@@ -63,6 +63,21 @@ const ANTWORTEN = {
   delete_event: () => ({ api_version: 1, version: VERSION, deleted: true }),
   clear_history: () => ({ api_version: 1, version: VERSION, cleared: true }),
   set_settings: () => ({ api_version: 1, version: VERSION, settings: GET_CONFIG.settings }),
+  // Zustandswerte einer Entity einer Teilbedingung.
+  get_entity_options: (n) => ({
+    api_version: 1,
+    version: VERSION,
+    entity_id: n.entity_id,
+    exists: Boolean(HASS_STATES[n.entity_id]),
+    name: HASS_STATES[n.entity_id]?.attributes.friendly_name || null,
+    state: HASS_STATES[n.entity_id]?.state || null,
+    states: n.entity_id.startsWith("climate.")
+      ? ["off", "heat", "cool", "auto"]
+      : n.entity_id.startsWith("person.")
+        ? ["home", "not_home"]
+        : ["on", "off"],
+    attributes: [],
+  }),
 };
 
 /** Jedes abgesetzte Kommando samt Parametern. */
@@ -90,7 +105,7 @@ const hass = {
   // ?sprache=en zeigt dasselbe Panel in der Grundsprache.
   locale: { language: new URLSearchParams(location.search).get("sprache") || "de" },
   areas: AREAS,
-  states: {},
+  states: HASS_STATES,
   connection: {
     async sendMessagePromise(nachricht) {
       const kommando = String(nachricht.type).replace(PREFIX, "");
