@@ -26,7 +26,9 @@ from custom_components.notification_center.coordinator import NotificationCenter
 from custom_components.notification_center.notifications.models import NotificationType
 from custom_components.notification_center.rules import engine
 from custom_components.notification_center.rules.models import (
+    Condition,
     ConditionKind,
+    LogicOperator,
     NumericOperator,
     Rule,
     RuleGroup,
@@ -686,3 +688,134 @@ async def test_bearbeitete_gruppe_meldet_weiter_ohne_doppelte_stufe(
 
     laufend = [e for e in runtime.notification_engine.active_events() if e.rule_group_id]
     assert [e.level for e in laufend] == [2]
+
+
+# -- Verknuepfte Bedingungen ------------------------------------------------
+#
+# Die Auswertung selbst ist in den Domaenentests abgedeckt. Hier geht es um
+# das, was nur mit laufendem Home Assistant zu pruefen ist: dass auch die
+# Entity einer Teilbedingung beobachtet wird und ihr Wechsel die Regel neu
+# bewertet, obwohl die Regel einer anderen Entity gehoert.
+
+HEIZUNG = "climate.wohnzimmer"
+
+
+def fenster_und_heizung(**kwargs: object) -> Rule:
+    """Fenster offen, waehrend die Heizung laeuft."""
+    defaults: dict[str, object] = {
+        "rule_id": "rule_verknuepft",
+        "extra_conditions": (
+            Condition(kind=ConditionKind.STATE_IS, entity_id=HEIZUNG, states=("heat",)),
+        ),
+    }
+    defaults.update(kwargs)
+    return fensterregel(**defaults)
+
+
+@pytest.fixture
+async def verknuepft(
+    hass: HomeAssistant, config_entry: MockConfigEntry
+) -> NotificationCenterRuntime:
+    """Eine Regel ueber zwei Entities; nur das Fenster ist uebernommen."""
+    hass.states.async_set(FENSTER, "off")
+    hass.states.async_set(HEIZUNG, "off")
+    return await _einrichten(hass, config_entry, fenster_und_heizung())
+
+
+async def test_verknuepfte_regel_meldet_erst_wenn_beides_zutrifft(
+    hass: HomeAssistant, verknuepft: NotificationCenterRuntime
+) -> None:
+    hass.states.async_set(FENSTER, "on")
+    await hass.async_block_till_done()
+    assert aktive(verknuepft) == 0
+
+    hass.states.async_set(HEIZUNG, "heat")
+    await hass.async_block_till_done()
+    assert aktive(verknuepft) == 1
+
+
+async def test_wechsel_der_partner_entity_bewertet_die_regel_neu(
+    hass: HomeAssistant, verknuepft: NotificationCenterRuntime
+) -> None:
+    """Der eigentliche Zweck: die Regel haengt nicht an ihrer eigenen Entity.
+
+    Ohne Abonnement der Partner-Entity entstuende die Meldung erst, wenn sich
+    zufaellig auch das Fenster wieder bewegt.
+    """
+    hass.states.async_set(HEIZUNG, "heat")
+    hass.states.async_set(FENSTER, "on")
+    await hass.async_block_till_done()
+    assert aktive(verknuepft) == 1
+
+    # Nur die Heizung geht aus, das Fenster bleibt offen.
+    hass.states.async_set(HEIZUNG, "off")
+    await hass.async_block_till_done()
+    assert aktive(verknuepft) == 0
+
+
+async def test_partner_entity_allein_erzeugt_keine_meldung(
+    hass: HomeAssistant, verknuepft: NotificationCenterRuntime
+) -> None:
+    """Die Partner-Entity wird beobachtet, aber nicht ueberwacht.
+
+    Sie ist nicht uebernommen: sie erzeugt keine eigenen Meldungen und
+    bekommt keine Vorschlaege.
+    """
+    hass.states.async_set(HEIZUNG, "heat")
+    await hass.async_block_till_done()
+
+    assert aktive(verknuepft) == 0
+    assert HEIZUNG not in verknuepft.config.monitored_entity_ids
+    assert HEIZUNG in verknuepft.config.tracked_entity_ids
+
+
+async def test_oder_verknuepfung_meldet_bei_einer_der_beiden(
+    hass: HomeAssistant, config_entry: MockConfigEntry
+) -> None:
+    hass.states.async_set(FENSTER, "off")
+    hass.states.async_set(HEIZUNG, "off")
+    laufzeit = await _einrichten(hass, config_entry, fenster_und_heizung(logic=LogicOperator.ANY))
+
+    hass.states.async_set(HEIZUNG, "heat")
+    await hass.async_block_till_done()
+
+    assert aktive(laufzeit) == 1
+
+
+async def test_neu_gespeicherte_verknuepfte_regel_meldet_sofort(
+    hass: HomeAssistant, runtime: NotificationCenterRuntime
+) -> None:
+    """Liegt beides schon an, soll die Meldung nicht auf den naechsten Wechsel warten."""
+    hass.states.async_set(FENSTER, "on")
+    hass.states.async_set(HEIZUNG, "heat")
+    await hass.async_block_till_done()
+
+    await runtime.async_save_rule(fenster_und_heizung())
+    await hass.async_block_till_done()
+
+    assert len(_ereignisse_von(runtime, "rule_verknuepft")) == 1
+
+
+async def test_fehlende_partner_entity_laesst_die_regel_stumm(
+    hass: HomeAssistant, config_entry: MockConfigEntry
+) -> None:
+    """Eine Bedingung ohne auswertbare Entity ist nicht erfuellt, nicht wahr."""
+    hass.states.async_set(FENSTER, "off")
+    laufzeit = await _einrichten(
+        hass,
+        config_entry,
+        fenster_und_heizung(
+            extra_conditions=(
+                Condition(
+                    kind=ConditionKind.STATE_IS,
+                    entity_id="climate.gibtsnicht",
+                    states=("heat",),
+                ),
+            )
+        ),
+    )
+
+    hass.states.async_set(FENSTER, "on")
+    await hass.async_block_till_done()
+
+    assert aktive(laufzeit) == 0

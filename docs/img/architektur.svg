@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1040 720" width="1040" height="720" role="img" aria-labelledby="titel beschreibung" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif">
   <title id="titel">Architecture of the Notification Center</title>
-  <desc id="beschreibung">Home Assistant delivers state changes, registry data and history. The integration decides in the backend what a notification is: the rule engine evaluates conditions, the notification engine owns the active set and writes the history, discovery proposes rules, storage keeps configuration and events. The API exposes WebSocket commands and services. Panel, card and automations only call that API; the panel and the card display, they decide nothing.</desc>
+  <desc id="beschreibung">Home Assistant delivers state changes, registry data and history. The integration decides in the backend what a notification is: the rule engine evaluates conditions and their logical combination, the notification engine owns the active set and writes the history, discovery proposes rules, storage keeps configuration and events. The API exposes WebSocket commands and services. Panel, card and automations only call that API; the panel and the card display, they decide nothing.</desc>
 
   <defs>
     <marker id="pfeil" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
@@ -44,7 +44,7 @@
   <text x="60" y="274" font-size="12.5" fill="#1f2328">Decides when a notification</text>
   <text x="60" y="291" font-size="12.5" fill="#1f2328">starts and when it ends.</text>
   <text x="60" y="314" font-size="11.5" fill="#57606a">state listener · evaluator · timers</text>
-  <text x="60" y="331" font-size="11.5" fill="#57606a">hysteresis · time conditions · groups</text>
+  <text x="60" y="331" font-size="11.5" fill="#57606a">hysteresis · time conditions · logic · groups</text>
 
   <!-- notifications -->
   <rect x="370" y="228" width="300" height="118" rx="8" fill="#ffffff" stroke="#d0d7de"/>

@@ -56,11 +56,36 @@ export const GET_CONFIG = {
     { rule_id: "rule_loetstation", entity_id: "switch.hobbyraum_loetstation", kind: "state_is", type: "warning", enabled: true, value_source: { kind: "state", attribute: null }, states: ["on"], operator: null, threshold: null, release_threshold: null, duration_seconds: 3600, message_template: "Lötstation läuft seit über einer Stunde", group_id: null, level: null },
     { rule_id: "rule_nas", entity_id: "switch.netzwerkspeicher", kind: "state_is", type: "info", enabled: true, value_source: { kind: "state", attribute: null }, states: ["on"], operator: null, threshold: null, release_threshold: null, duration_seconds: null, message_template: "{name}: an", group_id: null, level: null },
     { rule_id: "rule_alex", entity_id: "person.alex", kind: "state_is", type: "info", enabled: true, value_source: { kind: "state", attribute: null }, states: ["home"], operator: null, threshold: null, release_threshold: null, duration_seconds: null, message_template: "{name} ist zu Hause", group_id: null, level: null },
+    // Eine verknuepfte Regel: Fenster offen, waehrend die Heizung laeuft, und
+    // niemand zuhause ist. Meldung ueber das Fenster, Bedingung ueber drei
+    // Entities.
+    { rule_id: "rule_fenster_heizung", entity_id: "binary_sensor.kueche_fenster", kind: "state_is", type: "warning", enabled: true, value_source: { kind: "state", attribute: null }, states: ["on"], operator: null, threshold: null, release_threshold: null, duration_seconds: 300, message_template: "Küchenfenster offen, während die Heizung läuft", group_id: null, level: null, logic: "all", extra_conditions: [
+      { entity_id: "climate.schlafzimmer_heizung", kind: "state_is", value_source: { kind: "state", attribute: null }, negate: false, states: ["heat"], operator: null, threshold: null, release_threshold: null },
+      { entity_id: "person.alex", kind: "state_is", value_source: { kind: "state", attribute: null }, negate: true, states: ["home"], operator: null, threshold: null, release_threshold: null },
+    ] },
   ],
   groups: [],
   settings: { paused: false, retention_days: 90, max_events: 5000, analysis_days: 7, setup_completed: true },
   options: { retention_days: [7, 30, 90, 365, 0], max_events: [1000, 5000, 10000, 50000] },
 };
+
+/**
+ * Die Zustaende, die ``hass.states`` im Pruefstand enthaelt.
+ *
+ * Gebraucht vom Regel-Editor: die Vorschlagsliste der Entities und die Namen
+ * in der Beschreibung verknuepfter Regeln stammen aus Home Assistant selbst,
+ * nicht aus der Konfiguration des Notification Centers.
+ */
+export const HASS_STATES = Object.fromEntries(
+  GET_CONFIG.entities.map((eintrag) => [
+    eintrag.entity_id,
+    {
+      entity_id: eintrag.entity_id,
+      state: "off",
+      attributes: { friendly_name: eintrag.name },
+    },
+  ])
+);
 
 export const GET_ACTIVE = {
   api_version: 1,

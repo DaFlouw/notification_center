@@ -188,8 +188,14 @@ class ConfigDocument:
 
         umgehaengt: list[str] = []
         for rule_id, rule in list(self.rules.items()):
+            # Auch Regeln *anderer* Entities koennen die alte als Bedingung
+            # heranziehen. Bleiben sie stehen, greifen sie nie wieder, weil
+            # die alte Kennung nirgends mehr existiert -- und zwar stumm.
+            neu = rule.with_partner_replaced(old_entity_id, new_entity.entity_id)
             if rule.entity_id == old_entity_id:
-                self.rules[rule_id] = rule.with_entity(new_entity.entity_id)
+                neu = neu.with_entity(new_entity.entity_id)
+            if neu is not rule:
+                self.rules[rule_id] = neu
                 umgehaengt.append(rule_id)
 
         for group_id, group in list(self.groups.items()):
@@ -209,6 +215,14 @@ class ConfigDocument:
     # -- Regeln ----------------------------------------------------------
 
     def add_rule(self, rule: Rule) -> None:
+        """Legt eine Regel an oder ersetzt sie.
+
+        Verlangt wird die Uebernahme nur fuer die Entity der Regel: sie ist
+        der Gegenstand der Meldung. Eine Entity, die lediglich in einer
+        Teilbedingung vorkommt, muss nicht uebernommen sein -- sonst muesste
+        man fuer ein "waehrend die Heizung laeuft" die Heizung selbst
+        ueberwachen und bekaeme Vorschlaege fuer sie, die niemand wollte.
+        """
         if rule.entity_id not in self.entities:
             raise ConfigError(f"Regel verweist auf eine nicht ueberwachte Entity: {rule.entity_id}")
         self.rules[rule.rule_id] = rule
@@ -247,12 +261,30 @@ class ConfigDocument:
 
     @property
     def monitored_entity_ids(self) -> frozenset[str]:
-        """Nur diese Entities werden auf State-Changes beobachtet.
+        """Die uebernommenen Entities (Spezifikation 7).
+
+        Sie sind der Gegenstand der Regeln und der Historie. Beobachtet wird
+        zusaetzlich, was Teilbedingungen heranziehen: siehe
+        :attr:`tracked_entity_ids`.
+        """
+        return frozenset(self.entities)
+
+    @property
+    def tracked_entity_ids(self) -> frozenset[str]:
+        """Alle Entities, auf deren Wechsel gehoert werden muss.
+
+        Das sind die uebernommenen und zusaetzlich die, die nur als
+        Teilbedingung vorkommen. Ohne sie bemerkte eine verknuepfte Regel
+        deren Wechsel nicht und waere von der Launigkeit der eigenen Entity
+        abhaengig.
 
         Grundlage der ereignisbasierten Ueberwachung: es wird niemals ueber
         alle Entities von Home Assistant iteriert (Spezifikation 6).
         """
-        return frozenset(self.entities)
+        verknuepft = {
+            entity_id for rule in self.rules.values() for entity_id in rule.referenced_entity_ids
+        }
+        return frozenset(self.entities) | frozenset(verknuepft)
 
     # -- Serialisierung --------------------------------------------------
 

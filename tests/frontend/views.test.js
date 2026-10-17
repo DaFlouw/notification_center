@@ -20,6 +20,10 @@ import { escapeHtml, formatDuration, typeLabel } from "../../custom_components/n
 import { renderDashboard } from "../../custom_components/notification_center/frontend/views/dashboard.js";
 import { renderDiscovery } from "../../custom_components/notification_center/frontend/views/discovery.js";
 import {
+  beschreibung,
+  entwurfZuRegel,
+  leereBedingung,
+  leereRegel,
   renderRuleOverview,
   renderRules,
   uebersichtAusKonfiguration,
@@ -572,5 +576,225 @@ describe("Die Entity im Regel-Editor (Issue 9)", () => {
   it("maskiert die Kennung", () => {
     const html = renderRules({ ...zustand, entityId: '<img src=x onerror=alert(1)>' });
     assert.doesNotMatch(html, /<img/);
+  });
+});
+
+describe("Verknuepfte Bedingungen", () => {
+  /** Fenster offen, waehrend die Heizung laeuft. */
+  const VERKNUEPFT = {
+    rule_id: "rule_1",
+    entity_id: "binary_sensor.flur_haustuer",
+    kind: "state_is",
+    type: "warning",
+    states: ["on"],
+    value_source: { kind: "state", attribute: null },
+    logic: "all",
+    extra_conditions: [
+      {
+        entity_id: "climate.wohnzimmer",
+        kind: "state_is",
+        states: ["heat"],
+        negate: false,
+        value_source: { kind: "state", attribute: null },
+      },
+    ],
+  };
+
+  const NAMEN = { "climate.wohnzimmer": "Heizung Wohnzimmer" };
+
+  it("beschreibt beide Bedingungen mit dem Verknuepfungswort", () => {
+    const text = beschreibung(VERKNUEPFT, NAMEN);
+    assert.match(text, /Zustand ist on und Heizung Wohnzimmer: Zustand ist heat/);
+  });
+
+  it("verwendet bei 'eine genuegt' das andere Wort", () => {
+    const text = beschreibung({ ...VERKNUEPFT, logic: "any" }, NAMEN);
+    assert.match(text, / oder Heizung Wohnzimmer/);
+  });
+
+  it("zeigt die Kennung, wenn kein Name bekannt ist", () => {
+    const text = beschreibung(VERKNUEPFT);
+    assert.match(text, /climate\.wohnzimmer: Zustand ist heat/);
+  });
+
+  it("klammert eine verneinte Bedingung", () => {
+    // Ohne Klammer waere "nicht Zustand ist home" nicht zu lesen.
+    const text = beschreibung(
+      {
+        ...VERKNUEPFT,
+        extra_conditions: [
+          {
+            entity_id: "person.alex",
+            kind: "state_is",
+            states: ["home"],
+            negate: true,
+            value_source: { kind: "state", attribute: null },
+          },
+        ],
+      },
+      { "person.alex": "Alex" }
+    );
+    assert.match(text, /Alex: nicht \(Zustand ist home\)/);
+  });
+
+  it("beschreibt eine einzelne Bedingung unveraendert", () => {
+    // Die Erweiterung darf an der bisherigen Darstellung nichts aendern.
+    const einfach = { ...VERKNUEPFT, extra_conditions: [] };
+    assert.equal(beschreibung(einfach), "Zustand ist on");
+  });
+
+  it("haengt die Zeitbedingung an die ganze Verknuepfung", () => {
+    const text = beschreibung({ ...VERKNUEPFT, duration_seconds: 900 }, NAMEN);
+    assert.match(text, /Zustand ist heat · länger als 15 min$/);
+  });
+});
+
+describe("Regel-Editor: weitere Bedingungen", () => {
+  const BASIS = {
+    entityId: "binary_sensor.flur_haustuer",
+    entityName: "Haustür",
+    rules: [],
+    states: ["on", "off"],
+    attributes: [],
+    candidates: [
+      { entity_id: "climate.wohnzimmer", name: "Heizung Wohnzimmer" },
+      { entity_id: "person.alex", name: "Alex" },
+    ],
+  };
+
+  it("bietet eine neue Bedingung an, auch wenn es noch keine gibt", () => {
+    const html = renderRules({ ...BASIS, entwurf: leereRegel(BASIS.entityId) });
+    assert.match(html, /data-action="add-condition"/);
+    // Die Verknuepfung erscheint erst, wenn es etwas zu verknuepfen gibt.
+    assert.ok(!html.includes('data-rule-field="logic"'));
+  });
+
+  it("zeichnet eine Bedingung samt Entity-Feld, Verneinung und Vorschlagsliste", () => {
+    const entwurf = {
+      ...leereRegel(BASIS.entityId),
+      extra_conditions: [{ ...leereBedingung(), entity_id: "climate.wohnzimmer" }],
+    };
+    const html = renderRules({
+      ...BASIS,
+      entwurf,
+      conditionOptions: {
+        "climate.wohnzimmer": { states: ["heat", "off"], attributes: [], exists: true },
+      },
+    });
+
+    assert.match(html, /data-rule-field="logic"/);
+    assert.match(html, /Alle Bedingungen müssen zutreffen/);
+    assert.match(html, /data-cond-field="entity" data-cond-index="0"/);
+    assert.match(html, /value="climate\.wohnzimmer"/);
+    assert.match(html, /data-cond-field="negate"/);
+    assert.match(html, /data-action="remove-condition" data-index="0"/);
+    // Vorschlagsliste der Entities, einmal je Formular.
+    assert.match(html, /<datalist id="nc-entity-liste">/);
+    assert.match(html, /Heizung Wohnzimmer/);
+    // Die Zustaende der *Partner*-Entity, nicht die der eigenen.
+    assert.match(html, /<option value="heat"/);
+  });
+
+  it("nimmt fuer eine Bedingung ohne Kennung die Werte der eigenen Entity", () => {
+    const entwurf = {
+      ...leereRegel(BASIS.entityId),
+      extra_conditions: [leereBedingung()],
+    };
+    const html = renderRules({ ...BASIS, entwurf });
+
+    assert.match(html, /Diese Entity/);
+    assert.match(html, /<option value="on"/);
+  });
+
+  it("laesst eine Flanke nicht verneinen", () => {
+    const entwurf = {
+      ...leereRegel(BASIS.entityId),
+      extra_conditions: [{ ...leereBedingung(), kind: "state_changed_to" }],
+    };
+    const html = renderRules({ ...BASIS, entwurf });
+    assert.ok(!html.includes('data-cond-field="negate"'));
+  });
+
+  it("weist auf eine unbekannte Kennung hin", () => {
+    const entwurf = {
+      ...leereRegel(BASIS.entityId),
+      extra_conditions: [{ ...leereBedingung(), entity_id: "climate.gibtsnicht" }],
+    };
+    const html = renderRules({
+      ...BASIS,
+      entwurf,
+      conditionOptions: {
+        "climate.gibtsnicht": { states: [], attributes: [], exists: false },
+      },
+    });
+    assert.match(html, /Keine Entity mit dieser Kennung/);
+  });
+});
+
+describe("Uebergabe verknuepfter Bedingungen an die API", () => {
+  it("reicht Verknuepfung und Bedingungen weiter", () => {
+    const regel = entwurfZuRegel({
+      ...leereRegel("binary_sensor.flur_haustuer"),
+      states: ["on"],
+      logic: "any",
+      extra_conditions: [
+        {
+          ...leereBedingung(),
+          entity_id: "climate.wohnzimmer",
+          states: ["heat"],
+          negate: true,
+        },
+      ],
+    });
+
+    assert.equal(regel.logic, "any");
+    assert.equal(regel.extra_conditions.length, 1);
+    assert.equal(regel.extra_conditions[0].entity_id, "climate.wohnzimmer");
+    assert.deepEqual(regel.extra_conditions[0].states, ["heat"]);
+    assert.equal(regel.extra_conditions[0].negate, true);
+    // Die numerische Haelfte wird geleert, sonst weist das Backend ab.
+    assert.equal(regel.extra_conditions[0].threshold, null);
+    assert.equal(regel.extra_conditions[0].operator, null);
+  });
+
+  it("macht aus einer leeren Kennung 'diese Entity'", () => {
+    const regel = entwurfZuRegel({
+      ...leereRegel("sensor.temperatur"),
+      states: ["on"],
+      extra_conditions: [{ ...leereBedingung(), entity_id: "  " }],
+    });
+    assert.equal(regel.extra_conditions[0].entity_id, null);
+  });
+
+  it("raeumt die Zustandsliste einer numerischen Bedingung weg", () => {
+    const regel = entwurfZuRegel({
+      ...leereRegel("sensor.temperatur"),
+      states: ["on"],
+      extra_conditions: [
+        { ...leereBedingung(), kind: "numeric", operator: "gte", threshold: "70", states: ["alt"] },
+      ],
+    });
+
+    const bedingung = regel.extra_conditions[0];
+    assert.equal(bedingung.threshold, 70);
+    assert.equal(bedingung.operator, "gte");
+    assert.deepEqual(bedingung.states, []);
+  });
+
+  it("verneint eine Flanke nie, auch wenn der Entwurf es behauptet", () => {
+    const regel = entwurfZuRegel({
+      ...leereRegel("sensor.temperatur"),
+      states: ["on"],
+      extra_conditions: [
+        { ...leereBedingung(), kind: "state_changed_to", states: ["on"], negate: true },
+      ],
+    });
+    assert.equal(regel.extra_conditions[0].negate, false);
+  });
+
+  it("laesst eine Regel ohne weitere Bedingungen schlank", () => {
+    const regel = entwurfZuRegel({ ...leereRegel("sensor.temperatur"), states: ["on"] });
+    assert.equal(regel.logic, "all");
+    assert.deepEqual(regel.extra_conditions, []);
   });
 });

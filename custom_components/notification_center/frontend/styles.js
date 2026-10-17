@@ -240,6 +240,24 @@ sheet.replaceSync(`
     overflow-wrap: anywhere;
   }
 
+  /* Regel-Editor: jede weitere Bedingung als eigener, eingerueckter Block. */
+  .condition {
+    margin: 8px 0;
+    padding: 8px 0 8px 12px;
+    border-left: 2px solid var(--nc-border);
+  }
+
+  .condition .filters { margin-bottom: 4px; }
+
+  .negate {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 14px;
+    color: var(--nc-muted);
+    white-space: nowrap;
+  }
+
   .error { color: var(--nc-alarm); padding: 16px 0; }
   .loading { color: var(--nc-muted); padding: 16px 0; }
 

@@ -21,8 +21,10 @@ from custom_components.notification_center.rules.evaluator import (
     trigger_met,
 )
 from custom_components.notification_center.rules.models import (
+    Condition,
     ConditionKind,
     EntitySnapshot,
+    LogicOperator,
     NumericOperator,
     Rule,
     RuleGroup,
@@ -541,3 +543,279 @@ def test_zustand_ist_nicht_mit_zeitbedingung() -> None:
     assert evaluate_rule(rule, snap("running"), state, T0).phase is Phase.PENDING
     spaet = evaluate_rule(rule, snap("running", minutes=11), state, T0 + timedelta(minutes=11))
     assert spaet.became_satisfied is True
+
+
+# -- Verknuepfte Bedingungen ------------------------------------------------
+
+
+def partner(entity_id: str, state: str, **kwargs: object) -> EntitySnapshot:
+    """Momentaufnahme einer Entity, die nur als Bedingung vorkommt."""
+    defaults: dict[str, object] = {
+        "entity_id": entity_id,
+        "state": state,
+        "last_changed": T0,
+        "name": entity_id,
+    }
+    defaults.update(kwargs)
+    return EntitySnapshot(**defaults)  # type: ignore[arg-type]
+
+
+def fenster_und_heizung(**kwargs: object) -> Rule:
+    """Fenster offen, waehrend die Heizung laeuft -- eine Meldung ueber das Fenster."""
+    defaults: dict[str, object] = {
+        "extra_conditions": (
+            Condition(
+                kind=ConditionKind.STATE_IS,
+                entity_id="climate.wohnzimmer",
+                states=("heat",),
+            ),
+        )
+    }
+    defaults.update(kwargs)
+    return fenster(**defaults)
+
+
+def test_und_verlangt_beide_bedingungen() -> None:
+    rule = fenster_und_heizung()
+    state = RuleState(rule_id=rule.rule_id)
+
+    offen = snap("on", entity_id="binary_sensor.fenster_wz")
+    assert (
+        evaluate_rule(
+            rule,
+            offen,
+            state,
+            T0,
+            snapshots={"climate.wohnzimmer": partner("climate.wohnzimmer", "off")},
+        ).phase
+        is Phase.IDLE
+    )
+
+    state = RuleState(rule_id=rule.rule_id)
+    ergebnis = evaluate_rule(
+        rule,
+        offen,
+        state,
+        T0,
+        snapshots={"climate.wohnzimmer": partner("climate.wohnzimmer", "heat")},
+    )
+    assert ergebnis.became_satisfied is True
+
+
+def test_und_endet_wenn_die_zweite_bedingung_entfaellt() -> None:
+    """Auch die Partnerbedingung haelt die Meldung -- und beendet sie."""
+    rule = fenster_und_heizung()
+    state = RuleState(rule_id=rule.rule_id)
+    offen = snap("on", entity_id="binary_sensor.fenster_wz")
+
+    evaluate_rule(
+        rule,
+        offen,
+        state,
+        T0,
+        snapshots={"climate.wohnzimmer": partner("climate.wohnzimmer", "heat")},
+    )
+    danach = evaluate_rule(
+        rule,
+        offen,
+        state,
+        T0,
+        snapshots={"climate.wohnzimmer": partner("climate.wohnzimmer", "off")},
+    )
+
+    assert danach.became_unsatisfied is True
+    assert danach.phase is Phase.IDLE
+
+
+def test_oder_genuegt_eine_bedingung() -> None:
+    rule = fenster(
+        logic=LogicOperator.ANY,
+        extra_conditions=(
+            Condition(kind=ConditionKind.STATE_IS, entity_id="person.alex", states=("home",)),
+        ),
+    )
+    state = RuleState(rule_id=rule.rule_id)
+
+    # Das Fenster ist zu, aber die zweite Bedingung trifft zu.
+    ergebnis = evaluate_rule(
+        rule,
+        snap("off", entity_id="binary_sensor.fenster_wz"),
+        state,
+        T0,
+        snapshots={"person.alex": partner("person.alex", "home")},
+    )
+    assert ergebnis.became_satisfied is True
+
+
+def test_verneinte_bedingung_kehrt_das_ergebnis_um() -> None:
+    rule = fenster(
+        extra_conditions=(
+            Condition(
+                kind=ConditionKind.STATE_IS,
+                entity_id="person.alex",
+                states=("home",),
+                negate=True,
+            ),
+        )
+    )
+    state = RuleState(rule_id=rule.rule_id)
+
+    unterwegs = evaluate_rule(
+        rule,
+        snap("on", entity_id="binary_sensor.fenster_wz"),
+        state,
+        T0,
+        snapshots={"person.alex": partner("person.alex", "not_home")},
+    )
+    assert unterwegs.became_satisfied is True
+
+    state = RuleState(rule_id=rule.rule_id)
+    zuhause = evaluate_rule(
+        rule,
+        snap("on", entity_id="binary_sensor.fenster_wz"),
+        state,
+        T0,
+        snapshots={"person.alex": partner("person.alex", "home")},
+    )
+    assert zuhause.phase is Phase.IDLE
+
+
+def test_eine_unentscheidbare_bedingung_wird_nicht_verneint() -> None:
+    """``unavailable`` ist keine Aussage, aus der sich ihr Gegenteil ergibt.
+
+    Sonst waere "niemand ist zuhause" wahr, sobald die Anwesenheitserkennung
+    ausfaellt -- und die Meldung erschiene ohne jeden Anlass.
+    """
+    rule = fenster(
+        extra_conditions=(
+            Condition(
+                kind=ConditionKind.STATE_IS,
+                entity_id="person.alex",
+                states=("home",),
+                negate=True,
+            ),
+        )
+    )
+    state = RuleState(rule_id=rule.rule_id)
+
+    ergebnis = evaluate_rule(
+        rule,
+        snap("on", entity_id="binary_sensor.fenster_wz"),
+        state,
+        T0,
+        snapshots={"person.alex": partner("person.alex", "unavailable")},
+    )
+    assert ergebnis.phase is Phase.IDLE
+
+
+def test_fehlende_partner_entity_laesst_die_regel_ruhen() -> None:
+    rule = fenster_und_heizung()
+    state = RuleState(rule_id=rule.rule_id)
+
+    ergebnis = evaluate_rule(rule, snap("on", entity_id="binary_sensor.fenster_wz"), state, T0)
+    assert ergebnis.phase is Phase.IDLE
+
+
+def test_oder_uebergeht_eine_unentscheidbare_bedingung() -> None:
+    rule = fenster(
+        logic=LogicOperator.ANY,
+        extra_conditions=(
+            Condition(kind=ConditionKind.STATE_IS, entity_id="person.alex", states=("home",)),
+        ),
+    )
+    state = RuleState(rule_id=rule.rule_id)
+
+    # Die Entity fehlt; die erste Bedingung allein genuegt.
+    ergebnis = evaluate_rule(rule, snap("on", entity_id="binary_sensor.fenster_wz"), state, T0)
+    assert ergebnis.became_satisfied is True
+
+
+def test_zweite_bedingung_auf_dasselbe_attribut_derselben_entity() -> None:
+    rule = numeric(
+        threshold=28.0,
+        extra_conditions=(
+            Condition(
+                kind=ConditionKind.STATE_IS,
+                value_source=ValueSource(kind=ValueSourceKind.ATTRIBUTE, attribute="mode"),
+                states=("auto",),
+            ),
+        ),
+    )
+    state = RuleState(rule_id=rule.rule_id)
+
+    assert (
+        evaluate_rule(rule, snap("30", attributes={"mode": "manual"}), state, T0).phase
+        is Phase.IDLE
+    )
+
+    state = RuleState(rule_id=rule.rule_id)
+    assert (
+        evaluate_rule(rule, snap("30", attributes={"mode": "auto"}), state, T0).became_satisfied
+        is True
+    )
+
+
+def test_flanke_einer_partnerbedingung_braucht_ihren_eigenen_vorzustand() -> None:
+    """Jede beteiligte Entity fuehrt ihren letzten Zustand selbst mit."""
+    rule = fenster(
+        kind=ConditionKind.STATE_IS,
+        states=("on",),
+        extra_conditions=(
+            Condition(
+                kind=ConditionKind.STATE_CHANGED_TO,
+                entity_id="lock.haustuer",
+                states=("unlocked",),
+            ),
+        ),
+    )
+    state = RuleState(rule_id=rule.rule_id)
+    offen = snap("on", entity_id="binary_sensor.fenster_wz")
+
+    # Erste Auswertung: der Vorzustand des Schlosses ist unbekannt, also keine
+    # Flanke.
+    assert (
+        evaluate_rule(
+            rule, offen, state, T0, snapshots={"lock.haustuer": partner("lock.haustuer", "locked")}
+        ).phase
+        is Phase.IDLE
+    )
+    assert state.last_states["lock.haustuer"] == "locked"
+
+    # Jetzt der Wechsel: die Flanke greift.
+    ergebnis = evaluate_rule(
+        rule, offen, state, T0, snapshots={"lock.haustuer": partner("lock.haustuer", "unlocked")}
+    )
+    assert ergebnis.became_satisfied is True
+
+
+def test_zeitbedingung_gilt_fuer_die_verknuepfung_als_ganzes() -> None:
+    rule = fenster_und_heizung(duration_seconds=600)
+    state = RuleState(rule_id=rule.rule_id)
+    offen = snap("on", entity_id="binary_sensor.fenster_wz")
+    heizt = {"climate.wohnzimmer": partner("climate.wohnzimmer", "heat")}
+
+    assert evaluate_rule(rule, offen, state, T0, snapshots=heizt).phase is Phase.PENDING
+    spaet = evaluate_rule(rule, offen, state, T0 + timedelta(minutes=11), snapshots=heizt)
+    assert spaet.became_satisfied is True
+
+
+def test_der_wert_der_meldung_kommt_von_der_entity_der_regel() -> None:
+    """Der Meldungstext spricht ueber die Entity der Regel, nicht ueber den Partner."""
+    rule = numeric(
+        threshold=28.0,
+        extra_conditions=(
+            Condition(
+                kind=ConditionKind.STATE_IS, entity_id="climate.wohnzimmer", states=("heat",)
+            ),
+        ),
+    )
+    state = RuleState(rule_id=rule.rule_id)
+
+    ergebnis = evaluate_rule(
+        rule,
+        snap("30.5"),
+        state,
+        T0,
+        snapshots={"climate.wohnzimmer": partner("climate.wohnzimmer", "heat")},
+    )
+    assert ergebnis.value == "30.5"

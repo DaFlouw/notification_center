@@ -263,6 +263,36 @@ async def ws_get_suggestions(hass, connection, msg, runtime) -> None:
 
 
 @websocket_api.websocket_command(
+    {vol.Required("type"): f"{WS_PREFIX}/get_entity_options", vol.Required("entity_id"): str}
+)
+@websocket_api.async_response
+@_requires_runtime
+async def ws_get_entity_options(hass, connection, msg, runtime) -> None:
+    """Zustandswerte und Attribute einer beliebigen Entity.
+
+    Gebraucht vom Regel-Editor fuer die Entity einer *Teilbedingung*: sie muss
+    nicht uebernommen sein, und eine Vorschlagsanalyse ist fuer sie weder
+    noetig noch gewollt. Deshalb ein eigenes, billiges Kommando -- es befragt
+    nur die laufende Entity und den Katalog ihrer Domaene, nicht die Historie.
+    """
+    entity_id = msg["entity_id"]
+    state = hass.states.get(entity_id)
+    connection.send_result(
+        msg["id"],
+        _envelope(
+            {
+                "entity_id": entity_id,
+                "exists": state is not None,
+                "name": state.name if state else None,
+                "state": state.state if state else None,
+                "states": runtime.discovery.available_states(entity_id),
+                "attributes": runtime.discovery.usable_attributes(entity_id),
+            }
+        ),
+    )
+
+
+@websocket_api.websocket_command(
     {vol.Required("type"): f"{WS_PREFIX}/get_device", vol.Required("device_id"): str}
 )
 @websocket_api.async_response
@@ -490,6 +520,7 @@ COMMANDS = (
     ws_get_config,
     ws_discover,
     ws_get_suggestions,
+    ws_get_entity_options,
     ws_get_device,
     ws_add_entities,
     ws_remove_entity,

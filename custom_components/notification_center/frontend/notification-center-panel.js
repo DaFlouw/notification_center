@@ -17,6 +17,7 @@ import { LEERER_FILTER, buildQuery, renderHistory } from "./views/history.js";
 import { renderDiscovery } from "./views/discovery.js";
 import {
   entwurfZuRegel,
+  leereBedingung,
   leereRegel,
   renderRuleOverview,
   renderRules,
@@ -37,8 +38,18 @@ class NotificationCenterPanel extends HTMLElement {
   #dashboard = { active: [], counts: {}, paused: false };
   #history = { events: [], total: 0, hasMore: false, filter: { ...LEERER_FILTER }, areas: [] };
   #discovery = { entities: [], domain: "", search: "", suggestions: {} };
-  #rules = { entityId: null, entityName: "", rules: [], entwurf: null, states: [], attributes: [] };
-  #ruleOverview = { entities: [], rules: [], loading: false };
+  #rules = {
+    entityId: null,
+    entityName: "",
+    rules: [],
+    entwurf: null,
+    states: [],
+    attributes: [],
+    names: {},
+    candidates: [],
+    conditionOptions: {},
+  };
+  #ruleOverview = { entities: [], rules: [], loading: false, names: {} };
   #setupErledigt = true;
   #backendZuAlt = false;
   #fehler = null;
@@ -171,7 +182,7 @@ class NotificationCenterPanel extends HTMLElement {
 
     try {
       const konfiguration = await api.getConfig(this.#hass);
-      this.#ruleOverview = uebersichtAusKonfiguration(konfiguration);
+      this.#ruleOverview = { ...uebersichtAusKonfiguration(konfiguration), names: this.#namen() };
       this.#fehler = null;
     } catch (fehler) {
       this.#fehler = fehler.message || String(fehler);
@@ -195,6 +206,9 @@ class NotificationCenterPanel extends HTMLElement {
         entwurf: null,
         states: optionen.states || [],
         attributes: optionen.attributes || [],
+        names: this.#namen(),
+        candidates: this.#kandidaten(),
+        conditionOptions: {},
       };
       this.#seite = "rule-editor";
       this.#fehler = null;
@@ -263,6 +277,10 @@ class NotificationCenterPanel extends HTMLElement {
       this.#entwurfGeaendert(feld.dataset.ruleField, feld);
       return;
     }
+    if (feld.dataset.condField) {
+      this.#bedingungGeaendert(Number(feld.dataset.condIndex), feld.dataset.condField, feld);
+      return;
+    }
     if (feld.dataset.filter) {
       this.#filterGeaendert(feld.dataset.filter, feld.value);
       return;
@@ -280,6 +298,12 @@ class NotificationCenterPanel extends HTMLElement {
     if (feld.dataset.ruleField) {
       // Ohne erneutes Zeichnen: der Fokus soll im Feld bleiben.
       this.#entwurfGeaendert(feld.dataset.ruleField, feld, { neuZeichnen: false });
+      return;
+    }
+    if (feld.dataset.condField) {
+      this.#bedingungGeaendert(Number(feld.dataset.condIndex), feld.dataset.condField, feld, {
+        neuZeichnen: false,
+      });
       return;
     }
     if (feld.dataset.filter === "suche") {
@@ -316,6 +340,7 @@ class NotificationCenterPanel extends HTMLElement {
     if (!entwurf) return;
 
     if (feld === "kind") entwurf.kind = element.value;
+    else if (feld === "logic") entwurf.logic = element.value;
     else if (feld === "type") entwurf.type = element.value;
     else if (feld === "operator") entwurf.operator = element.value;
     else if (feld === "threshold") entwurf.threshold = element.value;
@@ -340,6 +365,103 @@ class NotificationCenterPanel extends HTMLElement {
     if (neuZeichnen) this.#render();
   }
 
+  /**
+   * Eine weitere Bedingung hat sich geaendert.
+   *
+   * Die Werte werden hier nur uebernommen; geprueft wird im Backend. Ein
+   * Wechsel der Entity holt deren Zustandswerte und Attribute nach, sonst
+   * boete das Wertfeld die Auswahl der vorigen Entity an.
+   */
+  async #bedingungGeaendert(index, feld, element, { neuZeichnen = true } = {}) {
+    const bedingung = this.#rules.entwurf?.extra_conditions?.[index];
+    if (!bedingung) return;
+
+    if (feld === "kind") bedingung.kind = element.value;
+    else if (feld === "operator") bedingung.operator = element.value;
+    else if (feld === "threshold") bedingung.threshold = element.value;
+    else if (feld === "negate") bedingung.negate = element.checked;
+    else if (feld === "source") {
+      bedingung.value_source = element.value
+        ? { kind: "attribute", attribute: element.value }
+        : { kind: "state", attribute: null };
+    } else if (feld === "states") {
+      bedingung.states = element.multiple
+        ? Array.from(element.selectedOptions).map((option) => option.value)
+        : element.value
+            .split(",")
+            .map((wert) => wert.trim())
+            .filter(Boolean);
+    } else if (feld === "entity") {
+      const kennung = element.value.trim();
+      if (kennung !== bedingung.entity_id) {
+        bedingung.entity_id = kennung;
+        // Die Werte der alten Entity passen nicht mehr zur neuen.
+        bedingung.states = [];
+        bedingung.value_source = { kind: "state", attribute: null };
+        if (neuZeichnen) await this.#ladeBedingungsOptionen(kennung);
+      }
+    }
+
+    if (neuZeichnen) this.#render();
+  }
+
+  /**
+   * Holt Zustandswerte und Attribute einer Entity einer Teilbedingung.
+   *
+   * Eigenes, billiges Kommando statt ``get_suggestions``: die Entity muss
+   * nicht uebernommen sein, und eine Vorschlagsanalyse waere fuer sie weder
+   * noetig noch gewollt. Bereits geholte Entities werden nicht erneut
+   * befragt.
+   */
+  async #ladeBedingungsOptionen(entityId) {
+    if (!entityId || this.#rules.conditionOptions[entityId]) return;
+
+    try {
+      const antwort = await api.getEntityOptions(this.#hass, entityId);
+      this.#rules.conditionOptions[entityId] = {
+        states: antwort.states || [],
+        attributes: antwort.attributes || [],
+        exists: antwort.exists !== false,
+      };
+    } catch {
+      // Eine unbekannte Kennung ist kein Fehler des Panels: der Hinweis im
+      // Formular genuegt, und tippen laesst sich weiter.
+      this.#rules.conditionOptions[entityId] = { states: [], attributes: [], exists: false };
+    }
+  }
+
+  /** Die Entities aller Teilbedingungen eines Entwurfs nachladen. */
+  async #ladeAlleBedingungsOptionen(entwurf) {
+    for (const bedingung of entwurf?.extra_conditions || []) {
+      await this.#ladeBedingungsOptionen(bedingung.entity_id);
+    }
+  }
+
+  /**
+   * Anzeigenamen aller Entities, fuer die Beschreibung verknuepfter Regeln.
+   *
+   * Eine Teilbedingung darf eine Entity betrachten, die nicht uebernommen
+   * ist; ihr Name steht deshalb nicht in der Konfiguration, sondern nur in
+   * Home Assistant selbst.
+   */
+  #namen() {
+    const namen = {};
+    for (const [entityId, zustand] of Object.entries(this.#hass?.states || {})) {
+      namen[entityId] = zustand.attributes?.friendly_name || entityId;
+    }
+    return namen;
+  }
+
+  /** Die Vorschlagsliste des Entity-Felds im Regel-Editor. */
+  #kandidaten() {
+    return Object.entries(this.#hass?.states || {})
+      .map(([entityId, zustand]) => ({
+        entity_id: entityId,
+        name: zustand.attributes?.friendly_name || entityId,
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }
+
   async #aktion(aktion, daten) {
     try {
       if (aktion === "show-rules") {
@@ -361,10 +483,39 @@ class NotificationCenterPanel extends HTMLElement {
         }
         const regel = this.#rules.rules.find((eintrag) => eintrag.rule_id === daten.rule);
         if (regel) {
-          this.#rules.entwurf = { ...regel };
+          // Eigene Kopien der Teilbedingungen: sonst veraendert das Formular
+          // die geladene Regel mit, und ein Abbruch waere keiner.
+          this.#rules.entwurf = {
+            ...regel,
+            extra_conditions: (regel.extra_conditions || []).map((bedingung) => ({
+              ...bedingung,
+              entity_id: bedingung.entity_id || "",
+            })),
+          };
           this.#seite = "rule-editor";
           this.#render();
+          await this.#ladeAlleBedingungsOptionen(this.#rules.entwurf);
+          this.#render();
         }
+        return;
+      }
+
+      if (aktion === "add-condition") {
+        const entwurf = this.#rules.entwurf;
+        if (!entwurf) return;
+        entwurf.extra_conditions = [...(entwurf.extra_conditions || []), leereBedingung()];
+        this.#render();
+        return;
+      }
+
+      if (aktion === "remove-condition") {
+        const entwurf = this.#rules.entwurf;
+        if (!entwurf) return;
+        const index = Number(daten.index);
+        entwurf.extra_conditions = (entwurf.extra_conditions || []).filter(
+          (_eintrag, stelle) => stelle !== index
+        );
+        this.#render();
         return;
       }
 
@@ -561,7 +712,10 @@ class NotificationCenterPanel extends HTMLElement {
         ? `[data-discovery="${element.dataset.discovery}"]`
         : element.dataset.ruleField
           ? `[data-rule-field="${element.dataset.ruleField}"]`
-          : null;
+          : element.dataset.condField
+            ? `[data-cond-field="${element.dataset.condField}"]` +
+              `[data-cond-index="${element.dataset.condIndex}"]`
+            : null;
 
     if (!kennung) return null;
     return { kennung, position: element.selectionStart ?? null };
