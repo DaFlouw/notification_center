@@ -7,7 +7,7 @@
  * geschoben (Spezifikation 34).
  */
 
-import { escapeHtml, eventDuration, formatDateTime, typeLabel } from "../format.js";
+import { escapeHtml, eventDuration, formatDateTime, sourceBadge, typeLabel } from "../format.js";
 import { t } from "../i18n.js";
 
 /** Waehlbare Seitengroessen. Das Backend laesst bis zu 500 Eintraege zu. */
@@ -48,6 +48,7 @@ export function renderHistory(state, locale) {
         <option value="">${t("history.allSources")}</option>
         <option value="entity_rule" ${filter.sources[0] === "entity_rule" ? "selected" : ""}>${t("history.sourceEntityRule")}</option>
         <option value="automation" ${filter.sources[0] === "automation" ? "selected" : ""}>${t("history.sourceAutomation")}</option>
+        <option value="ha_system" ${filter.sources[0] === "ha_system" ? "selected" : ""}>${t("history.sourceHaSystem")}</option>
       </select>
 
       <select data-filter="zeitraum" aria-label="${t("history.period")}">
@@ -114,6 +115,7 @@ function zeile(event, locale) {
       <span class="bar ${event.type}"></span>
       <span class="time">${formatDateTime(event.start_time, locale)}</span>
       <span class="badge type-${event.type}">${typeLabel(event.type)}</span>
+      ${sourceBadge(event)}
       <span class="message">${escapeHtml(event.message)}</span>
       <span class="duration">${event.active ? t("dashboard.active") : eventDuration(event)}</span>
       ${

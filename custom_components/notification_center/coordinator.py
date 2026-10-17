@@ -15,6 +15,7 @@ from homeassistant.helpers import entity_registry as er
 
 from .discovery.engine import DiscoveryEngine
 from .notifications.engine import NotificationEngine
+from .notifications.ha_system import HaSystemNotifications
 from .notifications.models import CloseReason
 from .rules.engine import RuleEngine
 from .rules.intents import NotificationIntent
@@ -36,6 +37,7 @@ class NotificationCenterRuntime:
     rule_engine: RuleEngine = field(init=False)
     notification_engine: NotificationEngine = field(init=False)
     discovery: DiscoveryEngine = field(init=False)
+    system_notifications: HaSystemNotifications = field(init=False)
 
     def __post_init__(self) -> None:
         self.notification_engine = NotificationEngine(
@@ -47,6 +49,9 @@ class NotificationCenterRuntime:
             self._async_handle_intents,
         )
         self.discovery = DiscoveryEngine(self.hass, self.config_store)
+        self.system_notifications = HaSystemNotifications(
+            self.hass, self.notification_engine, self.config_store
+        )
 
     @classmethod
     def create(cls, hass: HomeAssistant) -> NotificationCenterRuntime:
@@ -85,8 +90,14 @@ class NotificationCenterRuntime:
             active_rules=self.notification_engine.active_rule_starts()
         )
 
+        # Zuletzt, und nach der Wiederherstellung: eine schon uebernommene
+        # Systemnachricht wird dann erkannt und nicht ein zweites Mal
+        # angelegt.
+        await self.system_notifications.async_start()
+
     async def async_stop(self) -> None:
         """Haelt die Engines an, sichert und schliesst die Ablagen."""
+        self.system_notifications.async_stop()
         await self.rule_engine.async_stop()
         await self.notification_engine.async_stop()
         await self.config_store.async_shutdown()
@@ -198,6 +209,14 @@ class NotificationCenterRuntime:
         regel.enabled = False
         await self.notification_engine.async_close_rules([rule_id], CloseReason.RULE_DISABLED)
         await self.async_config_changed()
+
+    async def async_apply_system_notifications(self) -> None:
+        """Nach einer Aenderung an der Uebernahme der HA-Systemnachrichten.
+
+        Eingeschaltet nimmt sie den Bestand der Seitenleiste mit auf;
+        abgeschaltet beendet sie die bereits gezeigten Meldungen.
+        """
+        await self.system_notifications.async_apply_settings()
 
     async def async_set_paused(self, paused: bool) -> None:
         """Schaltet den globalen Pause-Modus (Spezifikation 42, 43).

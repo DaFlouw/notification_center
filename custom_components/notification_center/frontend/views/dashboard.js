@@ -6,7 +6,7 @@
  * jeder Kategorie stehen die neuesten oben.
  */
 
-import { categoryLabel, eventDuration, escapeHtml, formatTime } from "../format.js";
+import { categoryLabel, escapeHtml, eventDuration, formatTime, sourceBadge } from "../format.js";
 import { t } from "../i18n.js";
 
 const KATEGORIEN = ["alarm", "warning", "info"];
@@ -48,6 +48,7 @@ function zeile(event, locale) {
     <li class="row ${klickbar ? "clickable" : ""}"
         ${klickbar ? `data-entity="${escapeHtml(event.entity_id)}" tabindex="0" role="button"` : ""}>
       <span class="bar ${event.type}"></span>
+      ${sourceBadge(event)}
       <span class="message">${escapeHtml(event.message)}</span>
       <span class="time">${formatTime(event.start_time, locale)}</span>
       <span class="duration">${eventDuration(event)}</span>

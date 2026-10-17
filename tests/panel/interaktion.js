@@ -168,12 +168,16 @@ const FAELLE = [
   },
   {
     id: "L5",
-    titel: "Jede aktive Meldung im Dashboard ist anklickbar",
+    titel: "Anklickbar ist jede Meldung mit einer Entity",
     async fn() {
       await seite("dashboard");
-      const alle = SR().querySelectorAll("main .row").length;
-      const klickbar = SR().querySelectorAll("main .row.clickable").length;
-      gleich(klickbar, alle, "anklickbare Zeilen (alle sieben haben eine Entity)");
+      const alle = [...SR().querySelectorAll("main .row")];
+      const mitEntity = alle.filter((zeile) => zeile.dataset.entity).length;
+      const klickbar = alle.filter((zeile) => zeile.classList.contains("clickable")).length;
+      // Eine Systemnachricht von Home Assistant traegt keine Entity; ein
+      // Klick darauf koennte nichts oeffnen und wird deshalb nicht angeboten.
+      gleich(klickbar, mitEntity, "anklickbare Zeilen");
+      pruefe(klickbar < alle.length, "die Systemnachricht bleibt ohne Klickziel");
     },
   },
 

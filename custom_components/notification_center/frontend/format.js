@@ -18,6 +18,22 @@ export function categoryLabel(type) {
 /** Die bekannten Typen; alles andere wird unveraendert durchgereicht. */
 const TYPE_TYPEN = ["info", "warning", "alarm"];
 
+/**
+ * Abzeichen der Herkunft, sofern sie der Erklaerung bedarf.
+ *
+ * Regeln und Automationen sind das Erwartbare und bleiben unbeschriftet --
+ * ein Abzeichen an jeder Zeile waere nur Rauschen. Eine Meldung, die Home
+ * Assistant selbst erzeugt hat, hat dagegen niemand hier eingerichtet; ohne
+ * Hinweis waere sie nicht einzuordnen. Kurz als "HA", der ganze Text liegt
+ * im Titel.
+ */
+export function sourceBadge(event) {
+  if (event?.source !== "ha_system") return "";
+  return `<span class="badge" title="${escapeHtml(t("common.haSystem"))}">${escapeHtml(
+    t("common.haSystemShort")
+  )}</span>`;
+}
+
 /** Uhrzeit eines Ereignisses, etwa "14:30". */
 export function formatTime(iso, locale) {
   if (!iso) return "";

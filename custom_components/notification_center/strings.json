@@ -118,14 +118,27 @@
           "retention_days": "History retention",
           "max_events": "Maximum number of events",
           "analysis_days": "Analysis window for suggestions (days)",
+          "ha_system_notifications": "Adopt Home Assistant's own notifications",
+          "ha_system_type": "Type of the system messages",
           "paused": "Paused"
         },
         "data_description": {
           "retention_days": "Older events are removed. Both limits apply at the same time.",
           "max_events": "When exceeded, the oldest finished events are removed.",
           "analysis_days": "How far back history analysis looks for rule suggestions.",
+          "ha_system_notifications": "The messages behind the bell in the sidebar appear in the dashboard, the history and the counters. Repairs and updates are not included.",
+          "ha_system_type": "Home Assistant does not rank its own messages. This decides how urgent they appear here.",
           "paused": "While paused no new notifications are created. Running ones remain."
         }
+      }
+    }
+  },
+  "selector": {
+    "notification_type": {
+      "options": {
+        "info": "Information",
+        "warning": "Warning",
+        "alarm": "Alarm"
       }
     }
   }

@@ -14,7 +14,7 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from enum import StrEnum
-from typing import Any
+from typing import Any, Final
 
 from ..const import MODEL_SCHEMA_VERSION
 
@@ -44,6 +44,9 @@ class NotificationSource(StrEnum):
 
     ENTITY_RULE = "entity_rule"
     AUTOMATION = "automation"
+    #: Eine persistente Benachrichtigung von Home Assistant selbst -- das,
+    #: was in der Seitenleiste hinter der Glocke liegt.
+    HA_SYSTEM = "ha_system"
 
 
 class CloseReason(StrEnum):
@@ -56,6 +59,9 @@ class CloseReason(StrEnum):
     ESCALATED = "escalated"
     DEESCALATED = "deescalated"
     RULE_DISABLED = "rule_disabled"
+    #: Die Herkunft wurde abgeschaltet, etwa die Uebernahme der
+    #: HA-Systemnachrichten in den Einstellungen.
+    SOURCE_DISABLED = "source_disabled"
     ENTITY_REMOVED = "entity_removed"
     ENTITY_REPLACED = "entity_replaced"
     DISMISSED = "dismissed"
@@ -159,6 +165,14 @@ class NotificationEvent:
             "notification_id": self.notification_id,
             "owner": self.owner,
         }
+
+
+#: Owner der HA-Systemnachrichten.
+#:
+#: Sie tragen denselben Schluesselaufbau wie Automations-Notifications, damit
+#: der gesamte Weg -- eindeutig halten, ueberschreiben, beenden -- derselbe
+#: bleibt. Der Owner ist fest, weil es genau eine Quelle gibt.
+SYSTEM_OWNER: Final = "homeassistant"
 
 
 def automation_key(owner: str, notification_id: str) -> str:

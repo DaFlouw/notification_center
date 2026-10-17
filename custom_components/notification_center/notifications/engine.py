@@ -34,8 +34,10 @@ from .lifecycle import (
     Counts,
     automation_notification_key,
     rule_key,
+    system_notification_key,
 )
 from .models import (
+    SYSTEM_OWNER,
     CloseReason,
     NotificationEvent,
     NotificationSource,
@@ -259,12 +261,47 @@ class NotificationEngine:
         (Spezifikation 42). Solche Aufrufe werden spaeter nicht nachgeholt
         (Spezifikation 43).
         """
+        return await self._async_create_external(
+            key=automation_notification_key(owner, notification_id),
+            source=NotificationSource.AUTOMATION,
+            owner=owner,
+            notification_id=notification_id,
+            type=type,
+            message=message,
+            title=title,
+            entity_id=entity_id,
+            duration=duration,
+        )
+
+    async def _async_create_external(
+        self,
+        *,
+        key: str,
+        source: NotificationSource,
+        owner: str,
+        notification_id: str,
+        type: NotificationType,
+        message: str,
+        title: str | None = None,
+        entity_id: str | None = None,
+        duration: timedelta | None = None,
+        start_time: datetime | None = None,
+    ) -> str | None:
+        """Gemeinsamer Weg aller von aussen erzeugten Notifications.
+
+        Automationen und Home Assistant selbst liefern fertige Meldungen; der
+        Unterschied liegt allein in der Herkunft. Beide werden ueber Owner und
+        Kennung eindeutig gehalten, beide ueberschreiben sich statt sich zu
+        verdoppeln.
+
+        ``start_time`` uebernimmt einen mitgelieferten Beginn. Eine
+        Systemnachricht, die schon vor dem Start der Integration bestand, soll
+        ihr tatsaechliches Alter zeigen und nicht das des Starts.
+        """
         if self._config.settings.paused:
             _LOGGER.debug("Notification %s/%s waehrend der Pause verworfen", owner, notification_id)
             return None
 
-        key = automation_notification_key(owner, notification_id)
-        jetzt = dt_util.utcnow()
         bestehend = self._active.get(key)
 
         if bestehend is not None:
@@ -282,8 +319,8 @@ class NotificationEngine:
         ereignis = NotificationEvent(
             message=message,
             type=type,
-            source=NotificationSource.AUTOMATION,
-            start_time=jetzt,
+            source=source,
+            start_time=start_time or dt_util.utcnow(),
             title=title,
             entity_id=entity_id,
             owner=owner,
@@ -349,6 +386,68 @@ class NotificationEngine:
         beendet = await self.async_close_key(key, CloseReason.DISMISSED, notify=True)
         if not beendet:
             _LOGGER.debug("Keine aktive Notification %s/%s zum Beenden", owner, notification_id)
+        return beendet
+
+    # -- Systemnachrichten von Home Assistant ----------------------------
+
+    async def async_create_system(
+        self,
+        *,
+        notification_id: str,
+        type: NotificationType,
+        message: str,
+        title: str | None = None,
+        created_at: datetime | None = None,
+    ) -> str | None:
+        """Uebernimmt eine persistente Benachrichtigung von Home Assistant.
+
+        Derselbe Weg wie bei einer Automations-Notification: die Kennung von
+        Home Assistant haelt sie eindeutig, ein erneuter Aufruf mit derselben
+        Kennung aktualisiert den Text, ohne einen zweiten Eintrag im Log zu
+        erzeugen. Entscheidend ist das beim Start, wenn eine bereits
+        bestehende Meldung noch einmal gemeldet wird.
+        """
+        return await self._async_create_external(
+            key=system_notification_key(notification_id),
+            source=NotificationSource.HA_SYSTEM,
+            owner=SYSTEM_OWNER,
+            notification_id=notification_id,
+            type=type,
+            message=message,
+            title=title,
+            start_time=created_at,
+        )
+
+    async def async_close_system(
+        self,
+        notification_id: str,
+        reason: CloseReason = CloseReason.DISMISSED,
+    ) -> bool:
+        """Beendet eine uebernommene Systemnachricht.
+
+        Aufgerufen, wenn Home Assistant die Benachrichtigung verwirft. Der
+        umgekehrte Weg ist bewusst nicht vorgesehen: das Notification Center
+        zeigt, was Home Assistant meldet, und verwirft nichts in seinem Namen.
+        """
+        key = system_notification_key(notification_id)
+        self._cancel_expiry(key)
+        return await self.async_close_key(key, reason, notify=True)
+
+    async def async_close_all_system(self, reason: CloseReason) -> int:
+        """Beendet alle uebernommenen Systemnachrichten.
+
+        Gebraucht, wenn die Uebernahme abgeschaltet wird: die bereits
+        gezeigten Meldungen muessen dann verschwinden, sonst bleiben sie
+        stehen, bis Home Assistant sie zufaellig verwirft.
+        """
+        beendet = 0
+        for ereignis in self.active_events():
+            if ereignis.source is not NotificationSource.HA_SYSTEM:
+                continue
+            if ereignis.notification_id is None:
+                continue
+            if await self.async_close_system(ereignis.notification_id, reason):
+                beendet += 1
         return beendet
 
     # -- Ablaufende Notifications (Spezifikation 29) ---------------------

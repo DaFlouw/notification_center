@@ -343,3 +343,31 @@ def test_ersetzen_haengt_auch_fremde_teilbedingungen_um(document: ConfigDocument
     assert document.rules[eigene.rule_id].entity_id == "climate.neu"
     assert document.rules[fremde.rule_id].extra_conditions[0].entity_id == "climate.neu"
     assert document.rules[fremde.rule_id].entity_id == "sensor.temperatur_wz"
+
+
+# -- Einstellung der HA-Systemnachrichten -----------------------------------
+
+
+def test_systemnachrichten_sind_standardmaessig_aus() -> None:
+    """Ein Update soll niemandem ungefragt neue Meldungen ins Dashboard legen."""
+    settings = Settings()
+    assert settings.ha_system_notifications is False
+    assert settings.ha_system_notification_type is NotificationType.WARNING
+
+
+def test_typ_der_systemnachrichten_wird_geprueft() -> None:
+    with pytest.raises(ConfigError, match="Systemnachrichten"):
+        Settings(ha_system_type="dringend")
+
+
+def test_einstellung_der_systemnachrichten_ueberdauert_das_speichern() -> None:
+    settings = Settings(ha_system_notifications=True, ha_system_type=str(NotificationType.INFO))
+    wieder = Settings.from_dict(settings.to_dict())
+
+    assert wieder.ha_system_notifications is True
+    assert wieder.ha_system_notification_type is NotificationType.INFO
+
+
+def test_alte_konfiguration_kennt_die_einstellung_noch_nicht() -> None:
+    wieder = Settings.from_dict({"retention_days": 90, "max_events": 5000})
+    assert wieder.ha_system_notifications is False

@@ -13,6 +13,8 @@ export default {
   "common.edit": "Bearbeiten",
   "common.delete": "Löschen",
   "common.adopt": "Übernehmen",
+  "common.haSystem": "Systemnachricht von Home Assistant",
+  "common.haSystemShort": "HA",
 
   "type.info": "Info",
   "type.warning": "Warnung",
@@ -41,6 +43,7 @@ export default {
   "history.allAreas": "Alle Bereiche",
   "history.sourceEntityRule": "Entity-Regel",
   "history.sourceAutomation": "Automation",
+  "history.sourceHaSystem": "Systemnachricht",
   "history.period": "Zeitraum",
   "history.periodToday": "Heute",
   "history.periodWeek": "7 Tage",

@@ -118,14 +118,27 @@
           "retention_days": "Conservación del historial",
           "max_events": "Número máximo de eventos",
           "analysis_days": "Periodo de análisis para las sugerencias (días)",
+          "ha_system_notifications": "Adoptar las notificaciones de Home Assistant",
+          "ha_system_type": "Tipo de los mensajes del sistema",
           "paused": "En pausa"
         },
         "data_description": {
           "retention_days": "Los eventos más antiguos se eliminan. Ambos límites se aplican a la vez.",
           "max_events": "Al superarlo se eliminan primero los eventos terminados más antiguos.",
           "analysis_days": "Cuánto mira hacia atrás el análisis del historial para las sugerencias de reglas.",
+          "ha_system_notifications": "Los avisos que hay detrás de la campana de la barra lateral aparecen en el panel, en el historial y en los contadores. Las reparaciones y las actualizaciones no se incluyen.",
+          "ha_system_type": "Home Assistant no valora sus propios avisos. Aquí se decide con cuánta urgencia aparecen.",
           "paused": "En pausa no se crean notificaciones nuevas. Las que están en curso se mantienen."
         }
+      }
+    }
+  },
+  "selector": {
+    "notification_type": {
+      "options": {
+        "info": "Información",
+        "warning": "Aviso",
+        "alarm": "Alarma"
       }
     }
   }

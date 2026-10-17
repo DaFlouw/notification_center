@@ -42,11 +42,14 @@ from .const import (
     RETENTION_DAYS_UNLIMITED,
     SINGLE_INSTANCE_TITLE,
 )
+from .notifications.models import NotificationType
 
 CONF_RETENTION_DAYS = "retention_days"
 CONF_MAX_EVENTS = "max_events"
 CONF_ANALYSIS_DAYS = "analysis_days"
 CONF_PAUSED = "paused"
+CONF_HA_SYSTEM = "ha_system_notifications"
+CONF_HA_SYSTEM_TYPE = "ha_system_type"
 
 
 class NotificationCenterConfigFlow(ConfigFlow, domain=DOMAIN):
@@ -80,7 +83,10 @@ class NotificationCenterOptionsFlow(OptionsFlow):
             settings.retention_days = int(user_input[CONF_RETENTION_DAYS])
             settings.max_events = int(user_input[CONF_MAX_EVENTS])
             settings.analysis_days = int(user_input[CONF_ANALYSIS_DAYS])
+            settings.ha_system_notifications = bool(user_input[CONF_HA_SYSTEM])
+            settings.ha_system_type = str(user_input[CONF_HA_SYSTEM_TYPE])
             await runtime.async_set_paused(bool(user_input[CONF_PAUSED]))
+            await runtime.async_apply_system_notifications()
             await runtime.config_store.async_save()
 
             # Die Einstellungen liegen im Store, nicht in den Optionen des
@@ -102,6 +108,12 @@ class NotificationCenterOptionsFlow(OptionsFlow):
                     ): NumberSelector(
                         NumberSelectorConfig(min=1, max=90, mode=NumberSelectorMode.BOX)
                     ),
+                    vol.Required(
+                        CONF_HA_SYSTEM, default=settings.ha_system_notifications
+                    ): BooleanSelector(),
+                    vol.Required(
+                        CONF_HA_SYSTEM_TYPE, default=settings.ha_system_type
+                    ): _type_selector(),
                     vol.Required(CONF_PAUSED, default=settings.paused): BooleanSelector(),
                 }
             ),
@@ -118,6 +130,25 @@ def _retention_selector() -> SelectSelector:
         for tage in RETENTION_DAYS_OPTIONS
     ]
     return SelectSelector(SelectSelectorConfig(options=optionen, mode=SelectSelectorMode.DROPDOWN))
+
+
+def _type_selector() -> SelectSelector:
+    """Typ der HA-Systemnachrichten.
+
+    Die Beschriftungen kommen aus den Uebersetzungen der Integration, damit
+    die Auswahl in jeder Sprache lesbar ist.
+    """
+    return SelectSelector(
+        SelectSelectorConfig(
+            options=[
+                str(NotificationType.INFO),
+                str(NotificationType.WARNING),
+                str(NotificationType.ALARM),
+            ],
+            translation_key="notification_type",
+            mode=SelectSelectorMode.DROPDOWN,
+        )
+    )
 
 
 def _max_events_selector() -> SelectSelector:

@@ -404,6 +404,8 @@ async def ws_save_group(hass, connection, msg, runtime) -> None:
         vol.Optional("analysis_days"): vol.All(int, vol.Range(min=1, max=90)),
         vol.Optional("paused"): bool,
         vol.Optional("setup_completed"): bool,
+        vol.Optional("ha_system_notifications"): bool,
+        vol.Optional("ha_system_type"): vol.In([str(typ) for typ in NotificationType]),
     }
 )
 @websocket_api.async_response
@@ -414,6 +416,12 @@ async def ws_set_settings(hass, connection, msg, runtime) -> None:
     for feld in ("retention_days", "max_events", "analysis_days", "setup_completed"):
         if feld in msg:
             setattr(settings, feld, msg[feld])
+
+    for feld in ("ha_system_notifications", "ha_system_type"):
+        if feld in msg:
+            setattr(settings, feld, msg[feld])
+    if "ha_system_notifications" in msg or "ha_system_type" in msg:
+        await runtime.async_apply_system_notifications()
 
     if "paused" in msg:
         await runtime.async_set_paused(msg["paused"])
