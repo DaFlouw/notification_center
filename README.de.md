@@ -14,7 +14,7 @@ Es arbeitet ausschliesslich mit Daten der lokalen Home-Assistant-Instanz: keine 
 
 ## Inhalt
 
-**[`Installation`](#installation)**  **[`Einrichtung`](#einrichtung)**  **[`Das Panel`](#das-panel)**  **[`Regeln`](#regeln)**  **[`Regelgruppen`](#regelgruppen)**  **[`Lovelace-Card`](#lovelace-card)**  **[`Automations-API`](#automations-api)**  **[`Entities`](#entities)**  **[`Einstellungen`](#einstellungen)**  **[`Wie es arbeitet`](#wie-es-arbeitet)**  **[`Sprachen`](#sprachen)**  **[`Transparenz`](#transparenz)**  **[`Lizenz`](#lizenz)**
+**[`Installation`](#installation)**  **[`Einrichtung`](#einrichtung)**  **[`Das Panel`](#das-panel)**  **[`Regeln`](#regeln)**  **[`Regelgruppen`](#regelgruppen)**  **[`Lovelace-Card`](#lovelace-card)**  **[`Automations-API`](#automations-api)**  **[`HA-Systemnachrichten`](#ha-systemnachrichten)**  **[`Entities`](#entities)**  **[`Einstellungen`](#einstellungen)**  **[`Wie es arbeitet`](#wie-es-arbeitet)**  **[`Sprachen`](#sprachen)**  **[`Transparenz`](#transparenz)**  **[`Lizenz`](#lizenz)**
 
 ---
 
@@ -300,6 +300,26 @@ Zusaetzlich feuert die Integration bei jedem Beginn, jeder Aenderung und jedem E
 
 ---
 
+## HA-Systemnachrichten
+
+Home Assistant fuehrt seine eigenen Meldungen hinter der Glocke in der Seitenleiste: fehlgeschlagene Anmeldeversuche, ungueltige Konfiguration, Integrationen, die Aufmerksamkeit brauchen, abgeschlossene Sicherungen. Das Notification Center kann sie uebernehmen, damit Dashboard, Historie und Zaehler das vollstaendige Bild zeigen und nicht nur das, was hier eingerichtet wurde.
+
+Standardmaessig aus — niemand soll nach einem Update Meldungen im Dashboard finden, die er dort nie eingerichtet hat. *Konfigurieren* an der Integration schaltet die Uebernahme ein und legt fest, als welcher Typ die Meldungen erscheinen; Home Assistant bewertet seine eigenen nicht, diese Wahl liegt also bei dir.
+
+| | |
+|---|---|
+| Wo sie erscheinen | Dashboard, Historie und die Zaehler-Entities, gekennzeichnet mit **HA** |
+| Filtern | Historie → Herkunft → *Systemnachricht* |
+| Text | Auf eine Zeile zusammengezogen und auf 300 Zeichen gekuerzt; der vollstaendige Text bleibt in Home Assistant |
+| Beginn | Als Home Assistant die Meldung erzeugt hat, nicht als sie uebernommen wurde |
+| Ende | Wenn Home Assistant sie verwirft |
+
+Die Richtung ist bewusst einseitig: Home Assistant meldet, das Notification Center zeigt. Eine Systemnachricht abtun bleibt dort, wo es hingehoert, an der Glocke — das Notification Center verwirft nichts im Namen von Home Assistant. Was bereits in der Seitenleiste stand, wird beim Start uebernommen; ein Neustart verbirgt also nicht, was Home Assistant beim Hochfahren gemeldet hat.
+
+Reparaturen und Updates gehoeren nicht dazu. Sie sind eigene Mechanismen mit eigenen Oberflaechen, und ein Update laesst sich schon heute mit einer gewoehnlichen Regel auf seine `update`-Entity ueberwachen.
+
+---
+
 ## Entities
 
 Fuenf Zaehler stehen als Sensoren bereit. Ihre Werte stammen aus dem laufenden Zustand, nicht aus einer Abfrage des Logs, und werden ereignisgesteuert fortgeschrieben.
@@ -323,6 +343,8 @@ Ueber *Konfigurieren* an der Integration:
 | **Aufbewahrung der Historie** | 7, 30, 90, 365 Tage, unbegrenzt | Aelteres wird entfernt |
 | **Maximale Anzahl Ereignisse** | 1.000, 5.000, 10.000, 50.000 | Aeltestes zuerst |
 | **Analysezeitraum** | 1 bis 90 Tage | Wie weit die Historienanalyse zurueckblickt |
+| **Benachrichtigungen von Home Assistant uebernehmen** | an / aus | Die Meldungen hinter der Glocke erscheinen hier mit |
+| **Typ der Systemnachrichten** | Information, Warnung, Alarm | Wie dringlich sie erscheinen |
 | **Pausiert** | an / aus | Waehrend der Pause entstehen keine neuen Meldungen |
 
 Beide Aufbewahrungsgrenzen gelten gleichzeitig. Aktive Meldungen werden nie entfernt.

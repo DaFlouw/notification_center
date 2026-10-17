@@ -118,14 +118,27 @@
           "retention_days": "Aufbewahrung der Historie",
           "max_events": "Maximale Anzahl Ereignisse",
           "analysis_days": "Analysezeitraum für Vorschläge (Tage)",
+          "ha_system_notifications": "Benachrichtigungen von Home Assistant übernehmen",
+          "ha_system_type": "Typ der Systemnachrichten",
           "paused": "Pausiert"
         },
         "data_description": {
           "retention_days": "Ältere Ereignisse werden entfernt. Beide Grenzen gelten gleichzeitig.",
           "max_events": "Bei Überschreitung werden die ältesten abgeschlossenen Ereignisse entfernt.",
           "analysis_days": "Wie weit die Historienanalyse für Regelvorschläge zurückblickt.",
+          "ha_system_notifications": "Die Meldungen hinter der Glocke in der Seitenleiste erscheinen im Dashboard, in der Historie und in den Zählern. Reparaturen und Updates gehören nicht dazu.",
+          "ha_system_type": "Home Assistant bewertet seine eigenen Meldungen nicht. Hier wird festgelegt, wie dringlich sie erscheinen.",
           "paused": "Während der Pause entstehen keine neuen Notifications. Laufende bleiben bestehen."
         }
+      }
+    }
+  },
+  "selector": {
+    "notification_type": {
+      "options": {
+        "info": "Information",
+        "warning": "Warnung",
+        "alarm": "Alarm"
       }
     }
   }

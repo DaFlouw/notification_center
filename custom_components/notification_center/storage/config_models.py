@@ -24,7 +24,7 @@ from ..const import (
     MAX_EVENTS_OPTIONS,
     RETENTION_DAYS_OPTIONS,
 )
-from ..notifications.models import utc_now
+from ..notifications.models import NotificationType, utc_now
 from ..rules.models import Rule, RuleGroup
 
 
@@ -94,6 +94,20 @@ class Settings:
     analysis_days: int = DEFAULT_ANALYSIS_DAYS
     #: Der Einrichtungsassistent ist uebersprungbar (Spezifikation 67).
     setup_completed: bool = False
+    #: Persistente Benachrichtigungen von Home Assistant mit uebernehmen.
+    #:
+    #: Standardmaessig aus: wer das Notification Center aktualisiert, soll
+    #: nicht ploetzlich Meldungen im Dashboard finden, die er dort nie
+    #: eingerichtet hat.
+    ha_system_notifications: bool = False
+    #: Als welcher Typ die Systemnachrichten erscheinen.
+    #:
+    #: Home Assistant kennt bei ihnen keine Dringlichkeit. Ein
+    #: fehlgeschlagener Anmeldeversuch ist keine Information, eine
+    #: aktualisierte Einkaufsliste kein Alarm -- die Wahl gehoert deshalb dem
+    #: Anwender. Die Warnung ist die Vorgabe, weil eine Information im
+    #: Dashboard zu leicht untergeht.
+    ha_system_type: str = str(NotificationType.WARNING)
 
     def __post_init__(self) -> None:
         if self.retention_days not in RETENTION_DAYS_OPTIONS:
@@ -102,6 +116,16 @@ class Settings:
             raise ConfigError(f"Unzulaessige maximale Ereignisanzahl: {self.max_events}")
         if self.analysis_days <= 0:
             raise ConfigError("Analysezeitraum muss positiv sein")
+        try:
+            NotificationType(self.ha_system_type)
+        except ValueError:
+            raise ConfigError(
+                f"Unzulaessiger Typ fuer Systemnachrichten: {self.ha_system_type}"
+            ) from None
+
+    @property
+    def ha_system_notification_type(self) -> NotificationType:
+        return NotificationType(self.ha_system_type)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -110,6 +134,8 @@ class Settings:
             "max_events": self.max_events,
             "analysis_days": self.analysis_days,
             "setup_completed": self.setup_completed,
+            "ha_system_notifications": self.ha_system_notifications,
+            "ha_system_type": self.ha_system_type,
         }
 
     @classmethod
@@ -120,6 +146,8 @@ class Settings:
             max_events=data.get("max_events", DEFAULT_MAX_EVENTS),
             analysis_days=data.get("analysis_days", DEFAULT_ANALYSIS_DAYS),
             setup_completed=data.get("setup_completed", False),
+            ha_system_notifications=data.get("ha_system_notifications", False),
+            ha_system_type=data.get("ha_system_type", str(NotificationType.WARNING)),
         )
 
 

@@ -42,8 +42,23 @@ def automation_notification_key(owner: str, notification_id: str) -> str:
     return f"auto:{automation_key(owner, notification_id)}"
 
 
+def system_notification_key(notification_id: str) -> str:
+    """Schluessel einer HA-Systemnachricht.
+
+    Eigener Namensraum: die Kennungen kommen von Home Assistant und von
+    Integrationen, und eine Automation darf dieselbe verwenden, ohne die
+    Systemnachricht zu ueberschreiben.
+    """
+    return f"sys:{notification_id}"
+
+
 def key_for(event: NotificationEvent) -> str:
     """Schluessel eines Ereignisses, unabhaengig von seiner Herkunft."""
+    if event.source is NotificationSource.HA_SYSTEM:
+        if event.notification_id is None:
+            raise ValueError("HA-Systemnachricht braucht eine notification_id")
+        return system_notification_key(event.notification_id)
+
     if event.source is NotificationSource.AUTOMATION:
         if event.owner is None or event.notification_id is None:
             raise ValueError("Automations-Notification braucht owner und notification_id")

@@ -14,7 +14,7 @@ It works entirely on data from your local Home Assistant instance: no external d
 
 ## Contents
 
-**[`Installation`](#installation)**  **[`Setup`](#setup)**  **[`The panel`](#the-panel)**  **[`Rules`](#rules)**  **[`Rule groups`](#rule-groups)**  **[`Lovelace card`](#lovelace-card)**  **[`Automation API`](#automation-api)**  **[`Entities`](#entities)**  **[`Settings`](#settings)**  **[`How it works`](#how-it-works)**  **[`Languages`](#languages)**  **[`Transparency`](#transparency)**  **[`License`](#license)**
+**[`Installation`](#installation)**  **[`Setup`](#setup)**  **[`The panel`](#the-panel)**  **[`Rules`](#rules)**  **[`Rule groups`](#rule-groups)**  **[`Lovelace card`](#lovelace-card)**  **[`Automation API`](#automation-api)**  **[`HA system messages`](#ha-system-messages)**  **[`Entities`](#entities)**  **[`Settings`](#settings)**  **[`How it works`](#how-it-works)**  **[`Languages`](#languages)**  **[`Transparency`](#transparency)**  **[`License`](#license)**
 
 ---
 
@@ -300,6 +300,26 @@ The integration also fires a `notification_center_event` on the Home Assistant e
 
 ---
 
+## HA system messages
+
+Home Assistant keeps its own notifications behind the bell in the sidebar: failed login attempts, invalid configuration, integrations that need attention, finished backups. The Notification Center can adopt them, so that dashboard, history and counters show the whole picture instead of only what was set up here.
+
+Off by default — nobody should find messages in their dashboard after an update that they never configured. *Configure* on the integration switches it on and sets the type they appear as; Home Assistant does not rank its own messages, so that choice is yours.
+
+| | |
+|---|---|
+| Where they appear | Dashboard, history and the counter entities, marked **HA** |
+| Filtering | History → source → *System message* |
+| Text | Condensed to one line and shortened to 300 characters; the full text stays in Home Assistant |
+| Start | When Home Assistant created the message, not when it was adopted |
+| End | When Home Assistant discards it |
+
+The direction is one-way on purpose: Home Assistant reports, the Notification Center shows. Discarding a system message stays where it belongs, at the bell — the Notification Center never discards anything on Home Assistant's behalf. A message that already stood in the sidebar is adopted when the integration starts, so a restart does not hide what Home Assistant reported while booting.
+
+Repairs and updates are not part of this. They are separate mechanisms with their own screens, and an update can already be watched with an ordinary rule on its `update` entity.
+
+---
+
 ## Entities
 
 Five counters are available as sensors. Their values come from the running state rather than from a query against the log, and they are written forward as events happen.
@@ -323,6 +343,8 @@ Through *Configure* on the integration:
 | **History retention** | 7, 30, 90, 365 days, unlimited | Older entries are removed |
 | **Maximum number of events** | 1,000, 5,000, 10,000, 50,000 | Oldest first |
 | **Analysis period** | 1 to 90 days | How far the history analysis looks back |
+| **Adopt Home Assistant's notifications** | on / off | The messages behind the bell appear here too |
+| **Type of the system messages** | Information, Warning, Alarm | How urgent they appear |
 | **Paused** | on / off | While paused, no new notifications appear |
 
 Both retention limits apply at the same time. Active notifications are never removed.

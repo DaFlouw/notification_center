@@ -15,6 +15,7 @@ from custom_components.notification_center.notifications.lifecycle import (
     automation_notification_key,
     key_for,
     rule_key,
+    system_notification_key,
 )
 from custom_components.notification_center.notifications.models import (
     CloseReason,
@@ -357,3 +358,41 @@ def test_mehrfacher_typwechsel_laeuft_nicht_aus_dem_takt() -> None:
         aktive.put(ereignis)
 
     assert aktive.counts.to_dict() == Counts(info=1).to_dict()
+
+
+# -- HA-Systemnachrichten ---------------------------------------------------
+
+
+def systemereignis(notification_id: str = "login_attempt", **kwargs: object):
+    return make_event(
+        source=NotificationSource.HA_SYSTEM,
+        owner="homeassistant",
+        notification_id=notification_id,
+        **kwargs,
+    )
+
+
+def test_systemnachricht_wird_ueber_ihre_kennung_adressiert() -> None:
+    ereignis = systemereignis()
+    assert key_for(ereignis) == system_notification_key("login_attempt")
+
+
+def test_systemnachricht_und_automation_teilen_keinen_schluessel() -> None:
+    """Eine Automation darf dieselbe Kennung verwenden, ohne zu stoeren."""
+    system = key_for(systemereignis(notification_id="backup"))
+    automation = automation_notification_key("homeassistant", "backup")
+    assert system != automation
+
+
+def test_systemnachricht_ohne_kennung_ist_ungueltig() -> None:
+    with pytest.raises(ValueError, match="notification_id"):
+        key_for(make_event(source=NotificationSource.HA_SYSTEM, owner="homeassistant"))
+
+
+def test_systemnachricht_zaehlt_wie_jede_andere_meldung() -> None:
+    """Die Zaehler kennen keine Herkunft: aktiv ist aktiv."""
+    aktive = ActiveNotifications()
+    aktive.put(systemereignis(type=NotificationType.WARNING))
+    aktive.put(regelereignis(type=NotificationType.INFO))
+
+    assert aktive.counts.to_dict() == Counts(info=1, warning=1).to_dict()

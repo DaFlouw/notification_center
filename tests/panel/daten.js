@@ -90,7 +90,7 @@ export const HASS_STATES = Object.fromEntries(
 export const GET_ACTIVE = {
   api_version: 1,
   version: VERSION,
-  counts: { info: 3, warning: 2, alarm: 2, active: 7, events_today: 23 },
+  counts: { info: 3, warning: 3, alarm: 2, active: 8, events_today: 24 },
   paused: false,
   active: [
     { event_id: "ev_leck", source: "entity_rule", type: "alarm", active: true, start_time: vor(4), end_time: null, duration: seit(4), title: null, message: "Wasser in der Waschküche", entity_id: "binary_sensor.waschkueche_leckmelder", area_id: "waschkueche", rule_id: "rule_leck" },
@@ -100,13 +100,16 @@ export const GET_ACTIVE = {
     { event_id: "ev_terrasse", source: "entity_rule", type: "info", active: true, start_time: vor(41), end_time: null, duration: seit(41), title: null, message: "Terrassentür ist offen", entity_id: "binary_sensor.wohnzimmer_terrassentuer", area_id: "wohnzimmer", rule_id: "rule_terrasse" },
     { event_id: "ev_arbeitsplatte", source: "entity_rule", type: "info", active: true, start_time: vor(52), end_time: null, duration: seit(52), title: null, message: "Licht Arbeitsplatte an", entity_id: "light.kueche_arbeitsplatte", area_id: "kueche", rule_id: "rule_arbeitsplatte" },
     { event_id: "ev_alex", source: "entity_rule", type: "info", active: true, start_time: vor(447), end_time: null, duration: seit(447), title: null, message: "Alex ist zu Hause", entity_id: "person.alex", area_id: null, rule_id: "rule_alex" },
+    // Eine uebernommene Meldung von Home Assistant selbst: ohne Entity,
+    // deshalb nicht anklickbar, und in der Uebersicht als HA gekennzeichnet.
+    { event_id: "ev_system", source: "ha_system", type: "warning", active: true, start_time: vor(17), end_time: null, duration: seit(17), title: "Anmeldung", message: "Fehlgeschlagener Anmeldeversuch von 192.0.2.17", entity_id: null, area_id: null, owner: "homeassistant", notification_id: "http_login" },
   ],
 };
 
 export const GET_COUNTS = {
   api_version: 1,
   version: VERSION,
-  counts: { info: 3, warning: 2, alarm: 2, active: 7, events_today: 23 },
+  counts: { info: 3, warning: 3, alarm: 2, active: 8, events_today: 24 },
 };
 
 export const GET_HISTORY = {
@@ -125,6 +128,8 @@ export const GET_HISTORY = {
     { event_id: "ev_klima", source: "entity_rule", type: "warning", active: false, start_time: vor(220), end_time: vor(180), duration: 2400, message: "Schlafzimmer auf 24.0 °C gestellt", entity_id: "climate.schlafzimmer_heizung", area_id: "schlafzimmer" },
     { event_id: "ev_licht_alt", source: "entity_rule", type: "info", active: false, start_time: vor(300), end_time: vor(240), duration: 3600, message: "Licht Arbeitsplatte an", entity_id: "light.kueche_arbeitsplatte", area_id: "kueche" },
     { event_id: "ev_leck_alt", source: "entity_rule", type: "alarm", active: false, start_time: vor(1400), end_time: vor(1385), duration: 900, message: "Wasser in der Waschküche", entity_id: "binary_sensor.waschkueche_leckmelder", area_id: "waschkueche" },
+    { event_id: "ev_system", source: "ha_system", type: "warning", active: true, start_time: vor(17), end_time: null, duration: seit(17), title: "Anmeldung", message: "Fehlgeschlagener Anmeldeversuch von 192.0.2.17", entity_id: null, area_id: null },
+    { event_id: "ev_system_alt", source: "ha_system", type: "warning", active: false, start_time: vor(2800), end_time: vor(2790), duration: 600, message: "Sicherung konnte nicht erstellt werden", entity_id: null, area_id: null },
   ],
 };
 

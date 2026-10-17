@@ -16,7 +16,7 @@ import assert from "node:assert/strict";
 import { before, describe, it } from "node:test";
 
 import { setzeSprache } from "../../custom_components/notification_center/frontend/i18n.js";
-import { escapeHtml, formatDuration, typeLabel } from "../../custom_components/notification_center/frontend/format.js";
+import { escapeHtml, formatDuration, sourceBadge, typeLabel } from "../../custom_components/notification_center/frontend/format.js";
 import { renderDashboard } from "../../custom_components/notification_center/frontend/views/dashboard.js";
 import { renderDiscovery } from "../../custom_components/notification_center/frontend/views/discovery.js";
 import {
@@ -796,5 +796,77 @@ describe("Uebergabe verknuepfter Bedingungen an die API", () => {
     const regel = entwurfZuRegel({ ...leereRegel("sensor.temperatur"), states: ["on"] });
     assert.equal(regel.logic, "all");
     assert.deepEqual(regel.extra_conditions, []);
+  });
+});
+
+describe("HA-Systemnachrichten in den Uebersichten", () => {
+  const JETZT = new Date().toISOString();
+
+  /** Eine uebernommene Meldung von Home Assistant: ohne Entity, ohne Regel. */
+  const SYSTEM = {
+    event_id: "ev_system",
+    source: "ha_system",
+    type: "warning",
+    active: true,
+    start_time: JETZT,
+    message: "Fehlgeschlagener Anmeldeversuch",
+    entity_id: null,
+    area_id: null,
+  };
+
+  const AUS_REGEL = {
+    event_id: "ev_regel",
+    source: "entity_rule",
+    type: "info",
+    active: true,
+    start_time: JETZT,
+    message: "Licht Arbeitsplatte an",
+    entity_id: "light.kueche_arbeitsplatte",
+    area_id: "kueche",
+  };
+
+  const abzeichen = (html) => (html.match(/>HA</g) || []).length;
+
+  it("kennzeichnet die Meldung im Dashboard", () => {
+    const html = renderDashboard(
+      { active: [SYSTEM, AUS_REGEL], counts: { events_today: 2 } },
+      "de"
+    );
+    assert.equal(abzeichen(html), 1);
+    assert.match(html, /Fehlgeschlagener Anmeldeversuch/);
+  });
+
+  it("kennzeichnet sie in der Historie", () => {
+    const html = renderHistory(
+      { events: [SYSTEM, AUS_REGEL], total: 2, filter: { ...LEERER_FILTER }, areas: [] },
+      "de"
+    );
+    assert.equal(abzeichen(html), 1);
+  });
+
+  it("laesst sich in der Historie als Herkunft auswaehlen", () => {
+    const html = renderHistory(
+      { events: [], total: 0, filter: { ...LEERER_FILTER }, areas: [] },
+      "de"
+    );
+    assert.match(html, /<option value="ha_system"/);
+    assert.match(html, /Systemnachricht/);
+  });
+
+  it("nennt die ganze Herkunft im Titel", () => {
+    // "HA" allein erklaert nichts; der ausgeschriebene Text liegt im Titel.
+    assert.match(sourceBadge(SYSTEM), /title="Systemnachricht von Home Assistant"/);
+  });
+
+  it("beschriftet nur, was der Erklaerung bedarf", () => {
+    // Regeln und Automationen sind das Erwartbare und bleiben unbeschriftet.
+    assert.equal(sourceBadge(AUS_REGEL), "");
+    assert.equal(sourceBadge({ source: "automation" }), "");
+    assert.equal(sourceBadge(undefined), "");
+  });
+
+  it("bietet keinen Klick an, wo keine Entity verknuepft ist", () => {
+    const html = renderDashboard({ active: [SYSTEM], counts: {} }, "de");
+    assert.ok(!html.includes("clickable"));
   });
 });
