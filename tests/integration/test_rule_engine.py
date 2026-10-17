@@ -252,10 +252,10 @@ async def test_fehlerhafte_regel_stoppt_die_uebrigen_nicht(
     runtime.config.add_rule(fensterregel(rule_id="rule_kaputt"))
     echte_auswertung = engine.evaluate_rule
 
-    def _auswerten(rule, snapshot, state, now):
+    def _auswerten(rule, snapshot, state, now, **weitere):
         if rule.rule_id == "rule_kaputt":
             raise RuntimeError("absichtlicher Fehler")
-        return echte_auswertung(rule, snapshot, state, now)
+        return echte_auswertung(rule, snapshot, state, now, **weitere)
 
     with patch.object(engine, "evaluate_rule", _auswerten):
         hass.states.async_set(FENSTER, "on")
