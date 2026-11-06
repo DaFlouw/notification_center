@@ -13,6 +13,7 @@
  */
 
 import { escapeHtml, typeLabel } from "../format.js";
+import { raw } from "../html.js";
 import { t } from "../i18n.js";
 
 const BEDINGUNGEN = ["state_is", "state_is_not", "state_changed_to", "numeric"];
@@ -97,7 +98,9 @@ export function renderRuleOverview(state) {
         <strong>${t("rules.overviewEmpty")}</strong>
         <span>
           ${t("rules.overviewEmptyHint", {
-            link: `<button class="link" data-nav="discovery">${t("nav.discovery")}</button>`,
+            // Ausdruecklich Markup: die Schaltflaeche steht hier im
+            // Quelltext und soll keine maskierten Klammern zeigen.
+            link: raw(`<button class="link" data-nav="discovery">${t("nav.discovery")}</button>`),
           })}
         </span>
       </div>
@@ -211,7 +214,7 @@ export function renderRules(state) {
       <button class="link" data-action="back-to-rules">${t("rules.backToAll")}</button>
     </div>
 
-    <h2>${t("rules.forEntity", { name: escapeHtml(entityName || entityId) })}</h2>
+    <h2>${t("rules.forEntity", { name: entityName || entityId })}</h2>
 
     <!--
       Die Entity-ID gehoert auf diese Seite: von hier aus laesst sich die
@@ -503,12 +506,10 @@ function wertHinweis(entwurf, attributes) {
 
   return `
     <div class="entity-meta" style="margin: -4px 0 8px">
-      ${escapeHtml(t("rules.currentValue", { value: aktuell }))}
+      ${t("rules.currentValue", { value: aktuell })}
       ${
         schreibweise
-          ? `<span class="badge uncertain">${escapeHtml(
-              t("rules.caseMismatch", { value: aktuell })
-            )}</span>`
+          ? `<span class="badge uncertain">${t("rules.caseMismatch", { value: aktuell })}</span>`
           : ""
       }
     </div>

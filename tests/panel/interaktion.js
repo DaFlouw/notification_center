@@ -762,6 +762,21 @@ const FAELLE = [
 
   // -- Fehlerbehandlung ---------------------------------------------------
   {
+    id: "L55",
+    titel: "Ein Fehlertext wird als Text gezeigt, nicht als Markup (Issue 15)",
+    async fn() {
+      await seite("history");
+      // Das Backend gibt in seinen Ablehnungen die Eingabe wieder. Landet sie
+      // unmaskiert im HTML, entsteht aus einer Eingabe ein Element.
+      window.__naechsterFehler = '<img src=x onerror="window.__xss=1">Abgelehnt';
+      await waehle('[data-filter="typ"]', "info");
+
+      pruefe(!SR().querySelector("main .error img"), "aus dem Fehlertext entstand ein Element");
+      pruefe(window.__xss === undefined, "Code aus dem Fehlertext wurde ausgefuehrt");
+      pruefe(window.__text().includes("Abgelehnt"), "der Fehlertext wird nicht gezeigt");
+    },
+  },
+  {
     id: "L41",
     titel: "Ein Fehler des Backends wird angezeigt, das Panel bleibt bedienbar",
     async fn() {

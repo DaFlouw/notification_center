@@ -15,6 +15,7 @@
  * unbekannte Schluessel mitbringt.
  */
 
+import { alsHtml } from "./html.js";
 import de from "./translations/de.js";
 import en from "./translations/en.js";
 import es from "./translations/es.js";
@@ -64,6 +65,11 @@ export function setzeSprache(code) {
  * dann ``events_one`` und ``events_other``. Platzhalter stehen in geschweiften
  * Klammern und werden aus ``params`` ersetzt.
  *
+ * Eingesetzte Werte werden dabei maskiert: die Texte landen fast ausnahmslos
+ * in HTML, und die Werte kommen aus dem Backend, aus Home Assistant oder aus
+ * einer Eingabe. Wer bewusst Markup einsetzen will -- eine Schaltflaeche in
+ * einem Hinweistext etwa -- kennzeichnet es mit :func:`raw` aus ``html.js``.
+ *
  * Fehlt ein Schluessel in der gewaehlten Sprache, greift Englisch; fehlt er
  * auch dort, erscheint der Schluessel selbst. Das ist haesslich und genau
  * deshalb richtig: eine Luecke soll auffallen, nicht stillschweigend leer
@@ -91,6 +97,6 @@ function suche(key, params) {
 
 function einsetzen(vorlage, params) {
   return String(vorlage).replace(/\{(\w+)\}/g, (treffer, name) =>
-    params[name] === undefined ? treffer : String(params[name])
+    params[name] === undefined ? treffer : alsHtml(params[name])
   );
 }

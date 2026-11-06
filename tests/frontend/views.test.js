@@ -870,3 +870,41 @@ describe("HA-Systemnachrichten in den Uebersichten", () => {
     assert.ok(!html.includes("clickable"));
   });
 });
+
+describe("Maskieren in den Ansichten (Issue 15)", () => {
+  it("maskiert den Namen einer Entity im Regel-Editor", () => {
+    const html = renderRules({
+      entityId: "sensor.a",
+      entityName: "<b>fett</b>",
+      rules: [],
+      states: [],
+    });
+    assert.ok(!html.includes("<b>fett</b>"));
+    assert.match(html, /&lt;b&gt;fett&lt;\/b&gt;/);
+  });
+
+  it("haelt den Verweis im Leerzustand eine Schaltflaeche", () => {
+    // Die Gegenprobe zum Maskieren: gewolltes Markup bleibt Markup.
+    const html = renderRuleOverview({ entities: [], rules: [] });
+    assert.match(html, /<button class="link" data-nav="discovery">/);
+  });
+
+  it("maskiert den aktuellen Wert eines Attributs", () => {
+    const html = renderRules({
+      entityId: "sensor.a",
+      entityName: "A",
+      rules: [],
+      states: [],
+      attributes: [{ name: "mode", kind: "text", value: '<script>alert(1)</script>' }],
+      entwurf: {
+        entity_id: "sensor.a",
+        kind: "state_is",
+        type: "warning",
+        states: [],
+        value_source: { kind: "attribute", attribute: "mode" },
+      },
+    });
+    assert.ok(!html.includes("<script>"));
+    assert.match(html, /&lt;script&gt;/);
+  });
+});
