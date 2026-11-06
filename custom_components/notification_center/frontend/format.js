@@ -5,7 +5,12 @@
  * Home Assistant an die Oberflaeche durchreicht (Spezifikation 36).
  */
 
+import { escapeHtml } from "./html.js";
 import { t } from "./i18n.js";
+
+// Weiterhin von hier aus verfuegbar: die Ansichten holen sich das Maskieren
+// seit immer aus diesem Modul.
+export { escapeHtml };
 
 export function typeLabel(type) {
   return TYPE_TYPEN.includes(type) ? t(`type.${type}`) : type;
@@ -94,16 +99,3 @@ export function eventDuration(event) {
 }
 
 /** Schuetzt vor HTML-Einschleusung aus Meldungstexten. */
-export function escapeHtml(value) {
-  return String(value ?? "").replace(
-    /[&<>"']/g,
-    (zeichen) =>
-      ({
-        "&": "&amp;",
-        "<": "&lt;",
-        ">": "&gt;",
-        '"': "&quot;",
-        "'": "&#39;",
-      })[zeichen]
-  );
-}

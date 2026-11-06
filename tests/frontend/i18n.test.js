@@ -20,6 +20,7 @@ import {
   waehleSprache,
 } from "../../custom_components/notification_center/frontend/i18n.js";
 import { categoryLabel, typeLabel } from "../../custom_components/notification_center/frontend/format.js";
+import { raw } from "../../custom_components/notification_center/frontend/html.js";
 import { renderDashboard } from "../../custom_components/notification_center/frontend/views/dashboard.js";
 
 describe("Sprachwahl", () => {
@@ -159,5 +160,33 @@ describe("Ansichten folgen der Sprache", () => {
     assert.equal(categoryLabel("warning"), "Warnungen");
     // Unbekanntes bleibt unveraendert.
     assert.equal(typeLabel("sonstiges"), "sonstiges");
+  });
+});
+
+describe("Maskieren eingesetzter Werte (Issue 15)", () => {
+  it("maskiert einen Platzhalter", () => {
+    setzeSprache("de");
+    const text = t("rules.forEntity", { name: '<img src=x onerror="alert(1)">' });
+    assert.ok(!text.includes("<img"));
+    assert.match(text, /&lt;img/);
+  });
+
+  it("maskiert genau einmal", () => {
+    // Doppelt maskiert stuende "&amp;amp;" im Text und waere sichtbar falsch.
+    setzeSprache("de");
+    assert.equal(t("rules.currentValue", { value: "A & B" }), "Aktueller Wert: A &amp; B");
+  });
+
+  it("laesst ausdruecklich gekennzeichnetes Markup stehen", () => {
+    setzeSprache("en");
+    const text = t("rules.overviewEmptyHint", { link: raw("<button>Discovery</button>") });
+    assert.match(text, /<button>Discovery<\/button>/);
+  });
+
+  it("ruehrt die Texte der Woerterbuecher nicht an", () => {
+    // Maskiert werden die eingesetzten Werte, nicht die Vorlage.
+    setzeSprache("de");
+    assert.equal(t("common.save"), "Speichern");
+    assert.equal(t("history.shownOfTotal", { shown: 20, total: 80 }), "20 von 80");
   });
 });

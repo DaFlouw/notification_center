@@ -10,6 +10,7 @@
  */
 
 import { MODULE_VERSION, api, backendZuAlt, versionsKonflikt } from "./api.js";
+import { escapeHtml } from "./html.js";
 import { t, waehleSprache } from "./i18n.js";
 import { adoptStyles } from "./styles.js";
 import { renderDashboard } from "./views/dashboard.js";
@@ -688,7 +689,14 @@ class NotificationCenterPanel extends HTMLElement {
       </nav>
       <main>
         ${this.#versionshinweis()}
-        ${this.#fehler ? `<div class="error">${this.#fehler}</div>` : ""}
+        ${
+          this.#fehler
+            ? // Maskiert: der Text kommt aus dem Backend und gibt dabei die
+              // Eingabe wieder -- etwa die Kennung aus dem Dialog zum
+              // Ersetzen einer Entity (Issue 15).
+              `<div class="error">${escapeHtml(this.#fehler)}</div>`
+            : ""
+        }
         ${this.#inhalt(locale)}
       </main>
     `;
