@@ -198,3 +198,75 @@ def test_text_ohne_inhalt_bleibt_leer() -> None:
     assert kurzfassung(None) == ""
     assert kurzfassung("   \n  ") == ""
     assert titel("  ") is None
+
+
+# -- Abgleich beim Start (Issue 16) -----------------------------------------
+
+
+async def test_start_beendet_was_es_nicht_mehr_gibt(
+    hass: HomeAssistant, runtime: NotificationCenterRuntime
+) -> None:
+    """Issue 16: eine uebernommene Meldung blieb nach einem Neustart stehen.
+
+    Persistente Benachrichtigungen liegen in Home Assistant nur im Speicher.
+    Ein Neustart vergisst sie, ohne ihr Ende zu melden, waehrend die eigenen
+    Meldungen den Neustart mit Absicht ueberdauern. Beobachtet an einer
+    Anmeldeversuch-Meldung, die 27 Stunden im Dashboard stand, obwohl die
+    Seitenleiste leer war.
+
+    Nachgestellt wird der Fall ueber das Abmelden des Rueckrufs: waehrend die
+    Uebernahme nicht laeuft, verschwindet die Benachrichtigung unbemerkt --
+    genau wie beim Neustart und beim Neuladen der Integration.
+    """
+    pn.async_create(hass, "Verschwindet unbemerkt", notification_id="verwaist")
+    await hass.async_block_till_done()
+    assert len(systemmeldungen(runtime)) == 1
+
+    runtime.system_notifications.async_stop()
+    pn.async_dismiss(hass, "verwaist")
+    await hass.async_block_till_done()
+    # Ohne Rueckruf hat davon niemand erfahren.
+    assert len(systemmeldungen(runtime)) == 1
+
+    await runtime.system_notifications.async_start()
+    await hass.async_block_till_done()
+
+    assert systemmeldungen(runtime) == []
+
+
+async def test_abgleich_laesst_bestehende_meldungen_in_ruhe(
+    hass: HomeAssistant, runtime: NotificationCenterRuntime
+) -> None:
+    """Was die Seitenleiste noch fuehrt, bleibt -- auch ueber einen Start."""
+    pn.async_create(hass, "Bleibt bestehen", notification_id="bleibt")
+    await hass.async_block_till_done()
+    vorher = systemmeldungen(runtime)[0]
+
+    runtime.system_notifications.async_stop()
+    await runtime.system_notifications.async_start()
+    await hass.async_block_till_done()
+
+    danach = systemmeldungen(runtime)
+    assert len(danach) == 1
+    # Dasselbe Ereignis, kein zweiter Eintrag im Log.
+    assert danach[0].event_id == vorher.event_id
+
+
+async def test_abgleich_ruehrt_fremde_meldungen_nicht_an(
+    hass: HomeAssistant, runtime: NotificationCenterRuntime
+) -> None:
+    """Nur uebernommene Systemnachrichten gehen den Abgleich etwas an."""
+    await runtime.notification_engine.async_create_automation(
+        owner="automation.test",
+        notification_id="eigen",
+        type=NotificationType.INFO,
+        message="Von einer Automation",
+    )
+    await hass.async_block_till_done()
+
+    runtime.system_notifications.async_stop()
+    await runtime.system_notifications.async_start()
+    await hass.async_block_till_done()
+
+    alle = runtime.notification_engine.active_events()
+    assert [ereignis.message for ereignis in alle] == ["Von einer Automation"]

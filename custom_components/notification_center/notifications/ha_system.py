@@ -83,11 +83,10 @@ class HaSystemNotifications:
         self._unsub = pn.async_register_callback(self._hass, self._handle_update)
         _LOGGER.debug("Uebernahme der HA-Systemnachrichten aufgenommen")
 
-        # Der Rueckruf liefert nur kuenftige Aenderungen. Was bereits in der
-        # Seitenleiste steht, muss eigens geholt werden -- sonst fehlte nach
-        # jedem Neustart genau das, was Home Assistant beim Hochfahren
-        # gemeldet hat.
-        await self._async_adopt_existing()
+        # Der Rueckruf liefert nur kuenftige Aenderungen. Der Bestand der
+        # Seitenleiste muss deshalb eigens geholt werden -- in beide
+        # Richtungen.
+        await self._async_abgleichen()
 
     @callback
     def async_stop(self) -> None:
@@ -143,9 +142,34 @@ class HaSystemNotifications:
         async with self._sperre:
             await self._engine.async_close_system(notification_id)
 
-    async def _async_adopt_existing(self) -> None:
-        for notification_id, meldung in self._bestand().items():
+    async def _async_abgleichen(self) -> None:
+        """Bringt die uebernommenen Meldungen mit der Seitenleiste in Deckung.
+
+        Zwei Richtungen, und beide sind noetig (Issue 16):
+
+        *Uebernehmen*, was dort steht -- sonst fehlte nach jedem Neustart
+        genau das, was Home Assistant beim Hochfahren gemeldet hat.
+
+        *Beenden*, was dort fehlt -- denn persistente Benachrichtigungen
+        liegen in Home Assistant nur im Speicher. Ein Neustart vergisst sie,
+        ohne ``REMOVED`` zu melden, waehrend die eigenen Meldungen den
+        Neustart mit Absicht ueberdauern. Ohne diesen Schritt blieb eine
+        uebernommene Meldung danach fuer immer stehen. Dasselbe gilt, wenn
+        waehrend eines Neuladens der Integration an der Glocke etwas
+        verworfen wird: der Rueckruf dazu faellt in die Luecke.
+        """
+        bestand = self._bestand()
+
+        for notification_id, meldung in bestand.items():
             await self._async_uebernehmen(notification_id, meldung)
+
+        verwaist = await self._engine.async_close_system_except(
+            bestand.keys(), CloseReason.DISMISSED
+        )
+        if verwaist:
+            _LOGGER.debug(
+                "%s uebernommene Systemnachricht(en) beendet, die es nicht mehr gibt", verwaist
+            )
 
     def _bestand(self) -> dict[str, Any]:
         """Die Meldungen, die gerade in der Seitenleiste stehen.

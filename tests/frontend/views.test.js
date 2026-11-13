@@ -31,6 +31,7 @@ import {
 import {
   LEERER_FILTER,
   buildQuery,
+  deaktiviert,
   renderHistory,
   seitengroesse,
 } from "../../custom_components/notification_center/frontend/views/history.js";
@@ -906,5 +907,92 @@ describe("Maskieren in den Ansichten (Issue 15)", () => {
     });
     assert.ok(!html.includes("<script>"));
     assert.match(html, /&lt;script&gt;/);
+  });
+});
+
+describe("Meldungen von Hand deaktivieren", () => {
+  const JETZT = new Date().toISOString();
+
+  const LAUFEND = {
+    event_id: "ev_laufend",
+    source: "entity_rule",
+    type: "warning",
+    active: true,
+    start_time: JETZT,
+    message: "Fenster offen",
+    entity_id: "binary_sensor.fenster",
+    close_reason: null,
+  };
+
+  const DEAKTIVIERT = {
+    event_id: "ev_deaktiviert",
+    source: "entity_rule",
+    type: "warning",
+    active: false,
+    start_time: JETZT,
+    end_time: JETZT,
+    duration: 120,
+    message: "Fenster offen",
+    entity_id: "binary_sensor.fenster",
+    close_reason: "deactivated",
+  };
+
+  const BEENDET = { ...DEAKTIVIERT, event_id: "ev_beendet", close_reason: "condition_cleared" };
+
+  it("erkennt nur von Hand Beendetes als deaktiviert", () => {
+    assert.equal(deaktiviert(DEAKTIVIERT), true);
+    assert.equal(deaktiviert(BEENDET), false);
+    assert.equal(deaktiviert(LAUFEND), false);
+    assert.equal(deaktiviert(undefined), false);
+  });
+
+  it("bietet im Dashboard an jeder laufenden Meldung das Deaktivieren an", () => {
+    const html = renderDashboard({ active: [LAUFEND], counts: {} }, "de");
+    assert.match(html, /data-action="deactivate-event"/);
+    assert.match(html, /data-event="ev_laufend"/);
+    assert.match(html, /Deaktivieren/);
+  });
+
+  it("kennzeichnet den Eintrag in der Historie und laesst ihn fortsetzen", () => {
+    const html = renderHistory(
+      { events: [DEAKTIVIERT], total: 1, filter: { ...LEERER_FILTER }, areas: [] },
+      "de"
+    );
+    assert.match(html, />deaktiviert</);
+    assert.match(html, /data-action="reactivate-event"/);
+    assert.match(html, /Wieder aktivieren/);
+    // Loeschen bleibt moeglich: ein Eintrag, zwei Wege.
+    assert.match(html, /data-action="delete-event"/);
+  });
+
+  it("bietet das Fortsetzen nicht an, wo die Bedingung entfiel", () => {
+    const html = renderHistory(
+      { events: [BEENDET], total: 1, filter: { ...LEERER_FILTER }, areas: [] },
+      "de"
+    );
+    assert.ok(!html.includes('data-action="reactivate-event"'));
+    assert.ok(!html.includes(">deaktiviert<"));
+  });
+
+  it("laesst eine laufende Meldung in der Historie unangetastet", () => {
+    // Dort gibt es weder Loeschen noch Fortsetzen: sie laeuft ja.
+    const html = renderHistory(
+      { events: [LAUFEND], total: 1, filter: { ...LEERER_FILTER }, areas: [] },
+      "de"
+    );
+    assert.ok(!html.includes('data-action="reactivate-event"'));
+    assert.ok(!html.includes('data-action="delete-event"'));
+  });
+
+  it("kommt mit einem Eintrag ohne Abschlussgrund zurecht", () => {
+    // Aus einer aelteren Fassung: das Feld gab es noch nicht.
+    const alt = { ...BEENDET };
+    delete alt.close_reason;
+    assert.equal(deaktiviert(alt), false);
+    const html = renderHistory(
+      { events: [alt], total: 1, filter: { ...LEERER_FILTER }, areas: [] },
+      "de"
+    );
+    assert.ok(!html.includes('data-action="reactivate-event"'));
   });
 });

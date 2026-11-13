@@ -52,6 +52,13 @@ function zeile(event, locale) {
       <span class="message">${escapeHtml(event.message)}</span>
       <span class="time">${formatTime(event.start_time, locale)}</span>
       <span class="duration">${eventDuration(event)}</span>
+      <!--
+        Abhaken, ohne auf die Bedingung zu warten. Der Eintrag bleibt im Log
+        und ist dort wieder aktivierbar; deshalb steht hier kein Loeschen.
+      -->
+      <button class="link" data-action="deactivate-event"
+              data-event="${escapeHtml(event.event_id)}"
+              title="${t("dashboard.deactivateHint")}">${t("dashboard.deactivate")}</button>
     </li>
   `;
 }

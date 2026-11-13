@@ -61,6 +61,8 @@ const ANTWORTEN = {
   remove_entity: (n) => ({ api_version: 1, version: VERSION, removed: n.entity_id }),
   replace_entity: (n) => ({ api_version: 1, version: VERSION, replaced: n.old_entity_id }),
   delete_event: () => ({ api_version: 1, version: VERSION, deleted: true }),
+  deactivate_event: () => ({ api_version: 1, version: VERSION, deactivated: true }),
+  reactivate_event: () => ({ api_version: 1, version: VERSION, reactivated: true }),
   clear_history: () => ({ api_version: 1, version: VERSION, cleared: true }),
   set_settings: () => ({ api_version: 1, version: VERSION, settings: GET_CONFIG.settings }),
   // Zustandswerte einer Entity einer Teilbedingung.

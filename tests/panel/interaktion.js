@@ -760,6 +760,34 @@ const FAELLE = [
     },
   },
 
+  // -- Deaktivieren -------------------------------------------------------
+  {
+    id: "L56",
+    titel: "Deaktivieren schickt die Kennung der gemeinten Meldung mit",
+    async fn() {
+      await seite("dashboard");
+      const knopf = SR().querySelector('[data-action="deactivate-event"]');
+      pruefe(Boolean(knopf), "im Dashboard wird das Deaktivieren nicht angeboten");
+      const erwartet = knopf.dataset.event;
+      const ab = marke();
+      await klick('[data-action="deactivate-event"]');
+      gleich(letztes(ab, "deactivate_event").nachricht.event_id, erwartet, "event_id");
+    },
+  },
+  {
+    id: "L57",
+    titel: "Ein deaktivierter Eintrag der Historie laesst sich fortsetzen",
+    async fn() {
+      await seite("history");
+      const knopf = SR().querySelector('[data-action="reactivate-event"]');
+      pruefe(Boolean(knopf), "das Fortsetzen wird nicht angeboten");
+      const erwartet = knopf.dataset.event;
+      const ab = marke();
+      await klick('[data-action="reactivate-event"]');
+      gleich(letztes(ab, "reactivate_event").nachricht.event_id, erwartet, "event_id");
+    },
+  },
+
   // -- Fehlerbehandlung ---------------------------------------------------
   {
     id: "L55",

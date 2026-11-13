@@ -86,13 +86,17 @@ Zeigt ausschliesslich **aktive** Meldungen, gruppiert nach Alarmen, Warnungen un
 
 ![Dashboard](docs/img/dashboard.png)
 
+Jede Meldung laesst sich **deaktivieren** — von Hand abhaken, ohne auf ihre Bedingung zu warten. Sie verschwindet aus dem Dashboard, bleibt in der Historie als deaktiviert gekennzeichnet und ist von dort wieder aktivierbar. Solange ihre Bedingung ununterbrochen anliegt, kehrt sie nicht von allein zurueck; entfaellt die Bedingung und tritt erneut auf, meldet sie wieder — als das neue Ereignis, das sie dann ist.
+
 ### Historie
 
 Aktive und abgeschlossene Ereignisse, neueste zuerst. Filtern nach Typ, Quelle, Zeitraum und Bereich sowie die Volltextsuche laufen im Backend, nicht im Browser. Wie viele Eintraege eine Seite umfasst, waehlst du selbst: 50, 100 oder 200.
 
 ![Historie](docs/img/historie.png)
 
-Aktive Meldungen tragen kein Loeschkreuz — sie enden ueber ihre Bedingung, nicht von Hand.
+Ein deaktivierter Eintrag ist gekennzeichnet und traegt **Wieder aktivieren**. Fortgesetzt wird derselbe Datensatz: derselbe Beginn, kein zweiter Eintrag im Log, und die Dauer zaehlt weiter ab dem urspruenglichen Beginn. Ist die Bedingung inzwischen entfallen, endet die Meldung sofort wieder — eine Meldung ohne Bedingung gibt es nicht.
+
+Aktive Meldungen tragen kein Loeschkreuz: der Datensatz einer laufenden Meldung ist nichts, was man wegwirft. Erst deaktivieren, oder ihre Bedingung abwarten.
 
 ### Regeln
 
@@ -178,7 +182,7 @@ Was neu ist:
 Gemischte Vorrang-Ketten — `A und (B oder C)` — sind bewusst nicht vorgesehen: ohne Klammern liessen sie sich im Editor nicht ehrlich darstellen. Auch die Stufen einer Regelgruppe tragen keine weiteren Bedingungen; ihre Reihenfolge ergibt sich allein aus den Schwellen.
 
 > [!NOTE]
-> Entity-basierte Meldungen lassen sich nicht von Hand beenden. Sie enden, wenn ihre Bedingung nicht mehr gilt, ihre Regel geloescht oder ihre Entity aus der Ueberwachung genommen wird.
+> Eine entity-basierte Meldung endet, wenn ihre Bedingung nicht mehr gilt, ihre Regel geloescht oder ihre Entity aus der Ueberwachung genommen wird. Im Dashboard laesst sie sich zusaetzlich von Hand deaktivieren — das beendet diese eine Meldung, nicht die Regel, die weiter ueberwacht.
 
 ---
 
@@ -314,7 +318,9 @@ Standardmaessig aus — niemand soll nach einem Update Meldungen im Dashboard fi
 | Beginn | Als Home Assistant die Meldung erzeugt hat, nicht als sie uebernommen wurde |
 | Ende | Wenn Home Assistant sie verwirft |
 
-Die Richtung ist bewusst einseitig: Home Assistant meldet, das Notification Center zeigt. Eine Systemnachricht abtun bleibt dort, wo es hingehoert, an der Glocke — das Notification Center verwirft nichts im Namen von Home Assistant. Was bereits in der Seitenleiste stand, wird beim Start uebernommen; ein Neustart verbirgt also nicht, was Home Assistant beim Hochfahren gemeldet hat.
+Die Richtung ist bewusst einseitig: Home Assistant meldet, das Notification Center zeigt. Eine Systemnachricht abtun bleibt dort, wo es hingehoert, an der Glocke — das Notification Center verwirft nichts im Namen von Home Assistant.
+
+Beim Start werden beide Richtungen abgeglichen: was in der Seitenleiste steht, wird uebernommen — ein Neustart verbirgt also nicht, was Home Assistant beim Hochfahren gemeldet hat — und was dort nicht mehr steht, wird beendet. Die zweite Haelfte ist noetig, weil persistente Benachrichtigungen nur im Speicher liegen: ein Neustart vergisst sie, ohne ihr Ende zu melden, waehrend die eigenen Eintraege ihn mit Absicht ueberdauern. Das Ende kann dann nur der Zeitpunkt des Abgleichs sein; die Dauer des Eintrags enthaelt die Ausfallzeit.
 
 Reparaturen und Updates gehoeren nicht dazu. Sie sind eigene Mechanismen mit eigenen Oberflaechen, und ein Update laesst sich schon heute mit einer gewoehnlichen Regel auf seine `update`-Entity ueberwachen.
 

@@ -574,6 +574,20 @@ class NotificationCenterPanel extends HTMLElement {
         return;
       }
 
+      if (aktion === "deactivate-event") {
+        await api.deactivateEvent(this.#hass, daten.event);
+        // Das Abonnement meldet die neue Lage von selbst; die Historie wird
+        // nur neu geholt, wenn sie gerade zu sehen ist.
+        if (this.#seite === "history") await this.#ladeHistorie();
+        return;
+      }
+
+      if (aktion === "reactivate-event") {
+        await api.reactivateEvent(this.#hass, daten.event);
+        if (this.#seite === "history") await this.#ladeHistorie();
+        return;
+      }
+
       if (aktion === "delete-event") {
         await api.deleteEvent(this.#hass, daten.event);
         await this.#ladeHistorie();

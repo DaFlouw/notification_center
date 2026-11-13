@@ -36,6 +36,8 @@ export default {
   "dashboard.quiet": "Todo tranquilo",
   "dashboard.historyLink": "Historial →",
   "dashboard.active": "activo",
+  "dashboard.deactivate": "Desactivar",
+  "dashboard.deactivateHint": "Termina el aviso a mano. Permanece en el historial y allí se puede reactivar.",
 
   // -- Historial ------------------------------------------------------
   "history.allTypes": "Todos los tipos",
@@ -63,6 +65,9 @@ export default {
   "history.entries_one": "{count} entrada",
   "history.entries_other": "{count} entradas",
   "history.deleteEntry": "Eliminar entrada",
+  "history.deactivated": "desactivado",
+  "history.reactivate": "Reactivar",
+  "history.reactivateHint": "Vuelve a mostrar el aviso, siempre que su condición siga cumpliéndose.",
 
   // -- Descubrimiento --------------------------------------------------
   "discovery.allTypes": "Todos los tipos",

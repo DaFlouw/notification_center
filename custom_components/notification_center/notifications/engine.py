@@ -433,6 +433,36 @@ class NotificationEngine:
         self._cancel_expiry(key)
         return await self.async_close_key(key, reason, notify=True)
 
+    async def async_close_system_except(
+        self, notification_ids: Iterable[str], reason: CloseReason
+    ) -> int:
+        """Beendet uebernommene Systemnachrichten, die es nicht mehr gibt.
+
+        Grundlage des Abgleichs beim Start (Issue 16). Persistente
+        Benachrichtigungen liegen in Home Assistant nur im Speicher: ein
+        Neustart vergisst sie, ohne ihr Ende zu melden. Die eigenen Meldungen
+        ueberdauern den Neustart dagegen mit Absicht (Spezifikation 37) --
+        ohne Abgleich blieb eine uebernommene Meldung danach fuer immer
+        stehen.
+
+        Das Ende kann nur der Zeitpunkt des Abgleichs sein: wann Home
+        Assistant die Meldung verloren hat, weiss niemand. Die Dauer des
+        Eintrags enthaelt damit auch die Zeit, in der nichts lief. Das ist die
+        naechstliegende ehrliche Angabe.
+        """
+        bekannt = set(notification_ids)
+        beendet = 0
+
+        for ereignis in self.active_events():
+            if ereignis.source is not NotificationSource.HA_SYSTEM:
+                continue
+            if ereignis.notification_id is None or ereignis.notification_id in bekannt:
+                continue
+            if await self.async_close_system(ereignis.notification_id, reason):
+                beendet += 1
+
+        return beendet
+
     async def async_close_all_system(self, reason: CloseReason) -> int:
         """Beendet alle uebernommenen Systemnachrichten.
 
@@ -440,15 +470,66 @@ class NotificationEngine:
         gezeigten Meldungen muessen dann verschwinden, sonst bleiben sie
         stehen, bis Home Assistant sie zufaellig verwirft.
         """
-        beendet = 0
-        for ereignis in self.active_events():
-            if ereignis.source is not NotificationSource.HA_SYSTEM:
-                continue
-            if ereignis.notification_id is None:
-                continue
-            if await self.async_close_system(ereignis.notification_id, reason):
-                beendet += 1
-        return beendet
+        return await self.async_close_system_except((), reason)
+
+    # -- Von Hand deaktivieren -------------------------------------------
+
+    async def async_deactivate_event(self, event_id: str) -> bool:
+        """Beendet eine laufende Meldung von Hand.
+
+        Gedacht fuer das Abhaken im Panel: die Meldung verschwindet aus dem
+        Dashboard und bleibt als Eintrag im Log, dort als deaktiviert
+        gekennzeichnet und wieder aktivierbar.
+
+        Eine entity-basierte Meldung entsteht dadurch nicht erneut, solange
+        ihre Bedingung ununterbrochen anliegt: die Rule Engine legt nur beim
+        *Wechsel* in den erfuellten Zustand eine neue an. Faellt die Bedingung
+        weg und tritt erneut auf, meldet sie wieder -- was richtig ist, denn
+        das ist ein neues Ereignis.
+        """
+        treffer = self._active.find(event_id)
+        if treffer is None:
+            _LOGGER.debug("Keine aktive Meldung %s zum Deaktivieren", event_id)
+            return False
+
+        key, _ereignis = treffer
+        self._cancel_expiry(key)
+        return await self.async_close_key(key, CloseReason.DEACTIVATED, notify=True)
+
+    async def async_reactivate_event(self, event_id: str) -> NotificationEvent | None:
+        """Setzt eine von Hand deaktivierte Meldung fort.
+
+        Nur von Hand Deaktiviertes laesst sich wieder aktivieren. Alles
+        andere endete, weil seine Bedingung entfiel, eine Stufe wechselte oder
+        eine Regel verschwand -- das wieder aufzuwecken wuerde eine Lage
+        behaupten, die es nicht mehr gibt.
+
+        Ob die Bedingung noch anliegt, entscheidet nicht diese Schicht. Der
+        Aufrufer bringt die Rule Engine danach mit dem Ergebnis in Deckung;
+        liegt die Bedingung nicht mehr an, endet die Meldung dabei sofort
+        wieder.
+        """
+        ereignis = await self._store.async_get(event_id)
+        if ereignis is None:
+            _LOGGER.debug("Unbekannte Meldung %s", event_id)
+            return None
+        if not ereignis.deactivated:
+            _LOGGER.debug(
+                "Meldung %s wurde nicht von Hand deaktiviert und wird nicht fortgesetzt",
+                event_id,
+            )
+            return None
+
+        try:
+            self._active.reopen(ereignis)
+        except ValueError:
+            _LOGGER.debug("Zu %s laeuft bereits eine andere Meldung", event_id)
+            return None
+
+        await self._store.async_update(ereignis)
+        self._fire(ereignis, "reactivated")
+        self._notify_change()
+        return ereignis
 
     # -- Ablaufende Notifications (Spezifikation 29) ---------------------
 

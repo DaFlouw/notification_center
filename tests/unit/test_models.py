@@ -82,3 +82,48 @@ def test_automation_key_trennt_gleiche_ids_verschiedener_owner() -> None:
 
     # Der Trenner darf nicht durch Owner-Namen faelschbar sein.
     assert automation_key("a", "b_c") != automation_key("a_b", "c")
+
+
+# -- Von Hand deaktivieren --------------------------------------------------
+
+
+def test_von_hand_beendetes_ereignis_ist_als_solches_erkennbar() -> None:
+    ereignis = make_event()
+    ereignis.close(T0 + timedelta(minutes=5), CloseReason.DEACTIVATED)
+
+    assert ereignis.active is False
+    assert ereignis.deactivated is True
+    assert ereignis.to_dict()["close_reason"] == "deactivated"
+
+
+def test_anders_beendetes_ereignis_ist_nicht_wieder_aktivierbar() -> None:
+    """Was wegen seiner Bedingung endete, behauptet sonst eine alte Lage."""
+    ereignis = make_event()
+    ereignis.close(T0 + timedelta(minutes=5), CloseReason.CONDITION_CLEARED)
+    assert ereignis.deactivated is False
+
+
+def test_fortsetzen_behaelt_den_beginn() -> None:
+    ereignis = make_event()
+    beginn = ereignis.start_time
+    ereignis.close(T0 + timedelta(minutes=5), CloseReason.DEACTIVATED)
+
+    ereignis.reopen()
+
+    assert ereignis.active is True
+    assert ereignis.end_time is None
+    assert ereignis.close_reason is None
+    # Derselbe Datensatz, derselbe Beginn (Spezifikation 31).
+    assert ereignis.start_time == beginn
+    assert ereignis.deactivated is False
+
+
+def test_fortsetzen_eines_laufenden_ereignisses_ist_wirkungslos() -> None:
+    ereignis = make_event()
+    ereignis.reopen()
+    assert ereignis.active is True
+    assert ereignis.end_time is None
+
+
+def test_laufendes_ereignis_hat_keinen_abschlussgrund() -> None:
+    assert make_event().to_dict()["close_reason"] is None

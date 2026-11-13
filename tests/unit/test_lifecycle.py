@@ -396,3 +396,53 @@ def test_systemnachricht_zaehlt_wie_jede_andere_meldung() -> None:
     aktive.put(regelereignis(type=NotificationType.INFO))
 
     assert aktive.counts.to_dict() == Counts(info=1, warning=1).to_dict()
+
+
+# -- Deaktivieren und Fortsetzen -------------------------------------------
+
+
+def test_aktive_menge_findet_ein_ereignis_ueber_seine_kennung() -> None:
+    aktive = ActiveNotifications()
+    ereignis = regelereignis()
+    aktive.put(ereignis)
+
+    treffer = aktive.find(ereignis.event_id)
+    assert treffer is not None
+    schluessel, gefunden = treffer
+    assert schluessel == rule_key("rule_1")
+    assert gefunden is ereignis
+    assert aktive.find("gibt_es_nicht") is None
+
+
+def test_fortsetzen_zaehlt_kein_neues_ereignis() -> None:
+    """Es ist dasselbe Ereignis -- gezaehlt wurde es, als es entstand."""
+    aktive = ActiveNotifications()
+    aktive.roll_day(T0, events_today=1)
+    ereignis = regelereignis()
+    aktive.put(ereignis)
+    vorher = aktive.counts.events_today
+
+    aktive.close(rule_key("rule_1"), T0 + timedelta(minutes=5), CloseReason.DEACTIVATED)
+    aktive.reopen(ereignis)
+
+    assert aktive.counts.events_today == vorher
+    assert aktive.counts.active == 1
+    assert ereignis.active is True
+
+
+def test_fortsetzen_tritt_einer_laufenden_meldung_nicht_in_die_quere() -> None:
+    """Zwei Meldungen derselben Regel gleichzeitig gibt es nicht."""
+    aktive = ActiveNotifications()
+    alt = regelereignis()
+    aktive.put(alt)
+    aktive.close(rule_key("rule_1"), T0 + timedelta(minutes=5), CloseReason.DEACTIVATED)
+
+    # Die Bedingung hat erneut ausgeloest: eine neue Meldung laeuft.
+    neu = regelereignis(offset_minutes=10)
+    aktive.put(neu)
+
+    with pytest.raises(ValueError, match="laeuft bereits"):
+        aktive.reopen(alt)
+
+    assert aktive.get(rule_key("rule_1")) is neu
+    assert aktive.counts.active == 1

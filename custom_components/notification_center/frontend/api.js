@@ -21,7 +21,7 @@ export const EXPECTED_API_VERSION = 1;
  * hinterlegte Version deckt diesen Fall auf. Die CI prueft, dass sie zum
  * Manifest passt.
  */
-export const MODULE_VERSION = "1.3.1";
+export const MODULE_VERSION = "1.4.0";
 
 /**
  * Die Version dieses Frontends, abgelesen am eigenen Pfad.
@@ -97,6 +97,8 @@ export const api = {
   saveGroup: (hass, group) => call(hass, "save_group", { group }),
   setSettings: (hass, settings) => call(hass, "set_settings", settings),
   deleteEvent: (hass, eventId) => call(hass, "delete_event", { event_id: eventId }),
+  deactivateEvent: (hass, eventId) => call(hass, "deactivate_event", { event_id: eventId }),
+  reactivateEvent: (hass, eventId) => call(hass, "reactivate_event", { event_id: eventId }),
   clearHistory: (hass) => call(hass, "clear_history"),
 
   /**
