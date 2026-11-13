@@ -116,8 +116,20 @@ function zeile(event, locale) {
       <span class="time">${formatDateTime(event.start_time, locale)}</span>
       <span class="badge type-${event.type}">${typeLabel(event.type)}</span>
       ${sourceBadge(event)}
+      ${
+        deaktiviert(event)
+          ? `<span class="badge uncertain">${t("history.deactivated")}</span>`
+          : ""
+      }
       <span class="message">${escapeHtml(event.message)}</span>
       <span class="duration">${event.active ? t("dashboard.active") : eventDuration(event)}</span>
+      ${
+        deaktiviert(event)
+          ? `<button class="link" data-action="reactivate-event"
+                     data-event="${escapeHtml(event.event_id)}"
+                     title="${t("history.reactivateHint")}">${t("history.reactivate")}</button>`
+          : ""
+      }
       ${
         event.active
           ? ""
@@ -126,6 +138,18 @@ function zeile(event, locale) {
       }
     </li>
   `;
+}
+
+/**
+ * Von Hand deaktiviert -- und damit wieder aktivierbar.
+ *
+ * Erkannt am Grund des Abschlusses, nicht daran, dass der Eintrag beendet
+ * ist: alles andere endete, weil seine Bedingung entfiel, eine Stufe
+ * wechselte oder eine Regel verschwand. Das wieder aufzuwecken wuerde eine
+ * Lage behaupten, die es nicht mehr gibt.
+ */
+export function deaktiviert(event) {
+  return event?.active === false && event?.close_reason === "deactivated";
 }
 
 /**

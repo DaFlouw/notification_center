@@ -37,6 +37,8 @@ export default {
   "dashboard.quiet": "All quiet",
   "dashboard.historyLink": "History →",
   "dashboard.active": "active",
+  "dashboard.deactivate": "Deactivate",
+  "dashboard.deactivateHint": "Ends the notification by hand. It stays in the history and can be reactivated there.",
 
   // -- History --------------------------------------------------------
   "history.allTypes": "All types",
@@ -64,6 +66,9 @@ export default {
   "history.entries_one": "{count} entry",
   "history.entries_other": "{count} entries",
   "history.deleteEntry": "Delete entry",
+  "history.deactivated": "deactivated",
+  "history.reactivate": "Reactivate",
+  "history.reactivateHint": "Shows the notification again, as long as its condition still applies.",
 
   // -- Discovery ------------------------------------------------------
   "discovery.allTypes": "All types",

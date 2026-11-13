@@ -16,7 +16,7 @@ from homeassistant.helpers import entity_registry as er
 from .discovery.engine import DiscoveryEngine
 from .notifications.engine import NotificationEngine
 from .notifications.ha_system import HaSystemNotifications
-from .notifications.models import CloseReason
+from .notifications.models import CloseReason, NotificationSource
 from .rules.engine import RuleEngine
 from .rules.intents import NotificationIntent
 from .rules.models import Rule, RuleGroup
@@ -209,6 +209,29 @@ class NotificationCenterRuntime:
         regel.enabled = False
         await self.notification_engine.async_close_rules([rule_id], CloseReason.RULE_DISABLED)
         await self.async_config_changed()
+
+    async def async_deactivate_event(self, event_id: str) -> bool:
+        """Beendet eine laufende Meldung von Hand (Panel)."""
+        return await self.notification_engine.async_deactivate_event(event_id)
+
+    async def async_reactivate_event(self, event_id: str) -> bool:
+        """Setzt eine von Hand deaktivierte Meldung fort.
+
+        Die Rule Engine wird danach mit dem Ergebnis in Deckung gebracht: sie
+        fuehrt die Regel wieder als erfuellt, mit dem Beginn der Meldung, und
+        bewertet sie sofort neu. Liegt die Bedingung nicht mehr an, endet die
+        Meldung im selben Zug wieder -- sonst haette man eine Meldung ohne
+        Bedingung, die niemand mehr beendet.
+        """
+        ereignis = await self.notification_engine.async_reactivate_event(event_id)
+        if ereignis is None:
+            return False
+
+        if ereignis.source is NotificationSource.ENTITY_RULE and ereignis.rule_id is not None:
+            self.rule_engine.async_adopt_active({ereignis.rule_id: ereignis.start_time})
+            self.rule_engine.async_reconsider([ereignis.rule_id])
+
+        return True
 
     async def async_apply_system_notifications(self) -> None:
         """Nach einer Aenderung an der Uebernahme der HA-Systemnachrichten.

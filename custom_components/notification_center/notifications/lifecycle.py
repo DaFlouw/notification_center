@@ -138,6 +138,18 @@ class ActiveNotifications:
     def by_type(self, type: NotificationType) -> list[NotificationEvent]:
         return [event for event in self.events() if event.type is type]
 
+    def find(self, event_id: str) -> tuple[str, NotificationEvent] | None:
+        """Schluessel und Ereignis zu einer Event-ID.
+
+        Die aktive Menge ist klein (zweistellig, Spezifikation 44); ein
+        Durchlauf ist hier billiger als ein zweiter Index, der bei jeder
+        Aenderung mitgepflegt werden muesste.
+        """
+        for key, event in self._by_key.items():
+            if event.event_id == event_id:
+                return key, event
+        return None
+
     def keys_for_rules(self, rule_ids: Iterable[str]) -> list[str]:
         """Schluessel der aktiven Notifications bestimmter Regeln."""
         gesucht = {rule_key(rule_id) for rule_id in rule_ids}
@@ -180,6 +192,27 @@ class ActiveNotifications:
         self._by_type[gezaehlt] -= 1
         event.close(end_time, reason)
         return event
+
+    def reopen(self, event: NotificationEvent) -> None:
+        """Nimmt ein beendetes Ereignis wieder in die aktive Menge auf.
+
+        Anders als :meth:`put` zaehlt es nicht als neues Ereignis des Tages:
+        es ist dasselbe Ereignis, das bei seinem Entstehen schon gezaehlt
+        wurde.
+
+        Ist der Platz bereits von einer laufenden Meldung belegt -- die
+        Bedingung hat zwischenzeitlich erneut ausgeloest --, bleibt diese
+        unberuehrt und der Aufruf scheitert. Zwei Meldungen derselben Regel
+        gleichzeitig gibt es nicht.
+        """
+        key = key_for(event)
+        if key in self._by_key:
+            raise ValueError("Zu dieser Meldung laeuft bereits eine andere")
+
+        event.reopen()
+        self._by_key[key] = event
+        self._type_by_key[key] = event.type
+        self._by_type[event.type] += 1
 
     def close_all(self, end_time: datetime, reason: CloseReason) -> list[NotificationEvent]:
         geschlossen: list[NotificationEvent] = []

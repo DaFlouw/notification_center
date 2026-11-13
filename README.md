@@ -86,13 +86,17 @@ Shows **active** notifications only, grouped into alarms, warnings and info, eac
 
 ![Dashboard](docs/img/dashboard.png)
 
+Every notification can be **deactivated** — ticked off by hand, without waiting for its condition. It leaves the dashboard, stays in the history marked as deactivated, and can be reactivated from there. While its condition holds without interruption it does not come back by itself; once the condition clears and applies again, it reports as the new event it is.
+
 ### History
 
 Active and closed events, newest first. Filtering by type, source, period and area, as well as full-text search, run in the backend rather than in the browser. You choose how many entries a page holds: 50, 100 or 200.
 
 ![History](docs/img/historie.png)
 
-Active notifications carry no delete cross — they end through their condition, not by hand.
+A deactivated entry is marked as such and carries **Reactivate**, which continues the same record: same start, no second entry in the log, and the duration keeps counting from the original start. If the condition has ceased in the meantime, the notification ends again straight away — there is no notification without a condition.
+
+Active notifications carry no delete cross: a record of a running notification is not something to throw away. Deactivate it first, or wait for its condition.
 
 ### Rules
 
@@ -178,7 +182,7 @@ What is new:
 Mixed precedence — `A and (B or C)` — is deliberately not offered: it cannot be shown honestly in the editor without brackets. Levels of a rule group carry no further conditions either; their order is defined by their thresholds alone.
 
 > [!NOTE]
-> Entity-based notifications cannot be dismissed by hand. They end when their condition no longer holds, when their rule is deleted, or when their entity is removed from monitoring.
+> An entity-based notification ends when its condition no longer holds, when its rule is deleted, or when its entity is removed from monitoring. It can also be deactivated by hand in the dashboard — that ends this one notification, not the rule, which keeps watching.
 
 ---
 
@@ -314,7 +318,9 @@ Off by default — nobody should find messages in their dashboard after an updat
 | Start | When Home Assistant created the message, not when it was adopted |
 | End | When Home Assistant discards it |
 
-The direction is one-way on purpose: Home Assistant reports, the Notification Center shows. Discarding a system message stays where it belongs, at the bell — the Notification Center never discards anything on Home Assistant's behalf. A message that already stood in the sidebar is adopted when the integration starts, so a restart does not hide what Home Assistant reported while booting.
+The direction is one-way on purpose: Home Assistant reports, the Notification Center shows. Discarding a system message stays where it belongs, at the bell — the Notification Center never discards anything on Home Assistant's behalf.
+
+On start, both directions are reconciled: what stands in the sidebar is adopted, so a restart does not hide what Home Assistant reported while booting, and what the sidebar no longer holds is ended. The second half matters because persistent notifications live in memory only — a restart drops them without reporting their end, while the Notification Center's own entries survive it on purpose. The end time can then only be the moment of reconciliation; the entry's duration includes the downtime.
 
 Repairs and updates are not part of this. They are separate mechanisms with their own screens, and an update can already be watched with an ordinary rule on its `update` entity.
 

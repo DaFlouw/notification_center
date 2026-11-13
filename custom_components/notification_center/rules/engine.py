@@ -305,6 +305,32 @@ class RuleEngine:
 
             self._evaluate_entity(entity_id, jetzt)
 
+    @callback
+    def async_reconsider(self, rule_ids: Iterable[str]) -> None:
+        """Bewertet Regeln erneut, ohne ihren mitgefuehrten Zustand zu verwerfen.
+
+        Gebraucht, wenn eine von Hand deaktivierte Meldung wieder aktiviert
+        wird. Der Aufrufer hat den Regelzustand zuvor auf *erfuellt* gesetzt
+        (``async_adopt_active``); diese Auswertung entscheidet dann, ob die
+        Bedingung noch anliegt. Tut sie es nicht, gilt die Regel als gerade
+        entfallen und die wieder aufgenommene Meldung endet sofort -- statt
+        ohne Bedingung stehen zu bleiben.
+
+        Anders als ``async_evaluate_saved`` wird hier nichts vergessen: dort
+        beginnt eine Regel neu, hier soll sie gerade an ihren Zustand
+        erinnert werden.
+        """
+        jetzt = dt_util.utcnow()
+        entity_ids: set[str] = set()
+
+        for rule_id in rule_ids:
+            regel = self._config.rules.get(rule_id)
+            if regel is not None:
+                entity_ids.add(regel.entity_id)
+
+        for entity_id in entity_ids:
+            self._evaluate_entity(entity_id, jetzt)
+
     def _all_rules_for(self, entity_id: str) -> list[Rule]:
         """Alle Regeln einer Entity, auch die aus Gruppen."""
         return [rule for rule in self._config.rules.values() if rule.entity_id == entity_id]

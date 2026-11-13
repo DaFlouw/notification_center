@@ -450,6 +450,36 @@ async def ws_delete_event(hass, connection, msg, runtime) -> None:
     connection.send_result(msg["id"], _envelope({"deleted": geloescht}))
 
 
+@websocket_api.websocket_command(
+    {vol.Required("type"): f"{WS_PREFIX}/deactivate_event", vol.Required("event_id"): str}
+)
+@websocket_api.async_response
+@_requires_runtime
+async def ws_deactivate_event(hass, connection, msg, runtime) -> None:
+    """Beendet eine laufende Meldung von Hand.
+
+    Der Eintrag bleibt im Log und ist dort als deaktiviert gekennzeichnet;
+    ``reactivate_event`` setzt ihn fort.
+    """
+    erfolg = await runtime.async_deactivate_event(msg["event_id"])
+    connection.send_result(msg["id"], _envelope({"deactivated": erfolg}))
+
+
+@websocket_api.websocket_command(
+    {vol.Required("type"): f"{WS_PREFIX}/reactivate_event", vol.Required("event_id"): str}
+)
+@websocket_api.async_response
+@_requires_runtime
+async def ws_reactivate_event(hass, connection, msg, runtime) -> None:
+    """Setzt eine von Hand deaktivierte Meldung fort.
+
+    Scheitert, wenn der Eintrag nicht von Hand deaktiviert wurde oder
+    inzwischen eine andere Meldung derselben Regel laeuft.
+    """
+    erfolg = await runtime.async_reactivate_event(msg["event_id"])
+    connection.send_result(msg["id"], _envelope({"reactivated": erfolg}))
+
+
 @websocket_api.websocket_command({vol.Required("type"): f"{WS_PREFIX}/clear_history"})
 @websocket_api.async_response
 @_requires_runtime
@@ -538,6 +568,8 @@ COMMANDS = (
     ws_save_group,
     ws_set_settings,
     ws_delete_event,
+    ws_deactivate_event,
+    ws_reactivate_event,
     ws_clear_history,
     ws_subscribe_updates,
 )

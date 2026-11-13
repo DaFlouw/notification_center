@@ -130,6 +130,8 @@ export const GET_HISTORY = {
     { event_id: "ev_leck_alt", source: "entity_rule", type: "alarm", active: false, start_time: vor(1400), end_time: vor(1385), duration: 900, message: "Wasser in der Waschküche", entity_id: "binary_sensor.waschkueche_leckmelder", area_id: "waschkueche" },
     { event_id: "ev_system", source: "ha_system", type: "warning", active: true, start_time: vor(17), end_time: null, duration: seit(17), title: "Anmeldung", message: "Fehlgeschlagener Anmeldeversuch von 192.0.2.17", entity_id: null, area_id: null },
     { event_id: "ev_system_alt", source: "ha_system", type: "warning", active: false, start_time: vor(2800), end_time: vor(2790), duration: 600, message: "Sicherung konnte nicht erstellt werden", entity_id: null, area_id: null },
+    // Von Hand deaktiviert: bleibt im Log, gekennzeichnet, wieder aktivierbar.
+    { event_id: "ev_handtuch_deaktiviert", source: "entity_rule", type: "warning", active: false, start_time: vor(120), end_time: vor(95), duration: 1500, message: "Lötstation läuft seit über einer Stunde", entity_id: "switch.hobbyraum_loetstation", area_id: "hobbyraum", close_reason: "deactivated" },
   ],
 };
 

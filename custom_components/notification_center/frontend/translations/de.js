@@ -36,6 +36,8 @@ export default {
   "dashboard.quiet": "Alles ruhig",
   "dashboard.historyLink": "Historie →",
   "dashboard.active": "aktiv",
+  "dashboard.deactivate": "Deaktivieren",
+  "dashboard.deactivateHint": "Beendet die Meldung von Hand. Sie bleibt in der Historie und ist dort wieder aktivierbar.",
 
   // -- Historie -------------------------------------------------------
   "history.allTypes": "Alle Typen",
@@ -63,6 +65,9 @@ export default {
   "history.entries_one": "{count} Eintrag",
   "history.entries_other": "{count} Einträge",
   "history.deleteEntry": "Eintrag löschen",
+  "history.deactivated": "deaktiviert",
+  "history.reactivate": "Wieder aktivieren",
+  "history.reactivateHint": "Zeigt die Meldung erneut, sofern ihre Bedingung noch anliegt.",
 
   // -- Discovery ------------------------------------------------------
   "discovery.allTypes": "Alle Typen",

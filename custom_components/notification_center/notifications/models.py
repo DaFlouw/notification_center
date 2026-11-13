@@ -65,6 +65,10 @@ class CloseReason(StrEnum):
     ENTITY_REMOVED = "entity_removed"
     ENTITY_REPLACED = "entity_replaced"
     DISMISSED = "dismissed"
+    #: Von Hand im Panel beendet. Eigener Grund, nicht ``DISMISSED``: nur so
+    #: laesst sich im Log unterscheiden, was ein Mensch weggeklickt hat --
+    #: und nur das ist wieder aktivierbar.
+    DEACTIVATED = "deactivated"
     EXPIRED = "expired"
     SUPERSEDED = "superseded"
 
@@ -141,6 +145,28 @@ class NotificationEvent:
         self.active = False
         self.close_reason = reason
 
+    def reopen(self) -> None:
+        """Setzt ein beendetes Ereignis fort.
+
+        Fortsetzen, nicht neu anlegen: es bleibt derselbe Datensatz mit
+        demselben Beginn (Spezifikation 31). Im Log entsteht dadurch kein
+        zweiter Eintrag, und die Dauer zaehlt weiter ab dem urspruenglichen
+        Beginn -- die Zeit der Deaktivierung eingeschlossen. Das ist die
+        ehrlichere Angabe: die Bedingung lag waehrenddessen weiter an.
+
+        Mehrfaches Fortsetzen ist wirkungslos.
+        """
+        if self.active:
+            return
+        self.active = True
+        self.end_time = None
+        self.close_reason = None
+
+    @property
+    def deactivated(self) -> bool:
+        """Von Hand beendet und damit wieder aktivierbar."""
+        return not self.active and self.close_reason is CloseReason.DEACTIVATED
+
     # -- Serialisierung --------------------------------------------------
 
     def to_dict(self, now: datetime | None = None) -> dict[str, Any]:
@@ -164,6 +190,9 @@ class NotificationEvent:
             "level": self.level,
             "notification_id": self.notification_id,
             "owner": self.owner,
+            # Das Frontend kennzeichnet damit, was von Hand deaktiviert wurde,
+            # und bietet nur dort das Wiederaktivieren an.
+            "close_reason": str(self.close_reason) if self.close_reason else None,
         }
 
 
