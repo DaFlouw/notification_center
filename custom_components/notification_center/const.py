@@ -14,7 +14,7 @@ from typing import Final
 # --------------------------------------------------------------------------
 
 DOMAIN: Final = "notification_center"
-INTEGRATION_VERSION: Final = "1.5.0-rc1"
+INTEGRATION_VERSION: Final = "1.5.0-rc2"
 
 #: Nur eine globale Instanz pro Home-Assistant-Installation (Spezifikation 4).
 SINGLE_INSTANCE_TITLE: Final = "Notification Center"

@@ -84,7 +84,7 @@ Four areas, reachable through the tabs at the top.
 
 Shows **active** notifications only. Four tiles at the top give the overview and double as the filter: click *Alarms* and only alarms remain, click again and everything is back; the fourth tile leads to today's events. Below, the notifications are grouped by urgency, each with its text, its room, the time it started and how long it has been running. Every urgency has its own colour and its own shape, so it can be told apart at a glance. A notification with a linked entity is clickable and opens its more-info dialog.
 
-The version of the integration is shown here and only here, small at the foot of the page.
+The version of the integration is shown here and only here, small at the foot of the page; next to it, *Settings* leads to the integration's page in Home Assistant.
 
 ![Dashboard](docs/img/dashboard.png)
 
@@ -113,9 +113,11 @@ The page is built to stay usable as the number of rules grows:
 
 View, grouping and what is folded are remembered per browser.
 
+At the very bottom, if there are any, sits **Adopted, but without a rule**: entities that are watched but never report anything. From there you create their first rule or take the entity out again.
+
 ![Rule overview](docs/img/regeln.png)
 
-**Edit** leads into the editor. The rule whose form is currently open shows the note *being edited* instead of the button.
+**Edit** leads into the editor, a page of its own. At the top it shows the rule as a flow — the conditions with their value right now, the waiting time, the notification — and says whether it applies at this moment. Below are three steps: *When should it report?*, *How long does it have to last?*, *What should appear?* States, waiting time and type are picked by click; states are named the way Home Assistant names them.
 
 ![Rule editor](docs/img/editor.png)
 
@@ -124,7 +126,9 @@ View, grouping and what is folded are remembered per browser.
 
 ### Discovery
 
-Finds entities by type, name or entity ID and takes them into monitoring. Many come with a rule suggestion and a reason you can unfold.
+Finds entities by type, name or entity ID and takes them into monitoring. The toggles narrow the list to monitored entities, to monitored ones without a rule, or to entities with a suggestion; the types present in your installation sit below as pills with their counts. Where there is a rule suggestion — and only there — you find *View suggestions*: the condition in building blocks, with the reason underneath.
+
+Fifty hits are loaded; *Load more* fetches the next ones. To remove an entity again, go to the page of its rules.
 
 ![Discovery with a suggestion](docs/img/discovery.png)
 

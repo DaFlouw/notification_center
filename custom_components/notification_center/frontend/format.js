@@ -34,7 +34,7 @@ const TYPE_TYPEN = ["info", "warning", "alarm"];
  */
 export function sourceBadge(event) {
   if (event?.source !== "ha_system") return "";
-  return `<span class="badge" title="${escapeHtml(t("common.haSystem"))}">${escapeHtml(
+  return `<span class="badge source" title="${escapeHtml(t("common.haSystem"))}">${escapeHtml(
     t("common.haSystemShort")
   )}</span>`;
 }

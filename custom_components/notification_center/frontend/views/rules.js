@@ -16,17 +16,9 @@ import { categoryLabel, escapeHtml, eventDuration, typeLabel } from "../format.j
 import { raw } from "../html.js";
 import { t } from "../i18n.js";
 import { icon } from "../icons.js";
-
-const BEDINGUNGEN = ["state_is", "state_is_not", "state_changed_to", "numeric"];
+import { renderEditor } from "./editor.js";
 
 const OPERATOREN = ["gt", "gte", "lt", "lte", "eq"];
-
-const TYPEN = ["info", "warning", "alarm"];
-
-const LOGIK = ["all", "any"];
-
-/** Kennung der Entity-Liste des Formulars; im Shadow DOM eindeutig. */
-const ENTITY_LISTE = "nc-entity-liste";
 
 export function leereRegel(entityId) {
   return {
@@ -171,17 +163,20 @@ export function renderRuleOverview(state) {
   return `
     <section class="card pad" aria-label="${t("rules.filterLabel")}">
       <div class="filters">
-        <input type="search" data-rule-search placeholder="${t("rules.searchPlaceholder")}"
-               value="${escapeHtml(search)}" aria-label="${t("rules.searchPlaceholder")}">
+        <label class="search">
+          ${icon("search", 18)}
+          <input type="search" data-rule-search placeholder="${t("rules.searchPlaceholder")}"
+                 value="${escapeHtml(search)}" aria-label="${t("rules.searchPlaceholder")}">
+        </label>
 
-        <div class="segmented" role="group" aria-label="${t("rules.densityLabel")}">
+        <div class="segmented view" role="group" aria-label="${t("rules.densityLabel")}">
           <button data-action="set-rule-density" data-value="cards"
                   aria-pressed="${!dicht}">${t("rules.densityCards")}</button>
           <button data-action="set-rule-density" data-value="list"
                   aria-pressed="${dicht}">${t("rules.densityList")}</button>
         </div>
 
-        <div class="segmented" role="group" aria-label="${t("rules.groupLabel")}">
+        <div class="segmented view" role="group" aria-label="${t("rules.groupLabel")}">
           <button data-action="set-rule-group" data-value="room"
                   aria-pressed="${group !== "type"}">${t("rules.groupRoom")}</button>
           <button data-action="set-rule-group" data-value="type"
@@ -218,6 +213,50 @@ export function renderRuleOverview(state) {
             "rules.noMatchHint"
           )}</span></div>`
     }
+
+    ${ohneRegel(entities, rules)}
+  `;
+}
+
+/**
+ * Uebernommene Entities, die keine Regel tragen.
+ *
+ * Sie werden beobachtet, melden aber nie etwas -- und tauchen in der
+ * Uebersicht sonst nirgends auf. Wer in der Discovery "23 ueberwacht" liest
+ * und hier 17 Regeln zaehlt, sucht die Differenz vergeblich. Hier steht sie,
+ * mit den zwei Dingen, die man damit tun will: eine Regel anlegen oder die
+ * Entity wieder entfernen.
+ */
+export function ohneRegel(entities, rules) {
+  const mitRegel = new Set(rules.map((regel) => regel.entity_id));
+  const leer = entities.filter((eintrag) => !mitRegel.has(eintrag.entity_id));
+  if (!leer.length) return "";
+
+  return `
+    <section class="section">
+      <div class="section-title">${t("rules.withoutRule")} · ${leer.length}</div>
+      <ul class="card rows">
+        ${leer
+          .map(
+            (eintrag) => `
+              <li class="row">
+                <span class="row-body">
+                  <span class="entity-name">${escapeHtml(eintrag.name || eintrag.entity_id)}</span>
+                  <span class="mono">${escapeHtml(eintrag.entity_id)}${
+                    eintrag.area_name ? ` · ${escapeHtml(eintrag.area_name)}` : ""
+                  }</span>
+                </span>
+                <button class="btn soft" data-action="show-rules"
+                        data-entity="${escapeHtml(eintrag.entity_id)}"
+                        data-name="${escapeHtml(eintrag.name || "")}">${t("rules.create")}</button>
+                <button class="btn" data-action="remove-entity"
+                        data-entity="${escapeHtml(eintrag.entity_id)}">${t("discovery.remove")}</button>
+              </li>
+            `
+          )
+          .join("")}
+      </ul>
+    </section>
   `;
 }
 
@@ -551,13 +590,11 @@ export function renderRules(state) {
     entityName,
     rules = [],
     entwurf,
-    states = [],
-    attributes = [],
     names = {},
-    candidates = [],
-    conditionOptions = {},
     active = [],
   } = state;
+
+  if (entwurf) return renderEditor(state);
 
   const meldend = meldendeRegeln(active);
 
@@ -594,18 +631,15 @@ export function renderRules(state) {
           : `<div class="row-sub">${t("rules.none")}</div>`
       }
 
-      ${
-        entwurf
-          ? ""
-          : `<div class="footer-link">
-               <button class="action" data-action="new-rule">${t("rules.create")}</button>
-               <button class="action secondary" data-action="replace-entity"
-                       data-entity="${escapeHtml(entityId)}">${t("rules.replaceEntity")}</button>
-             </div>`
-      }
+      <div class="footer-link">
+        <button class="action" data-action="new-rule">${t("rules.create")}</button>
+        <button class="action secondary" data-action="replace-entity"
+                data-entity="${escapeHtml(entityId)}">${t("rules.replaceEntity")}</button>
+        <span class="spacer"></span>
+        <button class="btn ghost danger" data-action="remove-entity"
+                data-entity="${escapeHtml(entityId)}">${t("rules.removeEntity")}</button>
+      </div>
     </section>
-
-    ${entwurf ? formular(entwurf, states, attributes, candidates, conditionOptions) : ""}
   `;
 }
 
@@ -703,7 +737,7 @@ function bedingungsZeilen(regel, namen) {
 }
 
 /** Eine Bedingung als ein oder zwei Bausteine. Die Werte stehen fett. */
-function bedingungsChips(bedingung, namen = {}) {
+export function bedingungsChips(bedingung, namen = {}) {
   const ort = bedingung.entity_id
     ? `${escapeHtml(namen[bedingung.entity_id] || bedingung.entity_id)} · `
     : "";
@@ -805,348 +839,6 @@ function bedingungText(bedingung, namen = {}) {
 function dauerText(regel) {
   if (!regel.duration_seconds) return "";
   return t("rules.describe.longerThan", { minutes: Math.round(regel.duration_seconds / 60) });
-}
-
-function formular(entwurf, states, attributes, kandidaten = [], bedingungsOptionen = {}) {
-  const numerisch = entwurf.kind === "numeric";
-
-  return `
-    <section class="card pad">
-      <h3>${entwurf.rule_id ? t("rules.editTitle") : t("rules.create")}</h3>
-      <div class="form-label">${t("rules.sectionWhen")}</div>
-      <div class="filters">
-        <select data-rule-field="kind" aria-label="${t("rules.condition")}">
-          ${auswahl(BEDINGUNGEN, entwurf.kind, (wert) => t(`rules.kind.${wert}`))}
-        </select>
-
-        <select data-rule-field="source" aria-label="${t("rules.valueSource")}">
-          <option value="">${t("common.state")}</option>
-          ${attributes
-            .map(
-              (attribut) =>
-                `<option value="${escapeHtml(attribut.name)}" ${
-                  entwurf.value_source?.attribute === attribut.name ? "selected" : ""
-                }>${escapeHtml(t("rules.attribute", { name: attribut.name }))}</option>`
-            )
-            .join("")}
-        </select>
-      </div>
-
-      <div class="filters">
-        ${
-          numerisch
-            ? `<select data-rule-field="operator" aria-label="${t("rules.comparison")}">
-                 ${auswahl(OPERATOREN, entwurf.operator, (wert) => t(`rules.operator.${wert}`))}
-               </select>
-               <input type="number" step="any" data-rule-field="threshold"
-                      placeholder="${t("rules.threshold")}" aria-label="${t("rules.threshold")}"
-                      value="${entwurf.threshold ?? ""}">`
-            : zustandsauswahl(entwurf, states, attributes)
-        }
-      </div>
-
-      ${numerisch ? "" : wertHinweis(entwurf, attributes)}
-
-      ${bedingungsBlock(entwurf, kandidaten, {
-        "": { states, attributes, exists: true },
-        ...bedingungsOptionen,
-      })}
-
-      <div class="form-label">${t("rules.sectionThen")}</div>
-      <div class="filters">
-        <select data-rule-field="type" aria-label="${t("history.type")}">
-          ${auswahl(TYPEN, entwurf.type, typeLabel)}
-        </select>
-        <input type="text" data-rule-field="message" style="flex: 1; min-width: 220px"
-               placeholder="${escapeHtml(t("rules.messagePlaceholder"))}"
-               aria-label="${t("rules.message")}"
-               value="${escapeHtml(entwurf.message_template || "")}">
-      </div>
-
-      <details ${entwurf.release_threshold != null || entwurf.duration_seconds ? "open" : ""}>
-        <summary>${t("rules.advanced")}</summary>
-        <div class="filters" style="margin-top: 8px">
-          ${
-            numerisch
-              ? `<label class="field"><span>${t("rules.releasePlaceholder")}</span>
-                   <input type="number" step="any" data-rule-field="release"
-                          aria-label="${t("rules.release")}"
-                          value="${entwurf.release_threshold ?? ""}"></label>`
-              : ""
-          }
-          <label class="field"><span>${t("rules.durationPlaceholder")}</span>
-            <input type="number" min="0" data-rule-field="duration"
-                   aria-label="${t("rules.duration")}"
-                   value="${entwurf.duration_seconds ? Math.round(entwurf.duration_seconds / 60) : ""}"></label>
-        </div>
-      </details>
-
-      <div class="footer-link">
-        <button class="action" data-action="save-rule">${t("common.save")}</button>
-        <button class="action secondary" data-action="cancel-rule">${t("common.cancel")}</button>
-      </div>
-    </section>
-  `;
-}
-
-/**
- * Das Feld fuer den Zielwert.
- *
- * Die Auswahlliste gilt nur fuer den Zustand der Entity. Ist ein Attribut
- * die Wertquelle, passt sie nicht: ihre Werte gehoeren zu einer anderen
- * Groesse. Genau daran scheiterte eine Regel auf ein Attribut ``state``,
- * dessen Werte gross geschrieben sind, waehrend die Liste die klein
- * geschriebenen Zustaende der Entity anbot (Issue 14). Welche Werte ein
- * Attribut annehmen kann, weiss das Backend nicht -- deshalb ein Textfeld.
- */
-function zustandsauswahl(entwurf, states, attributes = []) {
-  if (attributname(entwurf)) {
-    return `<input type="text" data-rule-field="states"
-                   placeholder="${escapeHtml(attributVorgabe(entwurf, attributes))}"
-                   aria-label="${t("common.state")}"
-                   value="${escapeHtml((entwurf.states || []).join(", "))}">`;
-  }
-
-  if (!states.length) {
-    return `<input type="text" data-rule-field="states"
-                   placeholder="${t("rules.statePlaceholder")}" aria-label="${t("common.state")}"
-                   value="${escapeHtml((entwurf.states || []).join(", "))}">`;
-  }
-
-  // Auswahlfeld statt Textfeld: die Werte stammen aus der Entity selbst.
-  return `
-    <select data-rule-field="states" aria-label="${t("common.state")}" multiple
-            size="${Math.min(states.length, 4)}">
-      ${states
-        .map(
-          (zustand) =>
-            `<option value="${escapeHtml(zustand)}" ${
-              (entwurf.states || []).includes(zustand) ? "selected" : ""
-            }>${escapeHtml(zustand)}</option>`
-        )
-        .join("")}
-    </select>
-  `;
-}
-
-/** Der Name des Attributs, das als Wertquelle dient -- sonst ``null``. */
-function attributname(entwurf) {
-  return entwurf.value_source?.kind === "attribute" ? entwurf.value_source.attribute : null;
-}
-
-/** Der aktuelle Wert des gewaehlten Attributs, als Text. */
-function attributWert(entwurf, attributes) {
-  const name = attributname(entwurf);
-  if (!name) return null;
-  const attribut = (attributes || []).find((eintrag) => eintrag.name === name);
-  return attribut && attribut.value != null ? String(attribut.value) : null;
-}
-
-function attributVorgabe(entwurf, attributes) {
-  return attributWert(entwurf, attributes) ?? t("rules.statePlaceholder");
-}
-
-/**
- * Hilfe unter dem Feld: der aktuelle Wert, und eine Warnung, wenn der
- * eingetragene sich davon nur in der Gross- und Kleinschreibung
- * unterscheidet.
- *
- * Der Vergleich im Backend bleibt zeichengenau -- Zustaende sind in Home
- * Assistant gross- und kleinschreibungsempfindlich. Eine stillschweigend
- * unscharfe Regel waere schlechter als eine, die man sieht.
- */
-function wertHinweis(entwurf, attributes) {
-  const aktuell = attributWert(entwurf, attributes);
-  if (aktuell === null) return "";
-
-  const eingetragen = (entwurf.states || []).map((wert) => String(wert).trim()).filter(Boolean);
-  const schreibweise = eingetragen.some(
-    (wert) => wert !== aktuell && wert.toLowerCase() === aktuell.toLowerCase()
-  );
-
-  return `
-    <div class="entity-meta">
-      ${t("rules.currentValue", { value: aktuell })}
-      ${
-        schreibweise
-          ? `<span class="badge uncertain">${t("rules.caseMismatch", { value: aktuell })}</span>`
-          : ""
-      }
-    </div>
-  `;
-}
-
-
-/**
- * Die weiteren Bedingungen samt Verknuepfung.
- *
- * Die Auswahl der Verknuepfung erscheint erst, wenn es etwas zu verknuepfen
- * gibt: bei einer einzigen Bedingung waere sie eine Frage ohne Gegenstand.
- */
-function bedingungsBlock(entwurf, kandidaten, optionen) {
-  const extras = entwurf.extra_conditions || [];
-
-  return `
-    <div class="form-section">
-      ${
-        extras.length
-          ? `<div class="filters">
-               <select data-rule-field="logic" aria-label="${t("rules.logicLabel")}">
-                 ${auswahl(LOGIK, entwurf.logic || "all", (wert) =>
-                   wert === "any" ? t("rules.logicAny") : t("rules.logicAll")
-                 )}
-               </select>
-             </div>`
-          : ""
-      }
-
-      ${extras
-        .map((bedingung, index) => bedingungsZeile(bedingung, index, kandidaten, optionen))
-        .join("")}
-
-      <div class="filters">
-        <button class="link" data-action="add-condition">+ ${t("rules.addCondition")}</button>
-      </div>
-
-      ${entityListe(kandidaten)}
-    </div>
-  `;
-}
-
-/**
- * Eine weitere Bedingung.
- *
- * Das Entity-Feld ist ein Textfeld mit Vorschlagsliste und nicht ein
- * Auswahlfeld: eine Anlage hat leicht tausend Entities, und eine Liste dieser
- * Laenge laesst sich nicht bedienen. Leer bedeutet "diese Entity".
- */
-function bedingungsZeile(bedingung, index, kandidaten, optionen) {
-  const numerisch = bedingung.kind === "numeric";
-  // Die leere Kennung steht fuer die Entity der Regel; ihre Werte liegen
-  // unter demselben Schluessel in der Mappe.
-  const info = optionen[bedingung.entity_id || ""] || {};
-  const attribute = info.attributes || [];
-  const zustaende = info.states || [];
-  const feld = `data-cond-field`;
-  const nr = `data-cond-index="${index}"`;
-
-  return `
-    <div class="condition">
-      <div class="filters">
-        <input type="text" list="${ENTITY_LISTE}" ${feld}="entity" ${nr}
-               placeholder="${t("rules.thisEntity")}"
-               aria-label="${t("rules.conditionEntity")}"
-               value="${escapeHtml(bedingung.entity_id || "")}">
-
-        <select ${feld}="kind" ${nr} aria-label="${t("rules.condition")}">
-          ${auswahl(BEDINGUNGEN, bedingung.kind, (wert) => t(`rules.kind.${wert}`))}
-        </select>
-
-        <select ${feld}="source" ${nr} aria-label="${t("rules.valueSource")}">
-          <option value="">${t("common.state")}</option>
-          ${attribute
-            .map(
-              (attribut) =>
-                `<option value="${escapeHtml(attribut.name)}" ${
-                  bedingung.value_source?.attribute === attribut.name ? "selected" : ""
-                }>${escapeHtml(t("rules.attribute", { name: attribut.name }))}</option>`
-            )
-            .join("")}
-        </select>
-      </div>
-
-      <div class="filters">
-        ${
-          numerisch
-            ? `<select ${feld}="operator" ${nr} aria-label="${t("rules.comparison")}">
-                 ${auswahl(OPERATOREN, bedingung.operator, (wert) => t(`rules.operator.${wert}`))}
-               </select>
-               <input type="number" step="any" ${feld}="threshold" ${nr}
-                      placeholder="${t("rules.threshold")}" aria-label="${t("rules.threshold")}"
-                      value="${bedingung.threshold ?? ""}">`
-            : zustandsfeld(bedingung, zustaende, `${feld}="states" ${nr}`)
-        }
-
-        ${
-          bedingung.kind === "state_changed_to"
-            ? ""
-            : `<label class="negate">
-                 <input type="checkbox" ${feld}="negate" ${nr}
-                        ${bedingung.negate ? "checked" : ""}>
-                 ${t("rules.negate")}
-               </label>`
-        }
-
-        <button class="link" data-action="remove-condition" data-index="${index}">
-          ${t("rules.removeCondition")}
-        </button>
-      </div>
-
-      ${
-        bedingung.entity_id && info.exists === false
-          ? `<div class="entity-meta">${t("rules.entityUnknown")}</div>`
-          : ""
-      }
-    </div>
-  `;
-}
-
-/** Die Vorschlagsliste der Entities, einmal je Formular. */
-function entityListe(kandidaten) {
-  if (!kandidaten.length) return "";
-  return `
-    <datalist id="${ENTITY_LISTE}">
-      ${kandidaten
-        .map(
-          (eintrag) =>
-            `<option value="${escapeHtml(eintrag.entity_id)}">${escapeHtml(
-              eintrag.name || eintrag.entity_id
-            )}</option>`
-        )
-        .join("")}
-    </datalist>
-  `;
-}
-
-/**
- * Das Wertfeld einer Teilbedingung.
- *
- * Wie bei der ersten Bedingung: Auswahl, solange die Werte aus der Entity
- * selbst stammen, sonst ein Textfeld (siehe ``zustandsauswahl``).
- */
-function zustandsfeld(bedingung, zustaende, attribute) {
-  const wert = escapeHtml((bedingung.states || []).join(", "));
-
-  if (bedingung.value_source?.kind === "attribute" || !zustaende.length) {
-    return `<input type="text" ${attribute}
-                   placeholder="${t("rules.statePlaceholder")}"
-                   aria-label="${t("common.state")}" value="${wert}">`;
-  }
-
-  return `
-    <select ${attribute} aria-label="${t("common.state")}" multiple
-            size="${Math.min(zustaende.length, 4)}">
-      ${zustaende
-        .map(
-          (zustand) =>
-            `<option value="${escapeHtml(zustand)}" ${
-              (bedingung.states || []).includes(zustand) ? "selected" : ""
-            }>${escapeHtml(zustand)}</option>`
-        )
-        .join("")}
-    </select>
-  `;
-}
-
-function auswahl(werte, aktiv, beschriftung) {
-  return werte
-    .map(
-      (wert) =>
-        `<option value="${wert}" ${aktiv === wert ? "selected" : ""}>${escapeHtml(
-          beschriftung(wert)
-        )}</option>`
-    )
-    .join("");
 }
 
 /** Uebersetzt den Formularzustand in das Format der Backend-API. */

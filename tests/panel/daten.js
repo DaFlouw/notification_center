@@ -43,6 +43,8 @@ export const GET_CONFIG = {
     { entity_id: "switch.hobbyraum_loetstation", device_id: "dev_schalter_1", area_id: "hobbyraum", name: "Lötstation", area_name: "Hobbyraum", floor_id: "keller", floor_name: "Keller" },
     { entity_id: "switch.netzwerkspeicher", device_id: null, area_id: null, name: "Netzwerkspeicher", area_name: null, floor_id: null, floor_name: null },
     { entity_id: "person.alex", device_id: null, area_id: null, name: "Alex", area_name: null, floor_id: null, floor_name: null },
+    // Uebernommen, aber ohne Regel: steht in der Uebersicht in einem eigenen Abschnitt.
+    { entity_id: "sensor.keller_gefriertruhe_temperatur", device_id: null, area_id: null, name: "Temperatur Gefriertruhe", area_name: null, floor_id: null, floor_name: null },
   ],
   rules: [
     { rule_id: "rule_terrasse", entity_id: "binary_sensor.wohnzimmer_terrassentuer", kind: "state_is", type: "info", enabled: true, value_source: { kind: "state", attribute: null }, states: ["on"], operator: null, threshold: null, release_threshold: null, duration_seconds: null, message_template: "Terrassentür ist offen", group_id: null, level: null },
@@ -142,7 +144,7 @@ GET_HISTORY.events.sort((a, b) => new Date(b.start_time) - new Date(a.start_time
 export const DISCOVER = {
   api_version: 1,
   version: VERSION,
-  status_counts: { all: 142, monitored: 10, suggested: 7 },
+  status_counts: { all: 142, monitored: 10, without_rule: 1, suggested: 7 },
   domain_counts: { sensor: 51, binary_sensor: 38, light: 22, switch: 17, input_boolean: 8, climate: 6, person: 2 },
   entities: [
     { entity_id: "sensor.bad_luftfeuchte", name: "Luftfeuchte Bad", domain: "sensor", state: "74", device_class: "humidity", unit: "%", device_id: "dev_klima_1", device_name: "Klimasensor Bad", area_id: "bad", area_name: "Bad", monitored: true, rule_count: 1, has_suggestions: false },
