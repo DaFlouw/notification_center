@@ -18,6 +18,11 @@ const sheet = new CSSStyleSheet();
 sheet.replaceSync(`
   :host {
     --nc-accent: var(--primary-color, #03a9f4);
+    /* Gefuellte Flaechen mit weisser Schrift: das Blau von Home Assistant ist
+       dafuer zu hell (Kontrast rund 2,5 zu 1). Abgedunkelt traegt es den
+       Text, bleibt aber erkennbar dieselbe Farbe -- und folgt weiter dem
+       Theme. */
+    --nc-accent-strong: color-mix(in srgb, var(--nc-accent) 70%, #000000);
     --nc-surface: var(--card-background-color, #ffffff);
     --nc-ground: var(--primary-background-color, #f2f5fa);
     --nc-text: var(--primary-text-color, #1b2430);
@@ -41,9 +46,9 @@ sheet.replaceSync(`
     --nc-warning-chip: color-mix(in srgb, var(--nc-warning) 30%, var(--nc-surface));
     --nc-warning-ink: color-mix(in srgb, var(--nc-warning) 50%, var(--nc-text));
 
-    --nc-info-soft: color-mix(in srgb, var(--nc-info) 9%, var(--nc-surface));
+    --nc-info-soft: color-mix(in srgb, var(--nc-info) 12%, var(--nc-surface));
     --nc-info-chip: color-mix(in srgb, var(--nc-info) 24%, var(--nc-surface));
-    --nc-info-ink: color-mix(in srgb, var(--nc-info) 66%, var(--nc-text));
+    --nc-info-ink: color-mix(in srgb, var(--nc-info) 50%, var(--nc-text));
 
     --nc-ok-chip: color-mix(in srgb, var(--nc-ok) 20%, var(--nc-surface));
     --nc-ok-ink: color-mix(in srgb, var(--nc-ok) 62%, var(--nc-text));
@@ -53,7 +58,7 @@ sheet.replaceSync(`
     --nc-special-ink: color-mix(in srgb, var(--nc-special) 72%, var(--nc-text));
 
     --nc-accent-chip: color-mix(in srgb, var(--nc-accent) 16%, var(--nc-surface));
-    --nc-accent-ink: color-mix(in srgb, var(--nc-accent) 62%, var(--nc-text));
+    --nc-accent-ink: color-mix(in srgb, var(--nc-accent) 55%, var(--nc-text));
 
     --nc-radius: 20px;
     --nc-radius-row: 14px;
@@ -91,8 +96,8 @@ sheet.replaceSync(`
     width: 40px;
     height: 40px;
     border-radius: 12px;
-    background: var(--nc-accent);
-    color: var(--text-primary-color, #ffffff);
+    background: var(--nc-accent-strong);
+    color: #ffffff;
   }
 
   header h1 { font-size: 20px; font-weight: 500; margin: 0; }
@@ -123,8 +128,8 @@ sheet.replaceSync(`
   }
 
   nav button[aria-current="page"] {
-    background: var(--nc-accent);
-    color: var(--text-primary-color, #ffffff);
+    background: var(--nc-accent-strong);
+    color: #ffffff;
   }
 
   .count {
@@ -384,8 +389,8 @@ sheet.replaceSync(`
 
   button.action:not(.secondary), .btn.primary {
     border-color: transparent;
-    background: var(--nc-accent);
-    color: var(--text-primary-color, #ffffff);
+    background: var(--nc-accent-strong);
+    color: #ffffff;
   }
 
   .btn.soft { border-color: transparent; background: var(--nc-accent-chip); color: var(--nc-accent-ink); }
