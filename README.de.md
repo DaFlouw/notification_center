@@ -82,7 +82,9 @@ Vier Bereiche, erreichbar ueber die Reiter am Kopf.
 
 ### Dashboard
 
-Zeigt ausschliesslich **aktive** Meldungen, gruppiert nach Alarmen, Warnungen und Infos, jeweils mit Text, Ausloeseuhrzeit und Laufzeit. Eine Meldung mit verknuepfter Entity ist anklickbar und oeffnet deren Detailansicht.
+Zeigt ausschliesslich **aktive** Meldungen. Vier Kacheln oben geben den Ueberblick und sind zugleich der Filter: ein Klick auf *Alarme* laesst nur Alarme stehen, ein zweiter zeigt wieder alles; die vierte fuehrt zu den Ereignissen von heute. Darunter stehen die Meldungen nach Dringlichkeit, jeweils mit Text, Raum, Ausloeseuhrzeit und Laufzeit. Jede Dringlichkeit hat ihre eigene Farbe und ihre eigene Form und ist damit auf einen Blick zu unterscheiden. Eine Meldung mit verknuepfter Entity ist anklickbar und oeffnet deren Detailansicht.
+
+Die Version der Integration steht hier und nur hier, klein am Fuss der Seite.
 
 ![Dashboard](docs/img/dashboard.png)
 
@@ -90,7 +92,7 @@ Jede Meldung laesst sich **deaktivieren** — von Hand abhaken, ohne auf ihre Be
 
 ### Historie
 
-Aktive und abgeschlossene Ereignisse, neueste zuerst. Filtern nach Typ, Quelle, Zeitraum und Bereich sowie die Volltextsuche laufen im Backend, nicht im Browser. Wie viele Eintraege eine Seite umfasst, waehlst du selbst: 50, 100 oder 200.
+Aktive und abgeschlossene Ereignisse, neueste zuerst und nach Tagen gegliedert. Was noch laeuft, ist getoent und faellt beim Ueberfliegen auf. Filtern nach Typ, Quelle, Zeitraum und Bereich sowie die Volltextsuche laufen im Backend, nicht im Browser. Wie viele Eintraege eine Seite umfasst, waehlst du selbst: 50, 100 oder 200.
 
 ![Historie](docs/img/historie.png)
 
@@ -100,7 +102,16 @@ Aktive Meldungen tragen kein Loeschkreuz: der Datensatz einer laufenden Meldung 
 
 ### Regeln
 
-Der gesamte Regelbestand, nach Geschoss und Raum gruppiert, darunter eingerueckt die Entities. Was keinem Raum zugeordnet ist, sammelt sich am Ende.
+Der gesamte Regelbestand, nach Geschoss und Raum. Jede Regel zeigt ihre Bedingung als Bausteine — *Zustand ist **on***, *laenger als **15 min***, *und nicht Alex · Zustand ist **home*** — und ob sie gerade meldet. Was keinem Raum zugeordnet ist, sammelt sich am Ende.
+
+Die Seite ist dafuer gebaut, mit wachsendem Bestand brauchbar zu bleiben:
+
+- Was gerade meldet, steht angeheftet ganz oben.
+- Geschosse lassen sich einklappen und sagen zugeklappt, wie viele Regeln sie fuehren und ob eine davon meldet. Ab mehr als 24 Regeln starten Geschosse zugeklappt, in denen nichts meldet.
+- Die dichte Liste zeigt eine Zeile je Regel, jeden Raum als eigenes Feld; ab mehr als 24 Regeln ist sie die Vorgabe und jederzeit umschaltbar.
+- Die Suche erfasst Entity, Raum, Bedingung und Meldungstext; Filter grenzen auf einen Typ, auf verknuepfte oder auf abgeschaltete Regeln ein. Die Gliederung nach Typ statt nach Geschoss ist einen Klick entfernt.
+
+Darstellung, Gliederung und Eingeklapptes merkt sich der Browser.
 
 ![Regeluebersicht](docs/img/regeln.png)
 

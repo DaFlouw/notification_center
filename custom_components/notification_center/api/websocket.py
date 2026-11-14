@@ -218,6 +218,7 @@ async def ws_get_config(hass, connection, msg, runtime) -> None:
         vol.Optional("domain"): vol.Any(str, None),
         vol.Optional("search"): vol.Any(str, None),
         vol.Optional("limit"): vol.All(int, vol.Range(min=1, max=500)),
+        vol.Optional("status"): vol.Any(vol.In(["all", "monitored", "suggested"]), None),
     }
 )
 @websocket_api.async_response
@@ -228,8 +229,17 @@ async def ws_discover(hass, connection, msg, runtime) -> None:
         domain=msg.get("domain"),
         search=msg.get("search"),
         limit=msg.get("limit", 100),
+        status=msg.get("status"),
     )
-    connection.send_result(msg["id"], _envelope({"entities": ergebnis}))
+    connection.send_result(
+        msg["id"],
+        _envelope(
+            {
+                "entities": ergebnis,
+                "domain_counts": runtime.discovery.domain_counts(msg.get("search")),
+            }
+        ),
+    )
 
 
 @websocket_api.websocket_command(

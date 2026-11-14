@@ -7,7 +7,7 @@
  * (Spezifikation 13).
  */
 
-import { escapeHtml } from "../format.js";
+import { escapeHtml, typeLabel } from "../format.js";
 import { t } from "../i18n.js";
 
 /**
@@ -66,73 +66,168 @@ const TYP_GRUPPEN = [
   },
 ];
 
+/** Wie viele Typen als Schnellwahl erscheinen. */
+const SCHNELLWAHL = 6;
+
+const STATUS = ["all", "monitored", "suggested"];
+
 export function renderDiscovery(state) {
-  const { entities = [], domain = "", search = "", loading, suggestions = {} } = state;
+  const {
+    entities = [],
+    domain = "",
+    search = "",
+    loading,
+    suggestions = {},
+    status = "all",
+    domainCounts = {},
+  } = state;
 
   return `
-    <div class="filters">
-      <select data-discovery="domain" aria-label="${t("discovery.entityType")}">
-        <option value="" ${domain === "" ? "selected" : ""}>${t("discovery.allTypes")}</option>
-        ${TYP_GRUPPEN.map(
-          (gruppe) => `
-            <optgroup label="${escapeHtml(t(gruppe.schluessel))}">
-              ${gruppe.domains
-                .map(
-                  (domaene) =>
-                    `<option value="${domaene}" ${
-                      domain === domaene ? "selected" : ""
-                    }>${escapeHtml(t(`discovery.domain.${domaene}`))}</option>`
-                )
-                .join("")}
-            </optgroup>
-          `
-        ).join("")}
-      </select>
-      <input type="search" data-discovery="search" placeholder="${t("discovery.searchPlaceholder")}"
-             value="${escapeHtml(search)}" aria-label="${t("history.search")}">
-    </div>
+    <section class="card pad" aria-label="${t("discovery.filterLabel")}">
+      <div class="filters">
+        <input type="search" data-discovery="search" placeholder="${t("discovery.searchPlaceholder")}"
+               value="${escapeHtml(search)}" aria-label="${t("history.search")}">
+
+        <div class="segmented" role="group" aria-label="${t("discovery.statusLabel")}">
+          ${STATUS.map(
+            (wert) =>
+              `<button data-action="set-discovery-status" data-value="${wert}"
+                       aria-pressed="${status === wert}">${t(`discovery.status.${wert}`)}</button>`
+          ).join("")}
+        </div>
+
+        <select data-discovery="domain" aria-label="${t("discovery.entityType")}">
+          <option value="" ${domain === "" ? "selected" : ""}>${t("discovery.allTypes")}</option>
+          ${TYP_GRUPPEN.map(
+            (gruppe) => `
+              <optgroup label="${escapeHtml(t(gruppe.schluessel))}">
+                ${gruppe.domains
+                  .map(
+                    (domaene) =>
+                      `<option value="${domaene}" ${
+                        domain === domaene ? "selected" : ""
+                      }>${escapeHtml(t(`discovery.domain.${domaene}`))}</option>`
+                  )
+                  .join("")}
+              </optgroup>
+            `
+          ).join("")}
+        </select>
+      </div>
+
+      ${schnellwahl(domainCounts, domain)}
+    </section>
 
     ${loading ? `<div class="loading">${t("common.loading")}</div>` : ""}
 
     ${
       entities.length
-        ? `<ul>${entities.map((eintrag) => entityZeile(eintrag, suggestions[eintrag.entity_id])).join("")}</ul>`
+        ? nachBereich(entities)
+            .map(
+              ([bereich, eintraege]) => `
+                <section class="section">
+                  <div class="section-title">${escapeHtml(bereich)} · ${t("discovery.entityCount", {
+                    count: eintraege.length,
+                  })}</div>
+                  <ul class="card rows">
+                    ${eintraege
+                      .map((eintrag) => entityZeile(eintrag, suggestions[eintrag.entity_id]))
+                      .join("")}
+                  </ul>
+                </section>
+              `
+            )
+            .join("")
         : loading
           ? ""
-          : `<div class="empty"><strong>${t("discovery.empty")}</strong><span>${t("discovery.emptyHint")}</span></div>`
+          : `<div class="card empty"><strong>${t("discovery.empty")}</strong><span>${t("discovery.emptyHint")}</span></div>`
     }
   `;
 }
 
-function entityZeile(eintrag, vorschlaege) {
+/**
+ * Die haeufigsten Typen dieser Anlage als Schnellwahl, mit ihrer Anzahl.
+ *
+ * Die vollstaendige Auswahl bleibt daneben bestehen: es gibt ueber dreissig
+ * Typen, und als Pillen waeren sie eine Wand. Gezeigt wird, was hier
+ * tatsaechlich vorkommt -- das ist zugleich die Auskunft, wo es sich lohnt
+ * zu suchen.
+ */
+function schnellwahl(domainCounts, domain) {
+  const haeufigste = Object.entries(domainCounts || {})
+    .filter(([, anzahl]) => anzahl > 0)
+    .sort(([, a], [, b]) => b - a)
+    .slice(0, SCHNELLWAHL);
+  if (!haeufigste.length) return "";
+
   return `
-    <li>
-      <div class="entity-row">
-        <span class="entity-main">
-          <div class="entity-name">${escapeHtml(eintrag.name)}</div>
-          <div class="entity-meta">
-            ${escapeHtml(eintrag.entity_id)}
-            ${eintrag.device_name ? ` · ${escapeHtml(eintrag.device_name)}` : ""}
-            ${eintrag.area_name ? ` · ${escapeHtml(eintrag.area_name)}` : ""}
-          </div>
+    <div class="filters" role="group" aria-label="${t("discovery.entityType")}">
+      <button class="btn filter all" data-action="set-domain" data-domain=""
+              aria-pressed="${domain === ""}">${t("discovery.allTypes")}</button>
+      ${haeufigste
+        .map(
+          ([domaene, anzahl]) =>
+            `<button class="btn filter" data-action="set-domain" data-domain="${escapeHtml(domaene)}"
+                     aria-pressed="${domain === domaene}">${escapeHtml(
+                       t(`discovery.domain.${domaene}`)
+                     )} <span class="row-sub">${anzahl}</span></button>`
+        )
+        .join("")}
+    </div>
+  `;
+}
+
+/** Gruppiert nach Bereich; was keinem zugeordnet ist, steht am Ende. */
+function nachBereich(entities) {
+  const ohne = t("rules.noArea");
+  const gruppen = new Map();
+
+  for (const eintrag of entities) {
+    const bereich = eintrag.area_name || ohne;
+    if (!gruppen.has(bereich)) gruppen.set(bereich, []);
+    gruppen.get(bereich).push(eintrag);
+  }
+
+  return [...gruppen.entries()].sort(
+    ([a], [b]) => (a === ohne ? 1 : 0) - (b === ohne ? 1 : 0) || a.localeCompare(b)
+  );
+}
+
+function entityZeile(eintrag, vorschlaege) {
+  const wert = [eintrag.state, eintrag.unit].filter((teil) => teil != null && teil !== "").join(" ");
+
+  return `
+    <li class="entity-item">
+      <div class="row entity-row${vorschlaege ? " tint special" : ""}">
+        <span class="row-body">
+          <span class="entity-name">${escapeHtml(eintrag.name)}</span>
+          <span class="mono">${escapeHtml(eintrag.entity_id)}${
+            eintrag.device_name ? ` · ${escapeHtml(eintrag.device_name)}` : ""
+          }</span>
         </span>
+
+        ${wert ? `<span class="chip on-surface">${escapeHtml(wert)}</span>` : ""}
 
         ${
           eintrag.monitored
             ? `<span class="badge monitored">${t("discovery.monitored")} · ${t("discovery.rules", {
                 count: eintrag.rule_count,
               })}</span>
-               <button class="action secondary" data-action="show-rules"
+               <button class="btn soft" data-action="show-rules"
                        data-entity="${escapeHtml(eintrag.entity_id)}"
                        data-name="${escapeHtml(eintrag.name)}">${t("discovery.rulesButton")}</button>
-               <button class="action secondary" data-action="remove-entity"
+               <button class="btn" data-action="remove-entity"
                        data-entity="${escapeHtml(eintrag.entity_id)}">${t("discovery.remove")}</button>`
-            : `${eintrag.has_suggestions ? `<span class="badge">${t("discovery.suggestionsAvailable")}</span>` : ""}
-               <button class="action secondary" data-action="show-suggestions"
-                       data-entity="${escapeHtml(eintrag.entity_id)}">${
+            : `${
+                 eintrag.has_suggestions
+                   ? `<span class="pill special">${t("discovery.suggestionsAvailable")}</span>`
+                   : ""
+               }
+               <button class="btn" data-action="show-suggestions"
+                       data-entity="${escapeHtml(eintrag.entity_id)}" aria-expanded="${Boolean(vorschlaege)}">${
                          vorschlaege ? t("discovery.hideSuggestions") : t("discovery.suggestions")
                        }</button>
-               <button class="action" data-action="add-entity"
+               <button class="btn primary" data-action="add-entity"
                        data-entity="${escapeHtml(eintrag.entity_id)}"
                        data-name="${escapeHtml(eintrag.name)}">${t("common.adopt")}</button>`
         }
@@ -162,13 +257,16 @@ function vorschlagZeile(entityId, vorschlag) {
   return `
     <div class="suggestion">
       <div class="suggestion-head">
+        ${vorschlag.type ? `<span class="pill ${escapeHtml(vorschlag.type)}">${escapeHtml(typeLabel(vorschlag.type))}</span>` : ""}
         <span class="message">${escapeHtml(vorschlag.title)}</span>
         ${vorschlag.uncertain ? `<span class="badge uncertain">${t("discovery.uncertain")}</span>` : ""}
-        <button class="action secondary" data-action="accept-suggestion"
-                data-entity="${escapeHtml(entityId)}"
-                data-suggestion="${escapeHtml(vorschlag.key)}">${t("common.adopt")}</button>
       </div>
       ${begruendung(vorschlag)}
+      <div class="footer-link">
+        <button class="btn primary" data-action="accept-suggestion"
+                data-entity="${escapeHtml(entityId)}"
+                data-suggestion="${escapeHtml(vorschlag.key)}">${t("discovery.adoptWithRule")}</button>
+      </div>
     </div>
   `;
 }

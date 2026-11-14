@@ -135,9 +135,14 @@ export const GET_HISTORY = {
   ],
 };
 
+// Wie das Backend: neueste zuerst. Die Historie gliedert nach Tagen und
+// verlaesst sich auf diese Reihenfolge.
+GET_HISTORY.events.sort((a, b) => new Date(b.start_time) - new Date(a.start_time));
+
 export const DISCOVER = {
   api_version: 1,
   version: VERSION,
+  domain_counts: { sensor: 51, binary_sensor: 38, light: 22, switch: 17, input_boolean: 8, climate: 6, person: 2 },
   entities: [
     { entity_id: "sensor.bad_luftfeuchte", name: "Luftfeuchte Bad", domain: "sensor", state: "74", device_class: "humidity", unit: "%", device_id: "dev_klima_1", device_name: "Klimasensor Bad", area_id: "bad", area_name: "Bad", monitored: true, rule_count: 1, has_suggestions: false },
     { entity_id: "binary_sensor.bad_fenster", name: "Badfenster", domain: "binary_sensor", state: "off", device_class: "window", unit: null, device_id: "dev_kontakt_4", device_name: "Fensterkontakt Bad", area_id: "bad", area_name: "Bad", monitored: false, rule_count: 0, has_suggestions: true },

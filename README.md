@@ -82,7 +82,9 @@ Four areas, reachable through the tabs at the top.
 
 ### Dashboard
 
-Shows **active** notifications only, grouped into alarms, warnings and info, each with its text, the time it started and how long it has been running. A notification with a linked entity is clickable and opens its more-info dialog.
+Shows **active** notifications only. Four tiles at the top give the overview and double as the filter: click *Alarms* and only alarms remain, click again and everything is back; the fourth tile leads to today's events. Below, the notifications are grouped by urgency, each with its text, its room, the time it started and how long it has been running. Every urgency has its own colour and its own shape, so it can be told apart at a glance. A notification with a linked entity is clickable and opens its more-info dialog.
+
+The version of the integration is shown here and only here, small at the foot of the page.
 
 ![Dashboard](docs/img/dashboard.png)
 
@@ -90,7 +92,7 @@ Every notification can be **deactivated** — ticked off by hand, without waitin
 
 ### History
 
-Active and closed events, newest first. Filtering by type, source, period and area, as well as full-text search, run in the backend rather than in the browser. You choose how many entries a page holds: 50, 100 or 200.
+Active and closed events, newest first and grouped by day. What is still running is tinted, so it stands out while skimming. Filtering by type, source, period and area, as well as full-text search, run in the backend rather than in the browser. You choose how many entries a page holds: 50, 100 or 200.
 
 ![History](docs/img/historie.png)
 
@@ -100,7 +102,16 @@ Active notifications carry no delete cross: a record of a running notification i
 
 ### Rules
 
-Every rule you have, grouped by floor and area, with the entities indented underneath. Anything without an area collects at the end.
+Every rule you have, by floor and room. Each rule shows its condition as building blocks — *State is **on***, *longer than **15 min***, *and not Alex · State is **home*** — and whether it is reporting right now. Anything without an area collects at the end.
+
+The page is built to stay usable as the number of rules grows:
+
+- What is reporting right now is pinned to the top.
+- Floors fold away and say, while folded, how many rules they hold and whether one of them is reporting. With more than 24 rules, floors with nothing to report start folded.
+- The dense list shows one line per rule, with every room as its own field; it becomes the default above 24 rules and can be switched at any time.
+- Search covers entity, room, condition and message text; filters narrow by type, to combined rules or to switched-off ones. Grouping by type instead of by floor is one click away.
+
+View, grouping and what is folded are remembered per browser.
 
 ![Rule overview](docs/img/regeln.png)
 

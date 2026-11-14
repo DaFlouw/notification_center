@@ -12,9 +12,10 @@
  * Logik waere ohne Klammern nicht darstellbar.
  */
 
-import { escapeHtml, typeLabel } from "../format.js";
+import { categoryLabel, escapeHtml, eventDuration, typeLabel } from "../format.js";
 import { raw } from "../html.js";
 import { t } from "../i18n.js";
+import { icon } from "../icons.js";
 
 const BEDINGUNGEN = ["state_is", "state_is_not", "state_changed_to", "numeric"];
 
@@ -81,20 +82,50 @@ export function uebersichtAusKonfiguration(konfiguration) {
   };
 }
 
+/** Die Filter der Uebersicht, in der Reihenfolge ihrer Schaltflaechen. */
+const REGEL_FILTER = ["all", "alarm", "warning", "info", "combined", "disabled"];
+
+const TYP_REIHENFOLGE = ["alarm", "warning", "info"];
+
+/** Ab so vielen Regeln ist die dichte Liste die Vorgabe. */
+export const LISTE_AB = 24;
+
 /**
- * Uebersicht aller Regeln, nach Entity gruppiert.
+ * Uebersicht aller Regeln.
  *
- * Regeln waren zuvor nur ueber die Discovery erreichbar und dort schwer
- * wiederzufinden. Diese Seite zeigt den gesamten Bestand auf einen Blick.
+ * Gebaut fuer zwei Groessenordnungen. Ein Dutzend Regeln steht als
+ * Raumkarten da, jede Regel mit ihrer Bedingung in Bausteinen. Bei vielen
+ * Regeln traegt das nicht mehr -- dann greifen drei Dinge zusammen:
+ *
+ * * Was gerade meldet, steht angeheftet ganz oben. Das ist die Frage, mit der
+ *   man diese Seite meist oeffnet, und sie soll kein Aufklappen kosten.
+ * * Die Abschnitte (Geschoss oder Typ) lassen sich einklappen und sagen
+ *   zugeklappt, wie viele Regeln sie fuehren und ob eine davon meldet.
+ * * Die dichte Liste zeigt eine Zeile je Regel, die Raeume als eigene Felder,
+ *   damit die Zeilen nicht zu einer Wand verschwimmen.
+ *
+ * Suche und Filter arbeiten auf dem geladenen Bestand, nicht im Backend: es
+ * sind Dutzende Regeln, nicht Tausende Ereignisse.
  */
 export function renderRuleOverview(state) {
-  const { entities = [], rules = [], loading, names = {} } = state;
+  const {
+    entities = [],
+    rules = [],
+    loading,
+    names = {},
+    active = [],
+    search = "",
+    filter = "all",
+    group = "room",
+    density = null,
+    collapsed = {},
+  } = state;
 
   if (loading) return `<div class="loading">${t("common.loading")}</div>`;
 
   if (!rules.length) {
     return `
-      <div class="empty">
+      <div class="card empty">
         <strong>${t("rules.overviewEmpty")}</strong>
         <span>
           ${t("rules.overviewEmptyHint", {
@@ -108,50 +139,306 @@ export function renderRuleOverview(state) {
   }
 
   const platzierung = new Map(entities.map((eintrag) => [eintrag.entity_id, eintrag]));
-  const baum = gruppiere(rules, platzierung);
+  const meldend = meldendeRegeln(active);
+  const anzahl = zaehleFilter(rules);
+  const dicht = (density || (rules.length > LISTE_AB ? "list" : "cards")) === "list";
+  const sichtbar = rules.filter(
+    (regel) => passtZumFilter(regel, filter) && passtZurSuche(regel, search, platzierung, names)
+  );
 
-  const abschnitte = [...baum.entries()]
-    .sort(nachNamen)
-    .map(([geschoss, raeume]) => {
-      const inhalt = [...raeume.entries()]
-        .sort(nachNamen)
-        .map(
-          ([raum, eintraege]) => `
-            <div class="rule-room">
-              <h3>${escapeHtml(raum)}</h3>
-              ${eintraege.map((paar) => entityBlock(paar, platzierung, names)).join("")}
-            </div>
-          `
-        )
-        .join("");
-
-      return `
-        <section class="rule-floor">
-          <h2>${escapeHtml(geschoss)}</h2>
-          ${inhalt}
-        </section>
-      `;
-    });
+  const abschnitte = gliedere(sichtbar, platzierung, group);
+  const zustand = { collapsed, viele: rules.length > LISTE_AB };
+  const alleZu = abschnitte.length > 0 && abschnitte.every((a) => istZu(a, zustand, meldend));
 
   return `
-    <div class="entity-meta" style="margin-bottom: 12px">
-      ${t("rules.count", { count: rules.length })}
-    </div>
-    ${abschnitte.join("")}
+    <section class="card pad" aria-label="${t("rules.filterLabel")}">
+      <div class="filters">
+        <input type="search" data-rule-search placeholder="${t("rules.searchPlaceholder")}"
+               value="${escapeHtml(search)}" aria-label="${t("rules.searchPlaceholder")}">
+
+        <div class="segmented" role="group" aria-label="${t("rules.densityLabel")}">
+          <button data-action="set-rule-density" data-value="cards"
+                  aria-pressed="${!dicht}">${t("rules.densityCards")}</button>
+          <button data-action="set-rule-density" data-value="list"
+                  aria-pressed="${dicht}">${t("rules.densityList")}</button>
+        </div>
+
+        <div class="segmented" role="group" aria-label="${t("rules.groupLabel")}">
+          <button data-action="set-rule-group" data-value="room"
+                  aria-pressed="${group !== "type"}">${t("rules.groupRoom")}</button>
+          <button data-action="set-rule-group" data-value="type"
+                  aria-pressed="${group === "type"}">${t("rules.groupType")}</button>
+        </div>
+
+        <button class="btn" data-action="collapse-all-rules"
+                data-value="${alleZu ? "open" : "close"}">${
+                  alleZu ? t("rules.expandAll") : t("rules.collapseAll")
+                }</button>
+      </div>
+
+      <div class="filters" role="group" aria-label="${t("rules.filterLabel")}">
+        ${REGEL_FILTER.filter((wert) => wert === "all" || anzahl[wert] > 0)
+          .map(
+            (wert) =>
+              `<button class="btn filter ${wert}" data-action="set-rule-filter" data-value="${wert}"
+                       aria-pressed="${filter === wert}">${t(`rules.filter.${wert}`, {
+                         count: anzahl[wert],
+                       })}</button>`
+          )
+          .join("")}
+      </div>
+    </section>
+
+    ${angeheftet(sichtbar, platzierung, names, meldend)}
+
+    ${
+      sichtbar.length
+        ? abschnitte
+            .map((abschnitt) => abschnittHtml(abschnitt, zustand, dicht, platzierung, names, meldend))
+            .join("")
+        : `<div class="card empty"><strong>${t("rules.noMatch")}</strong><span>${t(
+            "rules.noMatchHint"
+          )}</span></div>`
+    }
   `;
 }
 
-/** Ordnet die Regeln nach Geschoss, darin nach Raum, darin nach Entity. */
-function gruppiere(rules, platzierung) {
-  const baum = new Map();
+/**
+ * Was gerade meldet, angeheftet ueber allem.
+ *
+ * Die Regeln stehen darunter noch einmal an ihrem Platz. Die Dopplung ist
+ * gewollt: oben die Lage, unten der Bestand.
+ */
+function angeheftet(rules, platzierung, namen, meldend) {
+  const laufend = rules
+    .filter((regel) => meldend.has(regel.rule_id))
+    .sort(
+      (a, b) =>
+        TYP_REIHENFOLGE.indexOf(a.type) - TYP_REIHENFOLGE.indexOf(b.type) ||
+        new Date(meldend.get(b.rule_id).start_time) - new Date(meldend.get(a.rule_id).start_time)
+    );
+  if (!laufend.length) return "";
+
+  return `
+    <section class="section">
+      <div class="section-title">${t("rules.reportingNow")} · ${laufend.length}</div>
+      <ul class="card rows">
+        ${laufend
+          .map((regel) => regelLinie(regel, platzierung, namen, meldend.get(regel.rule_id), true))
+          .join("")}
+      </ul>
+    </section>
+  `;
+}
+
+/**
+ * Ob ein Abschnitt zugeklappt ist.
+ *
+ * Was der Anwender selbst gesetzt hat, gilt. Ohne Vorgabe ist ein Abschnitt
+ * offen -- ausser bei grossem Bestand: dann startet zugeklappt, was nichts
+ * meldet, und die Seite beginnt mit dem, was Aufmerksamkeit braucht.
+ */
+function istZu(abschnitt, zustand, meldend) {
+  const gesetzt = zustand.collapsed?.[abschnitt.schluessel];
+  if (typeof gesetzt === "boolean") return gesetzt;
+  // "Alle einklappen" setzt eine Vorgabe fuer jeden Abschnitt ohne eigene.
+  if (typeof zustand.collapsed?.["*"] === "boolean") return zustand.collapsed["*"];
+  return zustand.viele && meldetIn(abschnitt.regeln, meldend) === 0;
+}
+
+function meldetIn(regeln, meldend) {
+  return regeln.filter((regel) => meldend.has(regel.rule_id)).length;
+}
+
+function abschnittHtml(abschnitt, zustand, dicht, platzierung, namen, meldend) {
+  const zu = istZu(abschnitt, zustand, meldend);
+  const melden = meldetIn(abschnitt.regeln, meldend);
+  const dringlichster = TYP_REIHENFOLGE.find((typ) =>
+    abschnitt.regeln.some((regel) => regel.type === typ && meldend.has(regel.rule_id))
+  );
+
+  return `
+    <section class="section">
+      <button class="toggle${zu ? " closed card" : ""}" data-action="toggle-rule-section"
+              data-key="${escapeHtml(abschnitt.schluessel)}" aria-expanded="${!zu}">
+        ${icon("chevron", 16)}
+        <span>${escapeHtml(abschnitt.titel)}</span>
+        <span class="summary">${t("rules.count", { count: abschnitt.regeln.length })} · ${t(
+          "rules.roomCount",
+          { count: abschnitt.karten.length }
+        )}</span>
+        ${
+          melden
+            ? `<span class="pill ${dringlichster}">${t("rules.reportingCount", { count: melden })}</span>`
+            : zu
+              ? `<span class="status">${t("rules.quiet")}</span>`
+              : ""
+        }
+      </button>
+      ${zu ? "" : dicht ? listenAnsicht(abschnitt, platzierung, namen, meldend) : kartenAnsicht(abschnitt, platzierung, namen, meldend)}
+    </section>
+  `;
+}
+
+function kartenAnsicht(abschnitt, platzierung, namen, meldend) {
+  return `
+    <div class="grid-cards">
+      ${abschnitt.karten
+        .map(
+          (karte) => `
+            <article class="card pad">
+              <h3>${escapeHtml(karte.titel)}</h3>
+              ${karte.entities.map((paar) => entityBlock(paar, platzierung, namen, meldend)).join("")}
+            </article>
+          `
+        )
+        .join("")}
+    </div>
+  `;
+}
+
+/**
+ * Die dichte Liste: je Raum ein eigenes Feld, darin eine Zeile je Regel.
+ *
+ * Das Feld ist die Klammer. Ohne sie waeren dreissig Zeilen eine Wand, in
+ * der man den Raumwechsel nur an einer Zwischenueberschrift erkennt.
+ */
+function listenAnsicht(abschnitt, platzierung, namen, meldend) {
+  return `
+    <div class="card rows">
+      ${abschnitt.karten
+        .map((karte) => {
+          const regeln = karte.entities.flatMap(([, eintraege]) => eintraege);
+          const melden = meldetIn(regeln, meldend);
+          const dringlichster = TYP_REIHENFOLGE.find((typ) =>
+            regeln.some((regel) => regel.type === typ && meldend.has(regel.rule_id))
+          );
+          return `
+            <div class="room-cluster">
+              <div class="room-head">
+                <strong>${escapeHtml(karte.titel)}</strong>
+                <span class="row-sub">${t("rules.count", { count: regeln.length })}</span>
+                ${
+                  melden
+                    ? `<span class="pill ${dringlichster}">${t("rules.reportingCount", {
+                        count: melden,
+                      })}</span>`
+                    : ""
+                }
+              </div>
+              <ul class="rule-lines tight">
+                ${regeln
+                  .map((regel) => regelLinie(regel, platzierung, namen, meldend.get(regel.rule_id)))
+                  .join("")}
+              </ul>
+            </div>
+          `;
+        })
+        .join("")}
+    </div>
+  `;
+}
+
+/** Eine Regel als einzelne Zeile, fuer die dichte Liste und die Anheftung. */
+function regelLinie(regel, platzierung, namen, ereignis = null, mitOrt = false) {
+  const ort = platzierung.get(regel.entity_id) || {};
+  const name = ort.name || regel.entity_id;
+  const ziel =
+    `data-rule="${escapeHtml(regel.rule_id)}" ` +
+    `data-entity="${escapeHtml(regel.entity_id || "")}" ` +
+    `data-name="${escapeHtml(name)}"`;
+  const wo = [ort.floor_name, ort.area_name].filter(Boolean).join(" · ");
+
+  return `
+    <li class="rule-line${ereignis ? ` reporting ${regel.type}` : ""}">
+      <span class="dot ${regel.type}" title="${escapeHtml(typeLabel(regel.type))}"></span>
+      <span class="rule-line-name">${escapeHtml(name)}</span>
+      <span class="rule-line-text">${escapeHtml(beschreibung(regel, namen))}</span>
+      ${mitOrt && wo ? `<span class="row-sub">${escapeHtml(wo)}</span>` : ""}
+      ${regel.enabled === false ? `<span class="badge">${t("rules.disabled")}</span>` : ""}
+      ${
+        ereignis
+          ? `<span class="status ${regel.type}">${t("rules.reportingSince", {
+              duration: eventDuration(ereignis),
+            })}</span>`
+          : `<span class="status">${t("rules.quiet")}</span>`
+      }
+      <button class="link" data-action="edit-rule" ${ziel}>${t("common.edit")}</button>
+    </li>
+  `;
+}
+
+/** Die gerade meldenden Regeln: Regel-Kennung auf ihr laufendes Ereignis. */
+function meldendeRegeln(active) {
+  return new Map(
+    (active || []).filter((event) => event.rule_id).map((event) => [event.rule_id, event])
+  );
+}
+
+function zaehleFilter(rules) {
+  return {
+    all: rules.length,
+    alarm: rules.filter((regel) => regel.type === "alarm").length,
+    warning: rules.filter((regel) => regel.type === "warning").length,
+    info: rules.filter((regel) => regel.type === "info").length,
+    combined: rules.filter((regel) => (regel.extra_conditions || []).length > 0).length,
+    disabled: rules.filter((regel) => regel.enabled === false).length,
+  };
+}
+
+function passtZumFilter(regel, filter) {
+  if (TYP_REIHENFOLGE.includes(filter)) return regel.type === filter;
+  if (filter === "combined") return (regel.extra_conditions || []).length > 0;
+  if (filter === "disabled") return regel.enabled === false;
+  return true;
+}
+
+/**
+ * Sucht ueber alles, woran man eine Regel erkennt: Entity, Raum, Geschoss,
+ * Bedingung und Meldungstext. Mehrere Woerter muessen alle vorkommen.
+ */
+function passtZurSuche(regel, search, platzierung, namen) {
+  const begriffe = String(search || "")
+    .toLowerCase()
+    .split(/\s+/)
+    .filter(Boolean);
+  if (!begriffe.length) return true;
+
+  const ort = platzierung.get(regel.entity_id) || {};
+  const heuhaufen = [
+    regel.entity_id,
+    ort.name,
+    ort.area_name,
+    ort.floor_name,
+    regel.message_template,
+    beschreibung(regel, namen),
+    typeLabel(regel.type),
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+
+  return begriffe.every((begriff) => heuhaufen.includes(begriff));
+}
+
+/**
+ * Ordnet die Regeln in Abschnitte, darin in Raumkarten, darin nach Entity.
+ *
+ * Der Abschnitt ist das Geschoss oder, wahlweise, der Typ. Die Raumkarte
+ * bleibt in beiden Faellen: der Raum ist das, woran man eine Entity
+ * wiederfindet.
+ */
+function gliedere(rules, platzierung, group) {
+  const abschnitte = new Map();
 
   for (const regel of rules) {
     const ort = platzierung.get(regel.entity_id) || {};
-    const geschoss = ort.floor_name || t("rules.noFloor");
+    const schluessel =
+      group === "type" ? regel.type : ort.floor_name || t("rules.noFloor");
     const raum = ort.area_name || t("rules.noArea");
 
-    if (!baum.has(geschoss)) baum.set(geschoss, new Map());
-    const raeume = baum.get(geschoss);
+    if (!abschnitte.has(schluessel)) abschnitte.set(schluessel, new Map());
+    const raeume = abschnitte.get(schluessel);
 
     if (!raeume.has(raum)) raeume.set(raum, new Map());
     const entities = raeume.get(raum);
@@ -160,27 +447,41 @@ function gruppiere(rules, platzierung) {
     entities.get(regel.entity_id).push(regel);
   }
 
-  // Aus der inneren Map je Raum eine sortierte Liste machen.
-  for (const raeume of baum.values()) {
-    for (const [raum, entities] of raeume.entries()) {
-      raeume.set(raum, [...entities.entries()]);
-    }
-  }
+  const sortiert =
+    group === "type"
+      ? [...abschnitte.entries()].sort(
+          ([a], [b]) => TYP_REIHENFOLGE.indexOf(a) - TYP_REIHENFOLGE.indexOf(b)
+        )
+      : [...abschnitte.entries()].sort(nachNamen);
 
-  return baum;
+  return sortiert.map(([schluessel, raeume]) => {
+    const karten = [...raeume.entries()].sort(nachNamen).map(([raum, entities]) => ({
+      titel: raum,
+      entities: [...entities.entries()],
+    }));
+    return {
+      schluessel: `${group}:${schluessel}`,
+      titel: group === "type" ? categoryLabel(schluessel) : schluessel,
+      regeln: karten.flatMap((karte) => karte.entities.flatMap(([, eintraege]) => eintraege)),
+      karten,
+    };
+  });
 }
 
-function entityBlock([entityId, eintraege], platzierung, namen = {}) {
+function entityBlock([entityId, eintraege], platzierung, namen = {}, meldend = new Map()) {
   const name = platzierung.get(entityId)?.name || entityId;
 
-  // Kein eigener Bearbeiten-Knopf: jede Regelzeile hat bereits einen, und
-  // zwei nebeneinander waren nur verwirrend.
   return `
-    <div class="rule-entity">
-      <div class="rule-entity-name">${escapeHtml(name)}</div>
-      <ul>${eintraege
-        .map((regel) => regelZeile(regel, entityId, name, null, namen))
-        .join("")}</ul>
+    <div class="entity-block">
+      <div>
+        <div class="entity-name">${escapeHtml(name)}</div>
+        <div class="mono">${escapeHtml(entityId)}</div>
+      </div>
+      <ul class="rule-lines">
+        ${eintraege
+          .map((regel) => regelZeile(regel, entityId, name, null, namen, meldend.get(regel.rule_id)))
+          .join("")}
+      </ul>
     </div>
   `;
 }
@@ -207,57 +508,75 @@ export function renderRules(state) {
     names = {},
     candidates = [],
     conditionOptions = {},
+    active = [],
   } = state;
+
+  const meldend = meldendeRegeln(active);
 
   return `
     <div class="filters">
       <button class="link" data-action="back-to-rules">${t("rules.backToAll")}</button>
     </div>
 
-    <h2>${t("rules.forEntity", { name: entityName || entityId })}</h2>
+    <section class="card pad">
+      <div>
+        <h2>${t("rules.forEntity", { name: entityName || entityId })}</h2>
+        <!--
+          Die Entity-ID gehoert auf diese Seite: von hier aus laesst sich die
+          Entity ersetzen, und dafuer muss man wissen, welche gerade gemeint
+          ist. Zurueckhaltend gesetzt -- sie ist Beleg, nicht Ueberschrift.
+        -->
+        <div class="mono">${escapeHtml(entityId || "")}</div>
+      </div>
 
-    <!--
-      Die Entity-ID gehoert auf diese Seite: von hier aus laesst sich die
-      Entity ersetzen, und dafuer muss man wissen, welche gerade gemeint ist.
-      Zurueckhaltend gesetzt -- sie ist Beleg, nicht Ueberschrift.
-    -->
-    <div class="entity-meta" style="margin: -8px 0 12px">${escapeHtml(entityId || "")}</div>
+      ${
+        rules.length
+          ? `<ul class="rule-lines">${rules
+              .map((regel) =>
+                regelZeile(
+                  regel,
+                  entityId,
+                  entityName,
+                  entwurf?.rule_id,
+                  names,
+                  meldend.get(regel.rule_id)
+                )
+              )
+              .join("")}</ul>`
+          : `<div class="row-sub">${t("rules.none")}</div>`
+      }
 
-    ${
-      rules.length
-        ? `<ul>${rules
-            .map((regel) => regelZeile(regel, entityId, entityName, entwurf?.rule_id, names))
-            .join("")}</ul>`
-        : `<div class="entity-meta" style="padding: 8px 0">${t("rules.none")}</div>`
-    }
+      ${
+        entwurf
+          ? ""
+          : `<div class="footer-link">
+               <button class="action" data-action="new-rule">${t("rules.create")}</button>
+               <button class="action secondary" data-action="replace-entity"
+                       data-entity="${escapeHtml(entityId)}">${t("rules.replaceEntity")}</button>
+             </div>`
+      }
+    </section>
 
-    ${
-      entwurf
-        ? formular(entwurf, states, attributes, candidates, conditionOptions)
-        : `<div class="footer-link">
-             <button class="action" data-action="new-rule">${t("rules.create")}</button>
-             <button class="action secondary" data-action="replace-entity"
-                     data-entity="${escapeHtml(entityId)}">${t("rules.replaceEntity")}</button>
-           </div>`
-    }
+    ${entwurf ? formular(entwurf, states, attributes, candidates, conditionOptions) : ""}
   `;
 }
 
 /**
- * Eine Regel als Listenzeile.
+ * Eine Regel als Block: Typ, Zustand, Bedingung in Bausteinen, Aktionen.
  *
- * ``offeneRegel`` ist die Regel, deren Formular gerade unter der Liste steht.
- * Sie bekommt keinen Bearbeiten-Knopf: er wuerde auf das verweisen, was
- * ohnehin schon offen ist. Bei einer einzigen Regel war die Schaltflaeche
- * damit durchgehend sinnlos, bei mehreren fuehrt sie weiterhin von einer
- * Regel zur naechsten.
+ * ``offeneRegel`` ist die Regel, deren Formular gerade darunter steht. Sie
+ * bekommt keinen Bearbeiten-Knopf: er wuerde auf das verweisen, was ohnehin
+ * schon offen ist.
+ *
+ * ``ereignis`` ist die laufende Meldung der Regel, sofern sie gerade meldet.
  */
 function regelZeile(
   regel,
   entityId = regel.entity_id,
   entityName = "",
   offeneRegel = null,
-  namen = {}
+  namen = {},
+  ereignis = null
 ) {
   // Entity und Name wandern mit: nur so kann der Editor auch aus der
   // Uebersicht heraus die richtigen Regeln laden.
@@ -267,20 +586,111 @@ function regelZeile(
     `data-name="${escapeHtml(entityName)}"`;
 
   const wirdBearbeitet = Boolean(offeneRegel) && regel.rule_id === offeneRegel;
+  const klassen = ["rule"];
+  if (ereignis) klassen.push("reporting", regel.type);
+  if (wirdBearbeitet) klassen.push("editing");
+
+  const zusaetze = (regel.extra_conditions || []).length;
 
   return `
-    <li class="row${wirdBearbeitet ? " editing" : ""}">
-      <span class="bar ${regel.type}"></span>
-      <span class="message">${escapeHtml(beschreibung(regel, namen))}</span>
-      ${regel.enabled === false ? `<span class="badge">${t("rules.disabled")}</span>` : ""}
-      ${
-        wirdBearbeitet
-          ? `<span class="badge">${t("rules.editing")}</span>`
-          : `<button class="link" data-action="edit-rule" ${ziel}>${t("common.edit")}</button>`
-      }
-      <button class="link" data-action="delete-rule" ${ziel}>${t("common.delete")}</button>
+    <li class="${klassen.join(" ")}" title="${escapeHtml(beschreibung(regel, namen))}">
+      <div class="rule-head">
+        <span class="pill ${regel.type}">${typeLabel(regel.type)}</span>
+        ${
+          zusaetze
+            ? `<span class="pill special">${t("rules.conditionCount", { count: zusaetze + 1 })}</span>`
+            : ""
+        }
+        ${regel.enabled === false ? `<span class="badge">${t("rules.disabled")}</span>` : ""}
+        ${
+          ereignis
+            ? `<span class="status ${regel.type}">${t("rules.reportingSince", {
+                duration: eventDuration(ereignis),
+              })}</span>`
+            : `<span class="status">${t("rules.quiet")}</span>`
+        }
+      </div>
+      <div class="rule-lines">${bedingungsZeilen(regel, namen)}</div>
+      <div class="rule-actions">
+        ${
+          wirdBearbeitet
+            ? `<span class="badge">${t("rules.editing")}</span>`
+            : `<button class="link" data-action="edit-rule" ${ziel}>${t("common.edit")}</button>`
+        }
+        <button class="link" data-action="delete-rule" ${ziel}>${t("common.delete")}</button>
+      </div>
     </li>
   `;
+}
+
+/**
+ * Die Bedingungen einer Regel als Bausteine, eine Zeile je Bedingung.
+ *
+ * Die Verknuepfung steht als Wort davor und nicht als Zeichen: "UND NICHT"
+ * liest jeder, ein Ausrufezeichen vor einer Klammer nicht.
+ */
+function bedingungsZeilen(regel, namen) {
+  const wort = regel.logic === "any" ? t("rules.logicWord.any") : t("rules.logicWord.all");
+  const zeilen = [`<div class="chips">${bedingungsChips({ ...regel, entity_id: null }, namen)}</div>`];
+
+  for (const bedingung of regel.extra_conditions || []) {
+    const vorsatz = bedingung.negate ? `${wort} ${t("rules.logicWord.not")}` : wort;
+    zeilen.push(
+      `<div class="chips"><span class="logic">${escapeHtml(vorsatz)}</span>${bedingungsChips(
+        bedingung,
+        namen
+      )}</div>`
+    );
+  }
+
+  if (regel.duration_seconds) {
+    zeilen.push(
+      `<div class="chips"><span class="chip">${t("rules.chip.longer", {
+        minutes: raw(`<strong>${Math.round(regel.duration_seconds / 60)} min</strong>`),
+      })}</span></div>`
+    );
+  }
+
+  return zeilen.join("");
+}
+
+/** Eine Bedingung als ein oder zwei Bausteine. Die Werte stehen fett. */
+function bedingungsChips(bedingung, namen = {}) {
+  const ort = bedingung.entity_id
+    ? `${escapeHtml(namen[bedingung.entity_id] || bedingung.entity_id)} · `
+    : "";
+  const quelle =
+    bedingung.value_source?.kind === "attribute"
+      ? escapeHtml(bedingung.value_source.attribute)
+      : t("common.state");
+
+  if (bedingung.kind === "numeric") {
+    const operator = OPERATOREN.includes(bedingung.operator)
+      ? t(`rules.operator.${bedingung.operator}`)
+      : escapeHtml(bedingung.operator);
+    const schwelle = `<span class="chip">${ort}${quelle} ${operator} <strong>${escapeHtml(
+      bedingung.threshold
+    )}</strong></span>`;
+    const zurueck =
+      bedingung.release_threshold != null
+        ? `<span class="chip">${t("rules.chip.back", {
+            value: raw(`<strong>${escapeHtml(bedingung.release_threshold)}</strong>`),
+          })}</span>`
+        : "";
+    return schwelle + zurueck;
+  }
+
+  const einleitung =
+    bedingung.kind === "state_changed_to"
+      ? t("rules.describe.changesTo")
+      : bedingung.kind === "state_is_not"
+        ? t("rules.describe.isNot")
+        : t("rules.describe.is");
+  const werte = (bedingung.states || [])
+    .map((wert) => `<strong>${escapeHtml(wert)}</strong>`)
+    .join(escapeHtml(t("rules.describe.or")));
+
+  return `<span class="chip">${ort}${quelle} ${einleitung} ${werte}</span>`;
 }
 
 /**
@@ -353,7 +763,9 @@ function formular(entwurf, states, attributes, kandidaten = [], bedingungsOption
   const numerisch = entwurf.kind === "numeric";
 
   return `
-    <div style="border-top: 1px solid var(--nc-border); margin-top: 16px; padding-top: 16px">
+    <section class="card pad">
+      <h3>${entwurf.rule_id ? t("rules.editTitle") : t("rules.create")}</h3>
+      <div class="form-label">${t("rules.sectionWhen")}</div>
       <div class="filters">
         <select data-rule-field="kind" aria-label="${t("rules.condition")}">
           ${auswahl(BEDINGUNGEN, entwurf.kind, (wert) => t(`rules.kind.${wert}`))}
@@ -369,10 +781,6 @@ function formular(entwurf, states, attributes, kandidaten = [], bedingungsOption
                 }>${escapeHtml(t("rules.attribute", { name: attribut.name }))}</option>`
             )
             .join("")}
-        </select>
-
-        <select data-rule-field="type" aria-label="${t("history.type")}">
-          ${auswahl(TYPEN, entwurf.type, typeLabel)}
         </select>
       </div>
 
@@ -396,7 +804,11 @@ function formular(entwurf, states, attributes, kandidaten = [], bedingungsOption
         ...bedingungsOptionen,
       })}
 
+      <div class="form-label">${t("rules.sectionThen")}</div>
       <div class="filters">
+        <select data-rule-field="type" aria-label="${t("history.type")}">
+          ${auswahl(TYPEN, entwurf.type, typeLabel)}
+        </select>
         <input type="text" data-rule-field="message" style="flex: 1; min-width: 220px"
                placeholder="${escapeHtml(t("rules.messagePlaceholder"))}"
                aria-label="${t("rules.message")}"
@@ -408,16 +820,16 @@ function formular(entwurf, states, attributes, kandidaten = [], bedingungsOption
         <div class="filters" style="margin-top: 8px">
           ${
             numerisch
-              ? `<input type="number" step="any" data-rule-field="release"
-                        placeholder="${t("rules.releasePlaceholder")}"
-                        aria-label="${t("rules.release")}"
-                        value="${entwurf.release_threshold ?? ""}">`
+              ? `<label class="field"><span>${t("rules.releasePlaceholder")}</span>
+                   <input type="number" step="any" data-rule-field="release"
+                          aria-label="${t("rules.release")}"
+                          value="${entwurf.release_threshold ?? ""}"></label>`
               : ""
           }
-          <input type="number" min="0" data-rule-field="duration"
-                 placeholder="${t("rules.durationPlaceholder")}"
-                 aria-label="${t("rules.duration")}"
-                 value="${entwurf.duration_seconds ? Math.round(entwurf.duration_seconds / 60) : ""}">
+          <label class="field"><span>${t("rules.durationPlaceholder")}</span>
+            <input type="number" min="0" data-rule-field="duration"
+                   aria-label="${t("rules.duration")}"
+                   value="${entwurf.duration_seconds ? Math.round(entwurf.duration_seconds / 60) : ""}"></label>
         </div>
       </details>
 
@@ -425,7 +837,7 @@ function formular(entwurf, states, attributes, kandidaten = [], bedingungsOption
         <button class="action" data-action="save-rule">${t("common.save")}</button>
         <button class="action secondary" data-action="cancel-rule">${t("common.cancel")}</button>
       </div>
-    </div>
+    </section>
   `;
 }
 
@@ -505,7 +917,7 @@ function wertHinweis(entwurf, attributes) {
   );
 
   return `
-    <div class="entity-meta" style="margin: -4px 0 8px">
+    <div class="entity-meta">
       ${t("rules.currentValue", { value: aktuell })}
       ${
         schreibweise
@@ -527,7 +939,7 @@ function bedingungsBlock(entwurf, kandidaten, optionen) {
   const extras = entwurf.extra_conditions || [];
 
   return `
-    <div style="margin-top: 12px">
+    <div class="form-section">
       ${
         extras.length
           ? `<div class="filters">

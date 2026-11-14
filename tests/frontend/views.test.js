@@ -20,6 +20,7 @@ import { escapeHtml, formatDuration, sourceBadge, typeLabel } from "../../custom
 import { renderDashboard } from "../../custom_components/notification_center/frontend/views/dashboard.js";
 import { renderDiscovery } from "../../custom_components/notification_center/frontend/views/discovery.js";
 import {
+  LISTE_AB,
   beschreibung,
   entwurfZuRegel,
   leereBedingung,
@@ -32,6 +33,7 @@ import {
   LEERER_FILTER,
   buildQuery,
   deaktiviert,
+  nachTagen,
   renderHistory,
   seitengroesse,
 } from "../../custom_components/notification_center/frontend/views/history.js";
@@ -240,7 +242,7 @@ describe("Dashboard", () => {
 
   it("macht nur Meldungen mit Entity anklickbar (Spezifikation 71)", () => {
     const html = renderDashboard({ active: AKTIVE, counts: {} }, "de-DE");
-    const klickbar = html.match(/class="row clickable"/g) || [];
+    const klickbar = html.match(/class="row[^"]*clickable"/g) || [];
     assert.equal(klickbar.length, 1);
   });
 
@@ -564,7 +566,7 @@ describe("Die Entity im Regel-Editor (Issue 9)", () => {
     const html = renderRules(zustand);
     assert.match(
       html,
-      /<div class="entity-meta"[^>]*>light\.kueche_arbeitsplatte<\/div>/
+      /<div class="mono"[^>]*>light\.kueche_arbeitsplatte<\/div>/
     );
     assert.match(html, /<h2>Regeln für Licht Arbeitsplatte<\/h2>/);
   });
@@ -994,5 +996,237 @@ describe("Meldungen von Hand deaktivieren", () => {
       "de"
     );
     assert.ok(!html.includes('data-action="reactivate-event"'));
+  });
+});
+
+describe("Dashboard: Kacheln als Filter", () => {
+  const JETZT = new Date().toISOString();
+  const basis = { source: "entity_rule", active: true, start_time: JETZT, entity_id: null };
+  const AKTIV = [
+    { ...basis, event_id: "a", type: "alarm", message: "Wasser im Keller", area_id: "keller" },
+    { ...basis, event_id: "w", type: "warning", message: "Fenster offen" },
+    { ...basis, event_id: "i", type: "info", message: "Licht an" },
+  ];
+
+  it("zeigt ohne Filter alle Dringlichkeiten", () => {
+    const html = renderDashboard({ active: AKTIV, counts: {} }, "de");
+    assert.match(html, /Wasser im Keller/);
+    assert.match(html, /Fenster offen/);
+    assert.match(html, /Licht an/);
+    assert.ok(!html.includes('aria-pressed="true"'));
+  });
+
+  it("zeigt mit gewaehlter Kachel nur diese Dringlichkeit", () => {
+    const html = renderDashboard({ active: AKTIV, counts: {}, filter: "alarm" }, "de");
+    assert.match(html, /Wasser im Keller/);
+    assert.ok(!html.includes("Fenster offen"));
+    assert.ok(!html.includes("Licht an"));
+    assert.match(html, /data-type="alarm"\s+aria-pressed="true"/);
+  });
+
+  it("sagt es, wenn die gewaehlte Dringlichkeit leer ist", () => {
+    // Wer "Alarme" anklickt, soll lesen, dass es keine gibt -- nicht raten.
+    const html = renderDashboard({ active: [AKTIV[2]], counts: {}, filter: "alarm" }, "de");
+    assert.match(html, /Hier liegt gerade nichts an/);
+  });
+
+  it("uebergeht einen unbekannten Filter", () => {
+    const html = renderDashboard({ active: AKTIV, counts: {}, filter: "quatsch" }, "de");
+    assert.match(html, /Licht an/);
+  });
+
+  it("nennt den Raum und den Beginn der Meldung", () => {
+    const html = renderDashboard(
+      { active: [AKTIV[0]], counts: {}, areas: { keller: "Keller" } },
+      "de"
+    );
+    assert.match(html, /Keller · seit /);
+  });
+
+  it("zeigt die Version nur, wenn sie mitgegeben wird", () => {
+    assert.match(renderDashboard({ active: [], counts: {}, version: "9.9.9" }, "de"), /9\.9\.9/);
+    assert.ok(!renderDashboard({ active: [], counts: {} }, "de").includes('class="version"'));
+  });
+});
+
+describe("Historie nach Tagen", () => {
+  const JETZT = new Date(2026, 10, 14, 12, 0);
+  const um = (tag, stunde) => ({
+    event_id: `e${tag}${stunde}`,
+    start_time: new Date(2026, 10, tag, stunde, 0).toISOString(),
+  });
+
+  it("fasst die Ereignisse eines Tages zusammen", () => {
+    const tage = nachTagen([um(14, 11), um(14, 9), um(13, 20), um(10, 8)], "de", JETZT);
+    assert.deepEqual(
+      tage.map((tag) => tag.events.length),
+      [2, 1, 1]
+    );
+  });
+
+  it("nennt heute und gestern beim Namen, aeltere Tage mit Datum", () => {
+    const tage = nachTagen([um(14, 11), um(13, 20), um(10, 8)], "de", JETZT);
+    assert.equal(tage[0].titel, "Heute");
+    assert.equal(tage[1].titel, "Gestern");
+    assert.match(tage[2].titel, /10\. November/);
+  });
+
+  it("bietet den Zeitraum als Umschalter an", () => {
+    const html = renderHistory(
+      { events: [], total: 0, filter: { ...LEERER_FILTER, zeitraum: "30" }, areas: [] },
+      "de"
+    );
+    assert.match(html, /data-action="set-period" data-value="30"\s+aria-pressed="true"/);
+    assert.match(html, /data-action="set-period" data-value="heute"\s+aria-pressed="false"/);
+  });
+});
+
+describe("Regeluebersicht bei wachsendem Bestand", () => {
+  const laufend = (ruleId) => ({
+    event_id: `ev_${ruleId}`,
+    rule_id: ruleId,
+    active: true,
+    start_time: new Date(Date.now() - 300000).toISOString(),
+  });
+
+  it("heftet an, was gerade meldet", () => {
+    const html = renderRuleOverview({ entities: ENTITIES, rules: RULES, active: [laufend("rule_1")] });
+    assert.match(html, /Meldet gerade · 1/);
+    assert.match(html, /meldet seit 5 min/);
+  });
+
+  it("zeigt die Anheftung nicht, wenn nichts meldet", () => {
+    const html = renderRuleOverview({ entities: ENTITIES, rules: RULES });
+    assert.ok(!html.includes("Meldet gerade"));
+  });
+
+  it("filtert nach Typ", () => {
+    const html = renderRuleOverview({ entities: ENTITIES, rules: RULES, filter: "info" });
+    const erwartet = RULES.filter((regel) => regel.type === "info").length;
+    assert.equal((html.match(/data-action="edit-rule"/g) || []).length, erwartet);
+  });
+
+  it("sucht ueber Entity und Raum", () => {
+    const html = renderRuleOverview({ entities: ENTITIES, rules: RULES, search: "haustür" });
+    assert.match(html, /Haustür/);
+    assert.ok(!html.includes("Licht Arbeitsplatte"));
+  });
+
+  it("sagt es, wenn nichts passt", () => {
+    const html = renderRuleOverview({ entities: ENTITIES, rules: RULES, search: "gibtsnicht" });
+    assert.match(html, /Keine Regel passt/);
+  });
+
+  it("klappt einen Abschnitt zu und nennt seinen Inhalt", () => {
+    const offen = renderRuleOverview({ entities: ENTITIES, rules: RULES });
+    const zu = renderRuleOverview({
+      entities: ENTITIES,
+      rules: RULES,
+      collapsed: { "room:Erdgeschoss": true },
+    });
+    assert.ok(
+      (zu.match(/data-action="edit-rule"/g) || []).length <
+        (offen.match(/data-action="edit-rule"/g) || []).length
+    );
+    assert.match(zu, /data-key="room:Erdgeschoss" aria-expanded="false"/);
+    // Zugeklappt bleibt sichtbar, wie viel dahinter liegt.
+    assert.match(zu, /Regeln · \d+ R(aum|äume)/);
+  });
+
+  it("klappt mit einer Vorgabe alle Abschnitte zu", () => {
+    const html = renderRuleOverview({ entities: ENTITIES, rules: RULES, collapsed: { "*": true } });
+    assert.equal((html.match(/data-action="edit-rule"/g) || []).length, 0);
+    assert.match(html, /Alle ausklappen/);
+  });
+
+  it("zeigt in der dichten Liste je Raum ein eigenes Feld", () => {
+    const html = renderRuleOverview({ entities: ENTITIES, rules: RULES, density: "list" });
+    assert.match(html, /class="room-cluster"/);
+    assert.equal((html.match(/data-action="edit-rule"/g) || []).length, RULES.length);
+  });
+
+  it("waehlt die dichte Liste bei grossem Bestand von selbst", () => {
+    const viele = Array.from({ length: LISTE_AB + 1 }, (_, i) => ({
+      ...RULES[0],
+      rule_id: `viel_${i}`,
+    }));
+    // Meldet nichts, startet ein grosser Bestand zugeklappt.
+    const html = renderRuleOverview({ entities: ENTITIES, rules: viele });
+    assert.match(html, /aria-expanded="false"/);
+    const offen = renderRuleOverview({ entities: ENTITIES, rules: viele, collapsed: { "*": false } });
+    assert.match(offen, /class="room-cluster"/);
+  });
+
+  it("gliedert wahlweise nach Typ", () => {
+    const html = renderRuleOverview({ entities: ENTITIES, rules: RULES, group: "type" });
+    assert.match(html, /data-key="type:info"/);
+  });
+
+  it("schreibt die Verknuepfung als Wort vor den Baustein", () => {
+    const regel = {
+      ...RULES[0],
+      rule_id: "rule_verknuepft",
+      extra_conditions: [
+        {
+          entity_id: "person.alex",
+          kind: "state_is",
+          states: ["home"],
+          negate: true,
+          value_source: { kind: "state", attribute: null },
+        },
+      ],
+    };
+    const html = renderRuleOverview({
+      entities: ENTITIES,
+      rules: [regel],
+      names: { "person.alex": "Alex" },
+    });
+    assert.match(html, /<span class="logic">und nicht<\/span>/);
+    assert.match(html, /Alex · Zustand ist <strong>home<\/strong>/);
+    assert.match(html, /2 Bedingungen/);
+  });
+});
+
+describe("Discovery: Gliederung und Schnellwahl", () => {
+  const TREFFER_BEREICHE = [
+    { entity_id: "sensor.a", name: "A", domain: "sensor", state: "21", unit: "°C", area_name: "Bad", monitored: false, rule_count: 0, has_suggestions: false },
+    { entity_id: "sensor.b", name: "B", domain: "sensor", state: "on", area_name: null, monitored: false, rule_count: 0, has_suggestions: false },
+    { entity_id: "sensor.c", name: "C", domain: "sensor", state: "5", area_name: "Bad", monitored: true, rule_count: 2, has_suggestions: false },
+  ];
+
+  it("gliedert nach Bereich, Unzugeordnetes ans Ende", () => {
+    const html = renderDiscovery({ entities: TREFFER_BEREICHE, suggestions: {} });
+    assert.match(html, /Bad · 2 Entities/);
+    assert.ok(html.indexOf("Bad · 2") < html.indexOf("Ohne Raum"));
+  });
+
+  it("zeigt den aktuellen Wert samt Einheit", () => {
+    const html = renderDiscovery({ entities: TREFFER_BEREICHE, suggestions: {} });
+    assert.match(html, />21 °C</);
+  });
+
+  it("bietet die haeufigsten Typen als Schnellwahl an", () => {
+    const html = renderDiscovery({
+      entities: [],
+      suggestions: {},
+      domainCounts: { sensor: 51, light: 22, switch: 0 },
+      domain: "light",
+    });
+    assert.match(html, /data-action="set-domain" data-domain="sensor"/);
+    assert.match(html, /data-domain="light"\s+aria-pressed="true"/);
+    // Was nicht vorkommt, wird nicht angeboten.
+    assert.ok(!html.includes('data-domain="switch"'));
+  });
+
+  it("kommt ohne Typzaehler aus", () => {
+    // Ein aelteres Backend liefert sie nicht; die volle Auswahl bleibt.
+    const html = renderDiscovery({ entities: [], suggestions: {} });
+    assert.ok(!html.includes('data-action="set-domain"'));
+    assert.match(html, /data-discovery="domain"/);
+  });
+
+  it("schaltet zwischen allen, ueberwachten und vorgeschlagenen um", () => {
+    const html = renderDiscovery({ entities: [], suggestions: {}, status: "monitored" });
+    assert.match(html, /data-value="monitored"\s+aria-pressed="true"/);
   });
 });

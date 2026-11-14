@@ -81,6 +81,33 @@ async def test_discovery_sucht_in_name_und_id(hass: HomeAssistant, runtime) -> N
     assert [e["entity_id"] for e in ueber_id] == [WASCHMASCHINE]
 
 
+async def test_discovery_filtert_auf_ueberwachte(hass: HomeAssistant, runtime) -> None:
+    """Gefiltert wird im Backend: die Trefferzahl ist begrenzt."""
+    runtime.config.add_entity(WatchedEntity(entity_id=TEMPERATUR))
+
+    treffer = runtime.discovery.discover_entities(status="monitored")
+    assert [e["entity_id"] for e in treffer] == [TEMPERATUR]
+
+
+async def test_discovery_filtert_auf_vorschlaege(hass: HomeAssistant, runtime) -> None:
+    treffer = runtime.discovery.discover_entities(status="suggested")
+    assert treffer
+    assert all(e["has_suggestions"] for e in treffer)
+
+
+async def test_discovery_zaehlt_je_typ_ueber_den_ganzen_bestand(
+    hass: HomeAssistant, runtime
+) -> None:
+    """Die Schnellwahl zeigt, was es gibt -- nicht, was die Trefferliste fasst."""
+    zaehler = runtime.discovery.domain_counts()
+    assert zaehler["binary_sensor"] >= 1
+    assert zaehler["sensor"] >= 1
+    assert "automation" not in zaehler
+
+    gesucht = runtime.discovery.domain_counts("waschmaschine")
+    assert sum(gesucht.values()) == 1
+
+
 async def test_discovery_uebergeht_ungeeignete_domains(hass: HomeAssistant, runtime) -> None:
     hass.states.async_set("automation.irgendwas", "on")
     await hass.async_block_till_done()
