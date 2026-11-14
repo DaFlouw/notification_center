@@ -148,12 +148,18 @@ class DiscoveryEngine:
         domain: str | None = None,
         search: str | None = None,
         limit: int = 100,
+        status: str | None = None,
     ) -> list[dict[str, Any]]:
         """Sucht Entities nach Typ, Name oder Entity-ID (Spezifikation 7).
 
         Die Vorschlagszahl beruht hier ausschliesslich auf Metadaten. Die
         Historie wird bewusst nicht angefasst: eine Suche darf nicht Dutzende
         Datenbankabfragen ausloesen.
+
+        ``status`` grenzt auf ueberwachte Entities (``monitored``) oder auf
+        solche mit einem Vorschlag (``suggested``) ein. Gefiltert wird hier
+        und nicht in der Oberflaeche: die Trefferzahl ist begrenzt, und ein
+        Filter ueber einer abgeschnittenen Liste wuerde Treffer verschweigen.
         """
         begriff = (search or "").strip().lower()
         treffer: list[dict[str, Any]] = []
@@ -165,13 +171,39 @@ class DiscoveryEngine:
                 continue
             if begriff and begriff not in f"{state.entity_id} {state.name}".lower():
                 continue
+            if status == "monitored" and state.entity_id not in self._config.entities:
+                continue
 
-            treffer.append(self._describe(state))
+            eintrag = self._describe(state)
+            if status == "suggested" and not eintrag["has_suggestions"]:
+                continue
+
+            treffer.append(eintrag)
             if len(treffer) >= limit:
                 break
 
         treffer.sort(key=lambda eintrag: (not eintrag["monitored"], eintrag["name"].lower()))
         return treffer
+
+    def domain_counts(self, search: str | None = None) -> dict[str, int]:
+        """Wie viele ueberwachbare Entities es je Typ gibt.
+
+        Fuer die Schnellwahl der Discovery: sie zeigt die Typen, die in
+        dieser Anlage tatsaechlich vorkommen. Gezaehlt wird ueber den ganzen
+        Bestand und nicht ueber die begrenzte Trefferliste; betrachtet wird
+        dabei nur die Domaene, kein Registry-Eintrag und keine Historie.
+        """
+        begriff = (search or "").strip().lower()
+        zaehler: dict[str, int] = {}
+
+        for state in self._hass.states.async_all():
+            if state.domain not in SUPPORTED_DOMAINS:
+                continue
+            if begriff and begriff not in f"{state.entity_id} {state.name}".lower():
+                continue
+            zaehler[state.domain] = zaehler.get(state.domain, 0) + 1
+
+        return zaehler
 
     def _describe(self, state: State) -> dict[str, Any]:
         metadata = self.metadata_for(state.entity_id)

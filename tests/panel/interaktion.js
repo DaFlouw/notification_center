@@ -218,18 +218,18 @@ const FAELLE = [
     async fn() {
       await seite("history");
       let ab = marke();
-      await waehle('[data-filter="zeitraum"]', "heute");
+      await klick('[data-action="set-period"][data-value="heute"]');
       const heute = letztes(ab, "get_history").nachricht.start;
       pruefe(heute, "heute: kein start");
       pruefe(new Date(heute).getHours() === 0 || heute.includes("T"), "heute: kein Zeitpunkt");
 
       ab = marke();
-      await waehle('[data-filter="zeitraum"]', "30");
+      await klick('[data-action="set-period"][data-value="30"]');
       const dreissig = letztes(ab, "get_history").nachricht.start;
       pruefe(new Date(dreissig) < new Date(heute), "30 Tage liegt nicht vor heute");
 
       ab = marke();
-      await waehle('[data-filter="zeitraum"]', "alle");
+      await klick('[data-action="set-period"][data-value="alle"]');
       pruefe(!("start" in letztes(ab, "get_history").nachricht), "Alle: start wurde mitgeschickt");
     },
   },
@@ -359,7 +359,7 @@ const FAELLE = [
     async fn() {
       await oeffneEditor(REGEL_ZUSTAND);
       pruefe(window.__text().includes("Heizung Schlafzimmer"), "falsche Entity");
-      const offen = SR().querySelector(".row.editing");
+      const offen = SR().querySelector(".rule.editing");
       pruefe(offen, "keine Zeile als in Bearbeitung markiert");
       pruefe(offen.textContent.includes("hvac_action"), "die falsche Zeile ist offen");
     },
@@ -405,7 +405,7 @@ const FAELLE = [
       gleich(element('[data-rule-field="kind"]').value, "state_is", "Bedingung");
       gleich(element('[data-rule-field="type"]').value, "warning", "Typ");
       gleich(element('[data-rule-field="message"]').value, "", "Meldungstext");
-      pruefe(!SR().querySelector(".row.editing"), "eine bestehende Zeile gilt als offen");
+      pruefe(!SR().querySelector(".rule.editing"), "eine bestehende Zeile gilt als offen");
     },
   },
   {
@@ -530,7 +530,7 @@ const FAELLE = [
       await klick('[data-action="cancel-rule"]');
       gleich(anzahl(ab, "save_rule"), 0, "Speicheraufrufe");
       pruefe(!SR().querySelector('[data-rule-field="kind"]'), "das Formular steht noch");
-      pruefe(!SR().querySelector(".row.editing"), "eine Zeile gilt weiter als offen");
+      pruefe(!SR().querySelector(".rule.editing"), "eine Zeile gilt weiter als offen");
     },
   },
   {
@@ -757,6 +757,40 @@ const FAELLE = [
         "die Ueberschrift des Editors fehlt"
       );
       pruefe(kennung, "am Knopf fehlt die Entity");
+    },
+  },
+
+  // -- Kacheln als Filter -------------------------------------------------
+  {
+    id: "L58",
+    titel: "Eine Kachel des Dashboards filtert, der zweite Klick hebt es auf",
+    async fn() {
+      await seite("dashboard");
+      const alle = SR().querySelectorAll("main .row").length;
+      await klick('[data-action="filter-dashboard"][data-type="alarm"]');
+      const gefiltert = [...SR().querySelectorAll("main .row")];
+      pruefe(gefiltert.length > 0 && gefiltert.length < alle, "der Filter greift nicht");
+      pruefe(
+        gefiltert.every((zeile) => zeile.classList.contains("alarm")),
+        "es stehen auch andere Dringlichkeiten da"
+      );
+      await klick('[data-action="filter-dashboard"][data-type="alarm"]');
+      gleich(SR().querySelectorAll("main .row").length, alle, "Zeilen nach dem Aufheben");
+    },
+  },
+  {
+    id: "L59",
+    titel: "Ein Abschnitt der Regeln laesst sich zu- und wieder aufklappen",
+    async fn() {
+      await seite("rules");
+      const vorher = SR().querySelectorAll('[data-action="edit-rule"]').length;
+      await klick('[data-action="toggle-rule-section"]');
+      pruefe(
+        SR().querySelectorAll('[data-action="edit-rule"]').length < vorher,
+        "der Abschnitt blieb offen"
+      );
+      await klick('[data-action="toggle-rule-section"]');
+      gleich(SR().querySelectorAll('[data-action="edit-rule"]').length, vorher, "Regeln danach");
     },
   },
 

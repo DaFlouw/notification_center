@@ -12,6 +12,7 @@
 import { MODULE_VERSION, api, backendZuAlt, versionsKonflikt } from "./api.js";
 import { escapeHtml } from "./html.js";
 import { t, waehleSprache } from "./i18n.js";
+import { icon } from "./icons.js";
 import { adoptStyles } from "./styles.js";
 import { renderDashboard } from "./views/dashboard.js";
 import { LEERER_FILTER, buildQuery, renderHistory } from "./views/history.js";
@@ -30,6 +31,43 @@ const SEITEN = ["dashboard", "history", "rules", "discovery"];
 /** Wartezeit, bis eine Eingabe als fertig gilt. */
 const ENTPRELLUNG = 500;
 
+/** Unter diesem Schluessel merkt sich der Browser die Ansicht der Regeln. */
+const ANSICHT_SCHLUESSEL = "notification-center.regelansicht";
+
+/**
+ * Die gemerkte Ansicht der Regeluebersicht.
+ *
+ * Reine Bequemlichkeit eines einzelnen Browsers: Gliederung, Dichte und was
+ * zugeklappt ist. Fehlt der Speicher oder ist er gesperrt, gilt die Vorgabe.
+ */
+function ladeAnsicht() {
+  try {
+    const roh = JSON.parse(localStorage.getItem(ANSICHT_SCHLUESSEL) || "{}");
+    return {
+      group: roh.group === "type" ? "type" : "room",
+      density: roh.density === "cards" || roh.density === "list" ? roh.density : null,
+      collapsed: roh.collapsed && typeof roh.collapsed === "object" ? roh.collapsed : {},
+    };
+  } catch {
+    return { group: "room", density: null, collapsed: {} };
+  }
+}
+
+function merkeAnsicht(ansicht) {
+  try {
+    localStorage.setItem(
+      ANSICHT_SCHLUESSEL,
+      JSON.stringify({
+        group: ansicht.group,
+        density: ansicht.density,
+        collapsed: ansicht.collapsed,
+      })
+    );
+  } catch {
+    // Ohne Speicher bleibt die Ansicht bis zum Neuladen bestehen.
+  }
+}
+
 class NotificationCenterPanel extends HTMLElement {
   #hass = null;
   #unsubscribe = null;
@@ -37,8 +75,18 @@ class NotificationCenterPanel extends HTMLElement {
   #seite = "dashboard";
 
   #dashboard = { active: [], counts: {}, paused: false };
+  /** Die gewaehlte Kachel des Dashboards; ``null`` zeigt alles. */
+  #dashboardFilter = null;
+  #regelAnzahl = 0;
   #history = { events: [], total: 0, hasMore: false, filter: { ...LEERER_FILTER }, areas: [] };
-  #discovery = { entities: [], domain: "", search: "", suggestions: {} };
+  #discovery = {
+    entities: [],
+    domain: "",
+    search: "",
+    suggestions: {},
+    status: "all",
+    domainCounts: {},
+  };
   #rules = {
     entityId: null,
     entityName: "",
@@ -51,6 +99,7 @@ class NotificationCenterPanel extends HTMLElement {
     conditionOptions: {},
   };
   #ruleOverview = { entities: [], rules: [], loading: false, names: {} };
+  #regelAnsicht = { search: "", filter: "all", ...ladeAnsicht() };
   #setupErledigt = true;
   #backendZuAlt = false;
   #fehler = null;
@@ -115,6 +164,7 @@ class NotificationCenterPanel extends HTMLElement {
         Boolean(konfiguration.settings.setup_completed) ||
         (konfiguration.entities || []).length > 0;
       if (!this.#setupErledigt) this.#seite = "welcome";
+      this.#regelAnzahl = (konfiguration.rules || []).length;
 
       // Aenderungen werden zugestellt, nicht abgefragt (Spezifikation 45).
       this.#unsubscribe = await api.subscribeUpdates(this.#hass, (nachricht) => {
@@ -123,7 +173,9 @@ class NotificationCenterPanel extends HTMLElement {
           counts: nachricht.counts || {},
           paused: Boolean(nachricht.paused),
         };
-        if (this.#seite === "dashboard") this.#render();
+        // Auch die Regeluebersicht zeigt die laufenden Meldungen: welche
+        // Regel gerade meldet, aendert sich mit ihnen.
+        if (this.#seite === "dashboard" || this.#seite === "rules") this.#render();
       });
       this.#render();
     } catch (fehler) {
@@ -166,8 +218,10 @@ class NotificationCenterPanel extends HTMLElement {
       const antwort = await api.discover(this.#hass, {
         domain: this.#discovery.domain || null,
         search: this.#discovery.search || null,
+        status: this.#discovery.status,
       });
       this.#discovery.entities = antwort.entities;
+      this.#discovery.domainCounts = antwort.domain_counts || {};
       this.#fehler = null;
     } catch (fehler) {
       this.#fehler = fehler.message || String(fehler);
@@ -184,6 +238,7 @@ class NotificationCenterPanel extends HTMLElement {
     try {
       const konfiguration = await api.getConfig(this.#hass);
       this.#ruleOverview = { ...uebersichtAusKonfiguration(konfiguration), names: this.#namen() };
+      this.#regelAnzahl = this.#ruleOverview.rules.length;
       this.#fehler = null;
     } catch (fehler) {
       this.#fehler = fehler.message || String(fehler);
@@ -310,6 +365,11 @@ class NotificationCenterPanel extends HTMLElement {
     if (feld.dataset.filter === "suche") {
       this.#history.filter.search = feld.value;
       this.#entprellt(() => this.#ladeHistorie());
+    }
+    if (feld.dataset.ruleSearch !== undefined) {
+      // Gesucht wird im geladenen Bestand; ein Abruf ist nicht noetig.
+      this.#regelAnsicht.search = feld.value;
+      this.#render();
     }
     if (feld.dataset.discovery === "search") {
       this.#discovery.search = feld.value;
@@ -465,6 +525,74 @@ class NotificationCenterPanel extends HTMLElement {
 
   async #aktion(aktion, daten) {
     try {
+      if (aktion === "filter-dashboard") {
+        // Ein zweiter Klick auf dieselbe Kachel hebt den Filter wieder auf.
+        this.#dashboardFilter = this.#dashboardFilter === daten.type ? null : daten.type;
+        this.#render();
+        return;
+      }
+
+      if (aktion === "show-today") {
+        this.#history.filter.zeitraum = "heute";
+        this.#seite = "history";
+        await this.#ladeHistorie();
+        return;
+      }
+
+      if (aktion === "set-period") {
+        this.#history.filter.zeitraum = daten.value;
+        await this.#ladeHistorie();
+        return;
+      }
+
+      if (aktion === "set-rule-filter") {
+        this.#regelAnsicht.filter = daten.value;
+        this.#render();
+        return;
+      }
+
+      if (aktion === "set-rule-group" || aktion === "set-rule-density") {
+        const feld = aktion === "set-rule-group" ? "group" : "density";
+        this.#regelAnsicht[feld] = daten.value;
+        merkeAnsicht(this.#regelAnsicht);
+        this.#render();
+        return;
+      }
+
+      if (aktion === "toggle-rule-section") {
+        const offen = this.shadowRoot
+          .querySelector(`[data-action="toggle-rule-section"][data-key="${CSS.escape(daten.key)}"]`)
+          ?.getAttribute("aria-expanded");
+        this.#regelAnsicht.collapsed = {
+          ...this.#regelAnsicht.collapsed,
+          [daten.key]: offen === "true",
+        };
+        merkeAnsicht(this.#regelAnsicht);
+        this.#render();
+        return;
+      }
+
+      if (aktion === "collapse-all-rules") {
+        // Eine Vorgabe fuer alle; einzelne Abschnitte lassen sich danach
+        // wieder gezielt oeffnen oder schliessen.
+        this.#regelAnsicht.collapsed = { "*": daten.value === "close" };
+        merkeAnsicht(this.#regelAnsicht);
+        this.#render();
+        return;
+      }
+
+      if (aktion === "set-discovery-status") {
+        this.#discovery.status = daten.value;
+        await this.#ladeDiscovery();
+        return;
+      }
+
+      if (aktion === "set-domain") {
+        this.#discovery.domain = daten.domain || "";
+        await this.#ladeDiscovery();
+        return;
+      }
+
       if (aktion === "show-rules") {
         await this.#ladeRegeln(daten.entity, daten.name);
         return;
@@ -692,15 +820,20 @@ class NotificationCenterPanel extends HTMLElement {
     const fokus = this.#merkeFokus();
 
     this.shadowRoot.innerHTML = `
-      <header><h1>${t("app.title")}</h1></header>
-      <nav ${this.#seite === "welcome" ? 'hidden=""' : ""}>
-        ${SEITEN.map(
-          (seite) =>
-            `<button data-page="${seite}" ${
-              this.#seite === seite ? 'aria-current="page"' : ""
-            }>${t(`nav.${seite}`)}</button>`
-        ).join("")}
-      </nav>
+      <header>
+        <div class="brand">
+          <span class="brand-mark">${icon("bell", 22)}</span>
+          <h1>${t("app.title")}</h1>
+        </div>
+        <nav ${this.#seite === "welcome" ? 'hidden=""' : ""}>
+          ${SEITEN.map(
+            (seite) =>
+              `<button data-page="${seite}" ${
+                this.#aktiveSeite() === seite ? 'aria-current="page"' : ""
+              }>${t(`nav.${seite}`)}${this.#zaehler(seite)}</button>`
+          ).join("")}
+        </nav>
+      </header>
       <main>
         ${this.#versionshinweis()}
         ${
@@ -739,8 +872,10 @@ class NotificationCenterPanel extends HTMLElement {
               `[data-cond-index="${element.dataset.condIndex}"]`
             : null;
 
-    if (!kennung) return null;
-    return { kennung, position: element.selectionStart ?? null };
+    const gefunden =
+      kennung || (element.dataset.ruleSearch !== undefined ? "[data-rule-search]" : null);
+    if (!gefunden) return null;
+    return { kennung: gefunden, position: element.selectionStart ?? null };
   }
 
   #stelleFokusHer(fokus) {
@@ -778,11 +913,43 @@ class NotificationCenterPanel extends HTMLElement {
 
   #inhalt(locale) {
     if (this.#seite === "welcome") return this.#willkommen();
-    if (this.#seite === "rules") return renderRuleOverview(this.#ruleOverview);
-    if (this.#seite === "rule-editor") return renderRules(this.#rules);
+    if (this.#seite === "rules") {
+      return renderRuleOverview({
+        ...this.#ruleOverview,
+        ...this.#regelAnsicht,
+        active: this.#dashboard.active,
+      });
+    }
+    if (this.#seite === "rule-editor") {
+      return renderRules({ ...this.#rules, active: this.#dashboard.active });
+    }
     if (this.#seite === "history") return renderHistory(this.#history, locale);
     if (this.#seite === "discovery") return renderDiscovery(this.#discovery);
-    return renderDashboard(this.#dashboard, locale);
+    return renderDashboard(
+      {
+        ...this.#dashboard,
+        filter: this.#dashboardFilter,
+        areas: Object.fromEntries(this.#bereiche().map((b) => [b.area_id, b.name])),
+        version: MODULE_VERSION,
+      },
+      locale
+    );
+  }
+
+  /** Der Reiter, der als gewaehlt gilt; der Editor gehoert zu den Regeln. */
+  #aktiveSeite() {
+    return this.#seite === "rule-editor" ? "rules" : this.#seite;
+  }
+
+  /** Die Zahl am Reiter: laufende Meldungen und Regelbestand. */
+  #zaehler(seite) {
+    const anzahl =
+      seite === "dashboard"
+        ? this.#dashboard.active.length
+        : seite === "rules"
+          ? this.#regelAnzahl
+          : 0;
+    return anzahl ? `<span class="count">${anzahl}</span>` : "";
   }
 
   #willkommen() {
