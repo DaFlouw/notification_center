@@ -282,6 +282,78 @@ eigens angelegte Wegwerf-Entity gesendet.
 `clear_history` wird dabei **nicht** gesendet: es loescht die Historie der
 gesamten Installation.
 
+## M -- Verknuepfte Bedingungen
+
+Zwei Testhelfer als Partner: `input_boolean.nc_test_a` traegt die Regel,
+`input_boolean.nc_test_b` und `input_select.nc_test_modus` sind Bedingungen.
+
+| ID | Fall | Erwartung |
+|----|------|-----------|
+| M1 | Regel auf A mit zweiter Bedingung "B ist on", Verknuepfung *alle*; nur A einschalten | Keine Meldung. |
+| M2 | Danach B einschalten | Meldung entsteht -- ausgeloest durch den Wechsel des Partners, nicht der eigenen Entity. |
+| M3 | B wieder ausschalten, A bleibt an | Meldung endet. |
+| M4 | Verknuepfung *eine genuegt*; nur B einschalten | Meldung entsteht. |
+| M5 | Zweite Bedingung verneint ("nicht: B ist on"); A an, B aus | Meldung entsteht; mit B an endet sie. |
+| M6 | Partner-Entity, die es nicht gibt (`input_boolean.nc_test_gibtsnicht`), verneint | Keine Meldung: unentscheidbar ist nicht wahr. |
+| M7 | Bedingung ohne eigene Kennung auf ein Attribut von A | Wird gegen A ausgewertet. |
+| M8 | `get_config` nach dem Speichern | `logic` und `extra_conditions` sind enthalten und unveraendert. |
+| M9 | B ist nicht uebernommen | Erscheint nicht unter den ueberwachten Entities, die Regel reagiert trotzdem auf B. |
+
+## N -- Systemnachrichten von Home Assistant
+
+Voraussetzung: *Benachrichtigungen von Home Assistant uebernehmen* ist an.
+
+| ID | Fall | Erwartung |
+|----|------|-----------|
+| N1 | `persistent_notification.create` mit `notification_id: nc_test_sys` | Erscheint in `get_active` mit `source: ha_system`, Typ laut Einstellung. |
+| N2 | Dieselbe Kennung erneut mit anderem Text | Derselbe Eintrag, neuer Text, kein zweiter im Log. |
+| N3 | `persistent_notification.dismiss` | Eintrag endet. |
+| N4 | Sehr langer, mehrzeiliger Text | Auf eine Zeile zusammengezogen, nach 300 Zeichen gekuerzt. |
+| N5 | Erzeugen, dann `reload_config_entry` | Eintrag bleibt genau einmal bestehen. |
+| N6 | Erzeugen, Einstellung aus, wieder an | Aus: Eintrag endet. An: der Bestand wird neu uebernommen. |
+| N7 | Erzeugen, Einstellung aus, in HA verwerfen, Einstellung an | Kein verwaister Eintrag (Issue 16). |
+| N8 | `get_history` mit `sources: ["ha_system"]` | Liefert genau die uebernommenen Eintraege. |
+
+## O -- Deaktivieren und Wiederaktivieren
+
+| ID | Fall | Erwartung |
+|----|------|-----------|
+| O1 | Laufende Regelmeldung per `deactivate_event` | Verschwindet aus `get_active`, Zaehler sinken. |
+| O2 | `get_history` danach | Eintrag vorhanden, `close_reason: deactivated`. |
+| O3 | Zustand der Entity erneut melden, Bedingung liegt weiter an | Keine neue Meldung. |
+| O4 | `reactivate_event` bei anliegender Bedingung | Derselbe Eintrag laeuft wieder, selber Beginn. |
+| O5 | Deaktivieren, Bedingung entfaellt, `reactivate_event` | Eintrag endet sofort wieder mit `condition_cleared`; nichts bleibt haengen. |
+| O6 | `reactivate_event` auf einen normal beendeten Eintrag | Abgelehnt (`reactivated: false`). |
+| O7 | Deaktivieren, Bedingung entfaellt und tritt erneut auf | Neue Meldung mit neuer Kennung. |
+
+## P -- Discovery-Filter und Zaehler
+
+| ID | Fall | Erwartung |
+|----|------|-----------|
+| P1 | `discover` ohne Filter | Antwort traegt `domain_counts` und `status_counts`. |
+| P2 | `discover` mit `status: monitored` | Nur ueberwachte Entities; Anzahl gleich `status_counts.monitored`. |
+| P3 | `discover` mit `status: suggested` | Jede hat `has_suggestions: true`. |
+| P4 | `discover` mit `search` | Beide Zaehler folgen der Suche. |
+| P5 | `get_entity_options` fuer eine nicht uebernommene Entity | Zustaende und Attribute, ohne Vorschlagsanalyse. |
+
+## Q -- Neue Oberflaeche
+
+Im Browser an der laufenden Instanz, nicht im Pruefstand: es geht um das,
+was der Pruefstand nicht sieht -- Theme, echte Daten, die Seitenleiste.
+
+| ID | Fall | Erwartung |
+|----|------|-----------|
+| Q1 | Panel im hellen und im dunklen Theme | Toenungen lesbar, kein weisser Kasten, keine unlesbare Schrift. |
+| Q2 | Kachel *Alarme* anklicken, erneut anklicken | Filtert, hebt wieder auf. |
+| Q3 | Kachel *Ereignisse heute* | Oeffnet die Historie mit Zeitraum *Heute*. |
+| Q4 | Regeln: Geschoss zuklappen, Seite neu laden | Bleibt zugeklappt. |
+| Q5 | Regeln: Darstellung *Liste* | Je Raum ein eigenes Feld. |
+| Q6 | Regeln: Suche nach einem Raumnamen | Nur dessen Regeln; der Fokus bleibt im Feld. |
+| Q7 | Regel bearbeiten und speichern | Formular in *Wenn / Dann melden / Erweitert*; die Regel ist danach unveraendert vorhanden. |
+| Q8 | Dashboard: *Deaktivieren*, dann Historie: *Wieder aktivieren* | Beides wirkt ohne Neuladen. |
+| Q9 | Schmales Fenster (Handybreite) | Nichts laeuft seitlich aus dem Bild; Reiter und Kacheln brechen um. |
+| Q10 | Version | Steht nur auf dem Dashboard, klein am Fuss. |
+
 ---
 
 ## Durchlauf vom 28.08.2026, Version 1.1.3
