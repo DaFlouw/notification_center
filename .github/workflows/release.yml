@@ -33,7 +33,12 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          # Ein Tag mit Bindestrich ist ein Vorabstand (v1.5.0-rc1). Er wird
+          # als Pre-Release angelegt: HACS bietet ihn dann nur dem an, der
+          # Vorabversionen ausdruecklich sehen will.
+          vorab=""
+          case "$GITHUB_REF_NAME" in *-*) vorab="--prerelease" ;; esac
           gh release create "$GITHUB_REF_NAME" \
             --title "$GITHUB_REF_NAME" \
             --generate-notes \
-            --verify-tag
+            --verify-tag $vorab
