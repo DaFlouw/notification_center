@@ -3,6 +3,8 @@
 <head>
 <meta charset="utf-8">
 <title>Notification Center — Panel-Pruefstand</title>
+<!-- Home Assistant bringt Roboto mit; der Pruefstand holt sie, damit der Abgleich mit dem Entwurf stimmt. -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=Roboto+Mono&display=swap">
 <style>
   html, body { margin: 0; padding: 0; background: #fff; color: #212121; font-family: Roboto, system-ui, sans-serif; }
   /* Die Variablen, die Home Assistant sonst stellt. Werte aus dem
@@ -106,6 +108,8 @@ window.__naechsterFehler = null;
 const hass = {
   // ?sprache=en zeigt dasselbe Panel in der Grundsprache.
   locale: { language: new URLSearchParams(location.search).get("sprache") || "de" },
+  // ?dunkel zeigt die dunkle Palette.
+  themes: { darkMode: new URLSearchParams(location.search).has("dunkel") },
   areas: AREAS,
   states: HASS_STATES,
   connection: {
@@ -207,7 +211,7 @@ document.getElementById("start").addEventListener("click", () => window.__lauf()
     const regel = p.get("regel") || "rule_klima_temp";
     (await bis('nav button[data-page="rules"]')).click();
     (await bis(`[data-action="edit-rule"][data-rule="${regel}"]`)).click();
-    await bis('[data-rule-field="kind"]');
+    await bis(".editor-head");
   } else if (ziel === "discovery") {
     (await bis('nav button[data-page="discovery"]')).click();
     if (p.has("vorschlaege")) {

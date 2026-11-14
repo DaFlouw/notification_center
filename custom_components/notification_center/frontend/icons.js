@@ -17,6 +17,9 @@ const PFADE = {
   info: '<circle cx="12" cy="12" r="9"></circle><path d="M12 11v5.5"></path><path d="M12 7.4v.2"></path>',
   close: '<path d="M6 6l12 12"></path><path d="M18 6 6 18"></path>',
   chevron: '<path d="m6 9 6 6 6-6"></path>',
+  search: '<circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path>',
+  arrow: '<path d="M5 12h14"></path><path d="m13 6 6 6-6 6"></path>',
+  timer: '<circle cx="12" cy="13" r="8"></circle><path d="M12 9v4l2.5 2"></path><path d="M9 2h6"></path>',
 };
 
 /** Ein Symbol als SVG-Text. Unbekannte Namen ergeben nichts. */

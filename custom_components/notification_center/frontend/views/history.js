@@ -41,8 +41,11 @@ export function renderHistory(state, locale) {
   return `
     <section class="card pad" aria-label="${t("history.filterLabel")}">
       <div class="filters">
-        <input type="search" data-filter="suche" placeholder="${t("history.search")}"
-               value="${escapeHtml(filter.search)}" aria-label="${t("history.search")}">
+        <label class="search">
+          ${icon("search", 18)}
+          <input type="search" data-filter="suche" placeholder="${t("history.search")}"
+                 value="${escapeHtml(filter.search)}" aria-label="${t("history.search")}">
+        </label>
 
         <div class="segmented" role="group" aria-label="${t("history.period")}">
           ${ZEITRAEUME.map(

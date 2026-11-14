@@ -10,6 +10,8 @@
  * `SYSTEMTESTS.md`, Abschnitte A bis J, gegen eine laufende Instanz geprueft.
  */
 
+import { MASSE, alsRgb, farbe } from "./konzept.js";
+
 const P = () => window.__panel;
 const SR = () => window.__panel.shadowRoot;
 
@@ -99,8 +101,79 @@ async function oeffneEditor(regelId = REGEL_NUMERISCH) {
   await seite("rules");
   await bisSichtbar(`[data-action="edit-rule"][data-rule="${regelId}"]`);
   await klick(`[data-action="edit-rule"][data-rule="${regelId}"]`);
-  await bisSichtbar('[data-rule-field="kind"]');
+  await bisSichtbar(".editor-head");
 }
+
+// ---------------------------------------------------------------------------
+// HMI: Farben und Masse nach dem Konzept (docs/UI-KONZEPT.md, konzept.js)
+// ---------------------------------------------------------------------------
+
+/** Faehrt die Ansicht an, auf der ein Messpunkt liegt. */
+async function zurAnsicht(name) {
+  if (name === "editor") {
+    await oeffneEditor("rule_fenster_heizung");
+    return;
+  }
+  if (name === "vorschlag") {
+    await seite("discovery");
+    if (!SR().querySelector(".entity-item.open")) {
+      await klick('[data-action="show-suggestions"]');
+      await bisSichtbar(".suggestion");
+    }
+    return;
+  }
+  await seite(name);
+  if (name === "discovery" && SR().querySelector(".entity-item.open")) {
+    await klick('.entity-item.open [data-action="show-suggestions"]');
+  }
+}
+
+/** Der Sollwert in der Schreibweise von ``getComputedStyle``. */
+function sollwert(eigenschaft, angabe, dunkel) {
+  if (angabe.startsWith("#")) return alsRgb(angabe);
+  // "dashed" ist ein Schluesselwort *und* der Name einer Farbe; was gemeint
+  // ist, sagt die Eigenschaft.
+  if (eigenschaft.endsWith("-style")) return angabe;
+  if (/^[a-z-]+$/.test(angabe)) return alsRgb(farbe(angabe, dunkel));
+  return angabe;
+}
+
+/** Misst einen Messpunkt nach und sammelt alle Abweichungen. */
+function messe(punkt, dunkel) {
+  const ziel = punkt.auswahl === ":host" ? P() : SR().querySelector(punkt.auswahl);
+  if (!ziel) throw new Error(`Element fehlt: ${punkt.auswahl}`);
+  const stil = getComputedStyle(ziel);
+  const abweichungen = [];
+  for (const [eigenschaft, angabe] of Object.entries(punkt.soll)) {
+    const soll = sollwert(eigenschaft, angabe, dunkel);
+    const ist = stil.getPropertyValue(eigenschaft);
+    if (ist !== soll) abweichungen.push(`${eigenschaft}: ${ist} statt ${soll}`);
+  }
+  if (abweichungen.length) throw new Error(abweichungen.join("; "));
+}
+
+/** Aus jedem Messpunkt des Konzepts ein Fall, hell gemessen und dunkel. */
+const HMI_FAELLE = MASSE.map((punkt) => ({
+  id: punkt.id,
+  titel: `Konzept: ${punkt.was} (${punkt.seite})`,
+  async fn() {
+    await zurAnsicht(punkt.seite);
+    const hass = P().hass;
+    try {
+      messe(punkt, false);
+      P().hass = { ...hass, themes: { darkMode: true } };
+      await ruhe();
+      try {
+        messe(punkt, true);
+      } catch (fehler) {
+        throw new Error(`dunkel -- ${fehler.message}`);
+      }
+    } finally {
+      P().hass = hass;
+      if (punkt.seite === "editor") await klick('[data-action="cancel-rule"]');
+    }
+  },
+}));
 
 // ---------------------------------------------------------------------------
 
@@ -129,7 +202,7 @@ const FAELLE = [
     titel: "Der Verweis 'Historie' im Dashboard fuehrt zur Historie",
     async fn() {
       await seite("dashboard");
-      await klick('[data-nav="history"]');
+      await klick('[data-action="show-today"]');
       gleich(
         SR().querySelector('nav button[aria-current="page"]').dataset.page,
         "history",
@@ -315,7 +388,8 @@ const FAELLE = [
     async fn() {
       await seite("history");
       const zeilen = [...SR().querySelectorAll("main .row")];
-      const aktive = zeilen.filter((z) => z.textContent.includes("aktiv"));
+      // Am Kennzeichen erkannt, nicht am Wort: "deaktiviert" enthaelt es auch.
+      const aktive = zeilen.filter((z) => z.querySelector(".pill.ok"));
       pruefe(aktive.length > 0, "keine aktiven Zeilen in den Testdaten");
       for (const zeile of aktive) {
         pruefe(
@@ -359,9 +433,13 @@ const FAELLE = [
     async fn() {
       await oeffneEditor(REGEL_ZUSTAND);
       pruefe(window.__text().includes("Heizung Schlafzimmer"), "falsche Entity");
-      const offen = SR().querySelector(".rule.editing");
-      pruefe(offen, "keine Zeile als in Bearbeitung markiert");
-      pruefe(offen.textContent.includes("hvac_action"), "die falsche Zeile ist offen");
+      gleich(
+        element('[data-action="delete-rule"]').dataset.rule,
+        REGEL_ZUSTAND,
+        "die offene Regel"
+      );
+      gleich(element('[data-rule-field="states"]').value, "idle, heating", "ihre Zustaende");
+      pruefe(!SR().querySelector('[data-action="edit-rule"]'), "die Liste steht noch daneben");
     },
   },
   {
@@ -396,16 +474,24 @@ const FAELLE = [
   // -- Regel-Editor -------------------------------------------------------
   {
     id: "L22",
-    titel: "'Regel erstellen' oeffnet ein leeres Formular",
+    titel: "'Regel erstellen' oeffnet einen leeren Editor",
     async fn() {
       await oeffneEditor();
       await klick('[data-action="cancel-rule"]');
       await klick('[data-action="new-rule"]');
-      await bisSichtbar('[data-rule-field="kind"]');
-      gleich(element('[data-rule-field="kind"]').value, "state_is", "Bedingung");
-      gleich(element('[data-rule-field="type"]').value, "warning", "Typ");
+      await bisSichtbar(".editor-head");
+      gleich(
+        element('[data-action="set-kind"][aria-pressed="true"]').dataset.value,
+        "state_is",
+        "Bedingung"
+      );
+      gleich(
+        element('[data-action="set-type"][aria-pressed="true"]').dataset.value,
+        "warning",
+        "Typ"
+      );
       gleich(element('[data-rule-field="message"]').value, "", "Meldungstext");
-      pruefe(!SR().querySelector(".rule.editing"), "eine bestehende Zeile gilt als offen");
+      pruefe(!SR().querySelector('[data-action="delete-rule"]'), "eine neue Regel bietet Loeschen an");
     },
   },
   {
@@ -415,14 +501,14 @@ const FAELLE = [
       await oeffneEditor();
       await klick('[data-action="cancel-rule"]');
       await klick('[data-action="new-rule"]');
-      await bisSichtbar('[data-rule-field="kind"]');
-      pruefe(SR().querySelector('[data-rule-field="states"]'), "Zustandsfeld fehlt");
-      await waehle('[data-rule-field="kind"]', "numeric");
+      await bisSichtbar(".editor-head");
+      pruefe(SR().querySelector('[data-action="toggle-state"]'), "Zustaende fehlen");
+      await klick('[data-action="set-kind"][data-value="numeric"]');
       pruefe(SR().querySelector('[data-rule-field="operator"]'), "Vergleichsfeld fehlt");
       pruefe(SR().querySelector('[data-rule-field="threshold"]'), "Schwellenfeld fehlt");
-      pruefe(!SR().querySelector('[data-rule-field="states"]'), "Zustandsfeld blieb stehen");
-      await waehle('[data-rule-field="kind"]', "state_is");
-      pruefe(SR().querySelector('[data-rule-field="states"]'), "Zustandsfeld kam nicht zurueck");
+      pruefe(!SR().querySelector('[data-action="toggle-state"]'), "Zustaende blieben stehen");
+      await klick('[data-action="set-kind"][data-value="state_is"]');
+      pruefe(SR().querySelector('[data-action="toggle-state"]'), "Zustaende kamen nicht zurueck");
     },
   },
   {
@@ -460,17 +546,29 @@ const FAELLE = [
   },
   {
     id: "L26",
-    titel: "Die Mehrfachauswahl der Zustaende landet als Liste in der Regel",
+    titel: "Angeklickte Zustaende landen als Liste in der Regel",
     async fn() {
-      await oeffneEditor(REGEL_ZUSTAND);
-      const feld = element('[data-rule-field="states"]');
-      pruefe(feld.multiple, "das Zustandsfeld erlaubt keine Mehrfachauswahl");
-      for (const option of feld.options) option.selected = true;
-      feld.dispatchEvent(new Event("change", { bubbles: true, composed: true }));
-      await ruhe();
+      // Eine Regel auf den Zustand selbst: nur dort gibt es Knoepfe. Bei einem
+      // Attribut als Quelle kennt niemand die moeglichen Werte vorab.
+      await oeffneEditor("rule_kuechenfenster");
+      // Alles anwaehlen, was noch nicht gewaehlt ist.
+      for (;;) {
+        const offen = SR().querySelector('[data-action="toggle-state"][aria-pressed="false"]');
+        if (!offen) break;
+        offen.click();
+        await ruhe();
+      }
+      const alle = [...SR().querySelectorAll('[data-action="toggle-state"]')].map(
+        (knopf) => knopf.dataset.value
+      );
+      pruefe(alle.length > 1, "zu wenige Zustaende in den Testdaten");
       const ab = marke();
       await klick('[data-action="save-rule"]');
-      gleich(letztes(ab, "save_rule").nachricht.rule.states, ["on", "off"], "states");
+      gleich(
+        [...letztes(ab, "save_rule").nachricht.rule.states].sort(),
+        [...alle].sort(),
+        "states"
+      );
     },
   },
   {
@@ -497,13 +595,12 @@ const FAELLE = [
   },
   {
     id: "L28",
-    titel: "Hysterese und Zeitbedingung im erweiterten Bereich",
+    titel: "Hysterese und Wartezeit wandern in die Regel",
     async fn() {
       await oeffneEditor();
-      const erweitert = element("details");
-      pruefe(erweitert.open, "der erweiterte Bereich ist bei gesetzten Werten nicht offen");
       await tippe('[data-rule-field="release"]', "7");
-      await tippe('[data-rule-field="duration"]', "15");
+      await klick('[data-action="set-duration"][data-value="15"]');
+      gleich(element('[data-rule-field="duration"]').value, "15", "Minutenfeld folgt dem Knopf");
       const ab = marke();
       await klick('[data-action="save-rule"]');
       const regel = letztes(ab, "save_rule").nachricht.rule;
@@ -529,8 +626,7 @@ const FAELLE = [
       const ab = marke();
       await klick('[data-action="cancel-rule"]');
       gleich(anzahl(ab, "save_rule"), 0, "Speicheraufrufe");
-      pruefe(!SR().querySelector('[data-rule-field="kind"]'), "das Formular steht noch");
-      pruefe(!SR().querySelector(".rule.editing"), "eine Zeile gilt weiter als offen");
+      pruefe(!SR().querySelector(".editor-head"), "der Editor steht noch");
     },
   },
   {
@@ -626,13 +722,15 @@ const FAELLE = [
   // -- Discovery ----------------------------------------------------------
   {
     id: "L33",
-    titel: "Die Typauswahl schickt 'domain' mit",
+    titel: "Die Typ-Pille schickt 'domain' mit, 'Alle Typen' nimmt sie zurueck",
     async fn() {
       await seite("discovery");
-      const ab = marke();
-      await waehle('[data-discovery="domain"]', "input_boolean");
-      gleich(letztes(ab, "discover").nachricht.domain, "input_boolean", "domain");
-      await waehle('[data-discovery="domain"]', "");
+      let ab = marke();
+      await klick('[data-action="set-domain"][data-domain="light"]');
+      gleich(letztes(ab, "discover").nachricht.domain, "light", "domain");
+      ab = marke();
+      await klick('[data-action="set-domain"][data-domain=""]');
+      gleich(letztes(ab, "discover").nachricht.domain, null, "domain nach 'Alle Typen'");
     },
   },
   {
@@ -665,15 +763,21 @@ const FAELLE = [
   },
   {
     id: "L36",
-    titel: "'Entfernen' fragt nach und schickt danach die Entity",
+    titel: "'Entity entfernen' steht bei ihren Regeln, fragt nach und schickt die Entity",
     async fn() {
       await seite("discovery");
-      const knopf = element('[data-action="remove-entity"]');
-      const kennung = knopf.dataset.entity;
+      pruefe(
+        !SR().querySelector('[data-action="remove-entity"]'),
+        "die Discovery bietet das Entfernen an"
+      );
+      await klick('[data-action="show-rules"]');
+      await bisSichtbar('[data-action="remove-entity"]');
+      const kennung = element('[data-action="remove-entity"]').dataset.entity;
+
       window.__dialoge.length = 0;
       window.__confirmAntwort = false;
       let ab = marke();
-      knopf.click();
+      element('[data-action="remove-entity"]').click();
       await ruhe();
       pruefe(window.__dialoge.some((d) => d.art === "confirm"), "es wurde nicht nachgefragt");
       gleich(anzahl(ab, "remove_entity"), 0, "Aufrufe trotz Abbruch");
@@ -683,6 +787,7 @@ const FAELLE = [
       element('[data-action="remove-entity"]').click();
       await ruhe();
       gleich(letztes(ab, "remove_entity").nachricht.entity_id, kennung, "entity_id");
+      pruefe(letztes(ab, "get_config"), "die Uebersicht wurde nicht neu geladen");
     },
   },
   {
@@ -727,19 +832,21 @@ const FAELLE = [
   },
   {
     id: "L39",
-    titel: "Die Begruendung eines Vorschlags laesst sich aufklappen",
+    titel: "Ein Vorschlag zeigt Bausteine und nennt seine Begruendung",
     async fn() {
       await seite("discovery");
       await klick('[data-action="show-suggestions"]');
-      const aufklappbar = SR().querySelector(".suggestions details");
-      pruefe(aufklappbar, "keine aufklappbare Begruendung");
-      pruefe(!aufklappbar.open, "die Begruendung ist von vornherein offen");
-      aufklappbar.open = true;
-      await ruhe();
+      const vorschlag = element(".suggestion");
+      pruefe(vorschlag.querySelector(".pill"), "der Typ fehlt");
+      pruefe(vorschlag.querySelector(".chip"), "die Bedingung steht nicht in Bausteinen da");
+      const grund = vorschlag.querySelector(".why");
+      pruefe(grund, "die Begruendung fehlt");
       pruefe(
-        aufklappbar.textContent.includes("window") || aufklappbar.textContent.includes("Geraeteklasse"),
+        grund.textContent.includes("window") || grund.textContent.includes("Geräteklasse"),
         "die Begruendung nennt ihre Quelle nicht"
       );
+      pruefe(!vorschlag.querySelector("details"), "die Begruendung ist noch versteckt");
+      await klick('[data-action="show-suggestions"]');
     },
   },
   {
@@ -791,6 +898,150 @@ const FAELLE = [
       );
       await klick('[data-action="toggle-rule-section"]');
       gleich(SR().querySelectorAll('[data-action="edit-rule"]').length, vorher, "Regeln danach");
+    },
+  },
+
+  // -- rc2 ----------------------------------------------------------------
+  {
+    id: "L60",
+    titel: "Der Knopf fuer Vorschlaege steht nur, wo welche zu erwarten sind",
+    async fn() {
+      await seite("discovery");
+      const zeilen = [...SR().querySelectorAll(".entity-item")];
+      const mitKnopf = zeilen.filter((z) => z.querySelector('[data-action="show-suggestions"]'));
+      const uebernehmbar = zeilen.filter((z) => z.querySelector('[data-action="add-entity"]'));
+      pruefe(mitKnopf.length > 0, "keine Entity mit Vorschlag in den Testdaten");
+      pruefe(
+        uebernehmbar.length > mitKnopf.length,
+        "jede uebernehmbare Entity traegt den Knopf -- auch die ohne Vorschlag"
+      );
+    },
+  },
+  {
+    id: "L61",
+    titel: "'Alle Typen' gibt es genau einmal; seltene Typen klappen dazu",
+    async fn() {
+      await seite("discovery");
+      pruefe(!SR().querySelector('[data-discovery="domain"]'), "das zweite Auswahlfeld steht noch");
+      gleich(
+        [...SR().querySelectorAll("main button, main option")].filter(
+          (e) => e.textContent.trim() === "Alle Typen"
+        ).length,
+        1,
+        "Anzahl 'Alle Typen'"
+      );
+      const vorher = SR().querySelectorAll('[data-action="set-domain"]').length;
+      await klick('[data-action="toggle-domains"]');
+      pruefe(
+        SR().querySelectorAll('[data-action="set-domain"]').length > vorher,
+        "es kamen keine Typen dazu"
+      );
+      await klick('[data-action="toggle-domains"]');
+      gleich(SR().querySelectorAll('[data-action="set-domain"]').length, vorher, "Typen danach");
+    },
+  },
+  {
+    id: "L62",
+    titel: "'Weitere laden' holt die naechsten fuenfzig; ein Filterwechsel beginnt von vorn",
+    async fn() {
+      await seite("discovery");
+      let ab = marke();
+      await klick('[data-action="discovery-more"]');
+      gleich(letztes(ab, "discover").nachricht.limit, 100, "limit nach dem ersten Nachladen");
+      ab = marke();
+      await klick('[data-action="set-discovery-status"][data-value="monitored"]');
+      gleich(letztes(ab, "discover").nachricht.limit, 50, "limit nach dem Filterwechsel");
+      await klick('[data-action="set-discovery-status"][data-value="all"]');
+    },
+  },
+  {
+    id: "L63",
+    titel: "Uebernommene Entities ohne Regel stehen eigens in der Regeluebersicht",
+    async fn() {
+      await seite("rules");
+      const abschnitt = [...SR().querySelectorAll("main .section")].find((s) =>
+        s.textContent.includes("ohne Regel")
+      );
+      pruefe(abschnitt, "der Abschnitt fehlt");
+      pruefe(abschnitt.querySelector('[data-action="show-rules"]'), "kein Weg zur ersten Regel");
+      pruefe(abschnitt.querySelector('[data-action="remove-entity"]'), "kein Entfernen");
+      pruefe(
+        SR().querySelector('[data-action="set-discovery-status"]') === null,
+        "falsche Seite"
+      );
+    },
+  },
+  {
+    id: "L64",
+    titel: "Der Verweis 'Einstellungen' fuehrt zur Integration, ohne neu zu laden",
+    async fn() {
+      await seite("dashboard");
+      const zurueck = location.href;
+      let gemeldet = false;
+      const hoerer = () => (gemeldet = true);
+      window.addEventListener("location-changed", hoerer);
+      try {
+        await klick('[data-action="open-integration"]');
+        gleich(
+          location.pathname,
+          "/config/integrations/integration/notification_center",
+          "Adresse"
+        );
+        pruefe(gemeldet, "Home Assistant erfuhr nichts von der neuen Adresse");
+      } finally {
+        window.removeEventListener("location-changed", hoerer);
+        history.replaceState(null, "", zurueck);
+      }
+    },
+  },
+  {
+    id: "L65",
+    titel: "Im Editor: 'eine genuegt' und der Typ wandern in die Regel",
+    async fn() {
+      await oeffneEditor("rule_fenster_heizung");
+      await klick('[data-action="set-logic"][data-value="any"]');
+      await klick('[data-action="set-type"][data-value="alarm"]');
+      const ab = marke();
+      await klick('[data-action="save-rule"]');
+      const regel = letztes(ab, "save_rule").nachricht.rule;
+      gleich(regel.logic, "any", "logic");
+      gleich(regel.type, "alarm", "type");
+      gleich(regel.extra_conditions.length, 2, "weitere Bedingungen");
+    },
+  },
+  {
+    id: "L66",
+    titel: "Im Editor: ein Platzhalter-Knopf haengt ihn an den Meldungstext",
+    async fn() {
+      await oeffneEditor();
+      await tippe('[data-rule-field="message"]', "Es ist");
+      await klick('[data-action="insert-placeholder"][data-value="{value}"]');
+      gleich(element('[data-rule-field="message"]').value, "Es ist {value}", "Meldungstext");
+      await klick('[data-action="cancel-rule"]');
+    },
+  },
+  {
+    id: "L67",
+    titel: "Das Panel folgt dem Theme nur in hell und dunkel",
+    async fn() {
+      await seite("dashboard");
+      const hass = P().hass;
+      try {
+        P().hass = { ...hass, themes: { darkMode: true } };
+        pruefe(P().hasAttribute("dark"), "das dunkle Theme kam nicht an");
+        P().hass = { ...hass, themes: { darkMode: false } };
+        pruefe(!P().hasAttribute("dark"), "das helle Theme kam nicht an");
+        // Eine Theme-Farbe darf nichts verschieben.
+        P().style.setProperty("--primary-color", "#009688");
+        gleich(
+          getComputedStyle(element(".brand-mark")).backgroundColor,
+          alsRgb(farbe("accent")),
+          "Marke trotz tuerkisem Theme"
+        );
+      } finally {
+        P().style.removeProperty("--primary-color");
+        P().hass = hass;
+      }
     },
   },
 
@@ -980,7 +1231,9 @@ FAELLE.push(
 /** Fuehrt alle Faelle nacheinander aus. */
 export async function lauf() {
   const ergebnis = [];
-  for (const fall of FAELLE) {
+  // Erst die Bedienung, dann das Aussehen: ein Messpunkt, der an einem
+  // Bedienfehler scheitert, soll nicht als Farbfehler erscheinen.
+  for (const fall of [...FAELLE, ...HMI_FAELLE]) {
     try {
       await fall.fn();
       ergebnis.push({ id: fall.id, titel: fall.titel, bestanden: true });

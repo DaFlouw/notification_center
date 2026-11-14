@@ -3,73 +3,20 @@
  * (Spezifikation 63 bis 66).
  *
  * Die Vorschlaege selbst kommen aus dem Backend. Hier steht nur ihre
- * Darstellung: die Empfehlung sichtbar, die Begruendung aufklappbar
- * (Spezifikation 13).
+ * Darstellung: die Empfehlung in Bausteinen, die Begruendung als Satz
+ * darunter (Spezifikation 13, Konzept Abschnitt Discovery).
  */
 
 import { escapeHtml, typeLabel } from "../format.js";
+import { raw } from "../html.js";
 import { t } from "../i18n.js";
-
-/**
- * Die auswaehlbaren Typen, nach Herkunft getrennt.
- *
- * Die Liste deckt genau die Domaenen ab, die das Backend zur Ueberwachung
- * anbietet. Fehlt hier eine, taucht sie zwar unter "Alle Typen" auf, laesst
- * sich aber nicht gezielt heraussuchen -- so waren die Helfer zuvor gar nicht
- * und mehrere Geraetetypen nur zufaellig zu finden.
- */
-const TYP_GRUPPEN = [
-  {
-    schluessel: "discovery.groupDevices",
-    domains: [
-      "binary_sensor",
-      "sensor",
-      "cover",
-      "valve",
-      "lock",
-      "climate",
-      "water_heater",
-      "switch",
-      "light",
-      "fan",
-      "humidifier",
-      "vacuum",
-      "lawn_mower",
-      "siren",
-      "media_player",
-      "remote",
-      "device_tracker",
-      "person",
-      "alarm_control_panel",
-      "update",
-      "number",
-      "select",
-      "text",
-      "date",
-      "datetime",
-      "time",
-      "todo",
-    ],
-  },
-  {
-    schluessel: "discovery.groupHelpers",
-    domains: [
-      "input_boolean",
-      "input_number",
-      "input_select",
-      "input_text",
-      "input_datetime",
-      "counter",
-      "timer",
-      "schedule",
-    ],
-  },
-];
+import { icon } from "../icons.js";
+import { bedingungsChips } from "./rules.js";
 
 /** Wie viele Typen als Schnellwahl erscheinen. */
 const SCHNELLWAHL = 6;
 
-const STATUS = ["all", "monitored", "suggested"];
+const STATUS = ["all", "monitored", "without_rule", "suggested"];
 
 export function renderDiscovery(state) {
   const {
@@ -81,46 +28,39 @@ export function renderDiscovery(state) {
     status = "all",
     domainCounts = {},
     statusCounts = {},
+    allDomains = false,
   } = state;
 
   return `
     <section class="card pad" aria-label="${t("discovery.filterLabel")}">
       <div class="filters">
-        <input type="search" data-discovery="search" placeholder="${t("discovery.searchPlaceholder")}"
-               value="${escapeHtml(search)}" aria-label="${t("history.search")}">
+<label class="search">
+          ${icon("search", 18)}
+          <input type="search" data-discovery="search" placeholder="${t("discovery.searchPlaceholder")}"
+                 value="${escapeHtml(search)}" aria-label="${t("history.search")}">
+        </label>
 
         <div class="segmented" role="group" aria-label="${t("discovery.statusLabel")}">
-          ${STATUS.map(
-            (wert) =>
-              `<button data-action="set-discovery-status" data-value="${wert}"
-                       aria-pressed="${status === wert}">${t(`discovery.status.${wert}`)}${
-                         // Ein aelteres Backend liefert die Zahlen nicht; dann
-                         // steht nur das Wort da.
-                         Number.isFinite(statusCounts[wert]) ? ` ${statusCounts[wert]}` : ""
-                       }</button>`
-          ).join("")}
+          ${STATUS.filter(
+            // Ein Umschalter, hinter dem nichts steht, ist nur Laerm. Die
+            // gewaehlte Ansicht bleibt stehen, auch wenn sie sich leert --
+            // sonst verschwaende der Knopf, auf dem man gerade steht.
+            (wert) => wert === "all" || wert === status || statusCounts[wert] !== 0
+          )
+            .map(
+              (wert) =>
+                `<button data-action="set-discovery-status" data-value="${wert}"
+                         aria-pressed="${status === wert}">${t(`discovery.status.${wert}`)}${
+                           // Ein aelteres Backend liefert die Zahlen nicht;
+                           // dann steht nur das Wort da.
+                           Number.isFinite(statusCounts[wert]) ? ` ${statusCounts[wert]}` : ""
+                         }</button>`
+            )
+            .join("")}
         </div>
-
-        <select data-discovery="domain" aria-label="${t("discovery.entityType")}">
-          <option value="" ${domain === "" ? "selected" : ""}>${t("discovery.allTypes")}</option>
-          ${TYP_GRUPPEN.map(
-            (gruppe) => `
-              <optgroup label="${escapeHtml(t(gruppe.schluessel))}">
-                ${gruppe.domains
-                  .map(
-                    (domaene) =>
-                      `<option value="${domaene}" ${
-                        domain === domaene ? "selected" : ""
-                      }>${escapeHtml(t(`discovery.domain.${domaene}`))}</option>`
-                  )
-                  .join("")}
-              </optgroup>
-            `
-          ).join("")}
-        </select>
       </div>
 
-      ${schnellwahl(domainCounts, domain)}
+      ${schnellwahl(domainCounts, domain, allDomains)}
     </section>
 
     ${loading ? `<div class="loading">${t("common.loading")}</div>` : ""}
@@ -147,37 +87,68 @@ export function renderDiscovery(state) {
           ? ""
           : `<div class="card empty"><strong>${t("discovery.empty")}</strong><span>${t("discovery.emptyHint")}</span></div>`
     }
+
+    ${weitere(entities.length, statusCounts[status])}
   `;
 }
 
 /**
- * Die haeufigsten Typen dieser Anlage als Schnellwahl, mit ihrer Anzahl.
+ * Der Knopf fuer die naechsten Treffer.
  *
- * Die vollstaendige Auswahl bleibt daneben bestehen: es gibt ueber dreissig
- * Typen, und als Pillen waeren sie eine Wand. Gezeigt wird, was hier
- * tatsaechlich vorkommt -- das ist zugleich die Auskunft, wo es sich lohnt
- * zu suchen.
+ * Erscheint nur, wenn das Backend mehr kennt, als gezeigt wird -- abgelesen
+ * an der Zahl des gewaehlten Umschalters. Ohne diese Zahl (aelteres Backend)
+ * bleibt er weg, statt ins Leere zu fuehren.
  */
-function schnellwahl(domainCounts, domain) {
-  const haeufigste = Object.entries(domainCounts || {})
+function weitere(gezeigt, gesamt) {
+  if (!Number.isFinite(gesamt) || gesamt <= gezeigt) return "";
+  return `
+    <div class="footer-link center">
+      <span class="row-sub">${t("history.shownOfTotal", { shown: gezeigt, total: gesamt })}</span>
+      <button class="btn" data-action="discovery-more">${t("discovery.loadMore")}</button>
+    </div>
+  `;
+}
+
+/**
+ * Die Typen dieser Anlage als Pillen, mit ihrer Anzahl.
+ *
+ * Das ist die *einzige* Typ-Auswahl. Frueher stand daneben noch ein
+ * Auswahlfeld mit denselben Typen -- zweimal "Alle Typen" nebeneinander, und
+ * keiner wusste, welches gilt. Gezeigt werden zuerst die haeufigsten; der
+ * Rest klappt auf Wunsch dazu. Was es hier nicht gibt, wird nicht angeboten.
+ */
+function schnellwahl(domainCounts, domain, alle) {
+  const vorhanden = Object.entries(domainCounts || {})
     .filter(([, anzahl]) => anzahl > 0)
-    .sort(([, a], [, b]) => b - a)
-    .slice(0, SCHNELLWAHL);
-  if (!haeufigste.length) return "";
+    .sort(([, a], [, b]) => b - a);
+  if (!vorhanden.length) return "";
+
+  const sichtbar = alle ? vorhanden : vorhanden.slice(0, SCHNELLWAHL);
+  // Der gewaehlte Typ bleibt sichtbar, auch wenn er zu den seltenen gehoert.
+  const gewaehlt = vorhanden.find(([domaene]) => domaene === domain);
+  if (gewaehlt && !sichtbar.includes(gewaehlt)) sichtbar.push(gewaehlt);
+  const uebrig = vorhanden.length - sichtbar.length;
 
   return `
-    <div class="filters" role="group" aria-label="${t("discovery.entityType")}">
-      <button class="btn filter all" data-action="set-domain" data-domain=""
+    <div class="filters tight" role="group" aria-label="${t("discovery.entityType")}">
+      <button class="btn filter plain" data-action="set-domain" data-domain=""
               aria-pressed="${domain === ""}">${t("discovery.allTypes")}</button>
-      ${haeufigste
+      ${sichtbar
         .map(
           ([domaene, anzahl]) =>
-            `<button class="btn filter" data-action="set-domain" data-domain="${escapeHtml(domaene)}"
+            `<button class="btn filter plain" data-action="set-domain" data-domain="${escapeHtml(domaene)}"
                      aria-pressed="${domain === domaene}">${escapeHtml(
                        t(`discovery.domain.${domaene}`)
                      )} <span class="row-sub">${anzahl}</span></button>`
         )
         .join("")}
+      ${
+        uebrig > 0 || alle
+          ? `<button class="link" data-action="toggle-domains" aria-expanded="${Boolean(alle)}">${
+              alle ? t("discovery.fewerTypes") : t("discovery.moreTypes", { count: uebrig })
+            }</button>`
+          : ""
+      }
     </div>
   `;
 }
@@ -200,10 +171,12 @@ function nachBereich(entities) {
 
 function entityZeile(eintrag, vorschlaege) {
   const wert = [eintrag.state, eintrag.unit].filter((teil) => teil != null && teil !== "").join(" ");
+  const offen = Boolean(vorschlaege);
+  const ziel = `data-entity="${escapeHtml(eintrag.entity_id)}" data-name="${escapeHtml(eintrag.name)}"`;
 
   return `
-    <li class="entity-item">
-      <div class="row entity-row${vorschlaege ? " tint special" : ""}">
+    <li class="entity-item${offen ? " open" : ""}">
+      <div class="row entity-row">
         <span class="row-body">
           <span class="entity-name">${escapeHtml(eintrag.name)}</span>
           <span class="mono">${escapeHtml(eintrag.entity_id)}${
@@ -213,34 +186,54 @@ function entityZeile(eintrag, vorschlaege) {
 
         ${wert ? `<span class="chip on-surface">${escapeHtml(wert)}</span>` : ""}
 
-        ${
-          eintrag.monitored
-            ? `<span class="badge monitored">${t("discovery.monitored")} · ${t("discovery.rules", {
-                count: eintrag.rule_count,
-              })}</span>
-               <button class="btn soft" data-action="show-rules"
-                       data-entity="${escapeHtml(eintrag.entity_id)}"
-                       data-name="${escapeHtml(eintrag.name)}">${t("discovery.rulesButton")}</button>
-               <button class="btn" data-action="remove-entity"
-                       data-entity="${escapeHtml(eintrag.entity_id)}">${t("discovery.remove")}</button>`
-            : `${
-                 eintrag.has_suggestions
-                   ? `<span class="pill special">${t("discovery.suggestionsAvailable")}</span>`
-                   : ""
-               }
-               <button class="btn" data-action="show-suggestions"
-                       data-entity="${escapeHtml(eintrag.entity_id)}" aria-expanded="${Boolean(vorschlaege)}">${
-                         vorschlaege ? t("discovery.hideSuggestions") : t("discovery.suggestions")
-                       }</button>
-               <button class="btn primary" data-action="add-entity"
-                       data-entity="${escapeHtml(eintrag.entity_id)}"
-                       data-name="${escapeHtml(eintrag.name)}">${t("common.adopt")}</button>`
-        }
+        ${eintrag.monitored ? ueberwacht(eintrag, ziel) : unbeobachtet(eintrag, vorschlaege, ziel)}
       </div>
 
-      ${vorschlaege ? vorschlagsBlock(eintrag, vorschlaege) : ""}
+      ${offen ? vorschlagsBlock(eintrag, vorschlaege) : ""}
     </li>
   `;
+}
+
+/** Schon uebernommen: Stand der Regeln und der Weg dorthin. */
+function ueberwacht(eintrag, ziel) {
+  // Entfernen steht bewusst nicht hier, sondern auf der Seite der Regeln:
+  // neben "Uebernehmen" der Nachbarzeile war es der Knopf, den man trifft,
+  // wenn man den anderen meint.
+  return `
+    <span class="badge ${eintrag.rule_count ? "monitored" : "uncertain"}">${
+      eintrag.rule_count
+        ? `${t("discovery.monitored")} · ${t("discovery.rules", { count: eintrag.rule_count })}`
+        : t("discovery.monitoredNoRule")
+    }</span>
+    <button class="link" data-action="show-rules" ${ziel}>${t("discovery.rulesButton")}</button>
+  `;
+}
+
+/**
+ * Noch nicht uebernommen.
+ *
+ * Der Knopf fuer die Vorschlaege erscheint nur, wo das Backend welche
+ * erwartet. Vorher stand er an jeder Zeile und fuehrte meist zu "keine
+ * Vorschlaege" -- ein Klick, der nichts bringt, an tausend Entities.
+ */
+function unbeobachtet(eintrag, vorschlaege, ziel) {
+  const offen = Boolean(vorschlaege);
+  const knopf =
+    eintrag.has_suggestions || offen
+      ? `<button class="btn special" data-action="show-suggestions"
+                 data-entity="${escapeHtml(eintrag.entity_id)}" aria-expanded="${offen}">${
+                   offen ? t("discovery.hideSuggestions") : t("discovery.viewSuggestions")
+                 }</button>`
+      : "";
+
+  // Ist der Vorschlag offen, stehen beide Antworten darunter; die Zeile
+  // wiederholt sie nicht.
+  const uebernehmen =
+    offen && vorschlaege.length
+      ? ""
+      : `<button class="btn" data-action="add-entity" ${ziel}>${t("common.adopt")}</button>`;
+
+  return knopf + uebernehmen;
 }
 
 function vorschlagsBlock(eintrag, vorschlaege) {
@@ -252,7 +245,6 @@ function vorschlagsBlock(eintrag, vorschlaege) {
 
   return `
     <div class="suggestions">
-      <div class="entity-meta">${t("discovery.suggestionCount", { count: vorschlaege.length })}</div>
       ${vorschlaege.map((vorschlag) => vorschlagZeile(eintrag, vorschlag)).join("")}
     </div>
   `;
@@ -260,11 +252,17 @@ function vorschlagsBlock(eintrag, vorschlaege) {
 
 function vorschlagZeile(eintrag, vorschlag) {
   const entityId = eintrag.entity_id;
+  const dauer = vorschlag.duration_seconds
+    ? `<span class="chip">${t("rules.chip.longer", {
+        minutes: raw(`<strong>${Math.round(vorschlag.duration_seconds / 60)} min</strong>`),
+      })}</span>`
+    : "";
+
   return `
-    <div class="suggestion">
+    <div class="suggestion" title="${escapeHtml(vorschlag.title || "")}">
       <div class="suggestion-head">
         ${vorschlag.type ? `<span class="pill ${escapeHtml(vorschlag.type)}">${escapeHtml(typeLabel(vorschlag.type))}</span>` : ""}
-        <span class="message">${escapeHtml(vorschlag.title)}</span>
+        ${bedingungsChips({ ...vorschlag, entity_id: null })}${dauer}
         ${vorschlag.uncertain ? `<span class="badge uncertain">${t("discovery.uncertain")}</span>` : ""}
       </div>
       ${begruendung(vorschlag)}
@@ -274,8 +272,7 @@ function vorschlagZeile(eintrag, vorschlag) {
                 data-suggestion="${escapeHtml(vorschlag.key)}">${t("discovery.adoptWithRule")}</button>
         <!--
           Die zweite Antwort auf einen Vorschlag: die Entity will ich, die
-          Regel nicht. Sie steht hier, wo die Entscheidung faellt, und nicht
-          nur in der Zeile darueber.
+          Regel nicht. Sie steht hier, wo die Entscheidung faellt.
         -->
         <button class="btn" data-action="add-entity"
                 data-entity="${escapeHtml(entityId)}"
@@ -285,20 +282,11 @@ function vorschlagZeile(eintrag, vorschlag) {
   `;
 }
 
+/** Die Begruendung als ein Satz unter den Bausteinen. */
 function begruendung(vorschlag) {
   if (!vorschlag.reasons || !vorschlag.reasons.length) return "";
 
-  return `
-    <details>
-      <summary>${t("discovery.why")}</summary>
-      <dl>
-        ${vorschlag.reasons
-          .map(
-            (grund) =>
-              `<dt>${escapeHtml(grund.label)}</dt><dd>${escapeHtml(grund.value)}</dd>`
-          )
-          .join("")}
-      </dl>
-    </details>
-  `;
+  return `<p class="why">${t("discovery.whyLead")} ${vorschlag.reasons
+    .map((grund) => `${escapeHtml(grund.label)}: ${escapeHtml(grund.value)}`)
+    .join(" · ")}</p>`;
 }

@@ -315,7 +315,7 @@ describe("Discovery", () => {
 
   it("beschriftet den Knopf nach Zustand (Ticket 12)", () => {
     const zu = renderDiscovery({ entities: TREFFER, suggestions: {} });
-    assert.match(zu, />Vorschläge</);
+    assert.match(zu, />Vorschläge ansehen</);
 
     const auf = renderDiscovery({
       entities: TREFFER,
@@ -326,8 +326,99 @@ describe("Discovery", () => {
 
   it("nennt keine Vorschlagszahl vor dem Laden (Ticket 2)", () => {
     const html = renderDiscovery({ entities: TREFFER, suggestions: {} });
-    assert.match(html, /Vorschläge verfügbar/);
-    assert.doesNotMatch(html, /0 Vorschläge/);
+    assert.doesNotMatch(html, /\d+ Vorschl/);
+  });
+
+  it("zeigt den Knopf nur, wo Vorschlaege zu erwarten sind", () => {
+    // An tausend Entities ohne Vorschlag fuehrte er zu "keine Vorschlaege".
+    const ohne = renderDiscovery({
+      entities: [{ ...TREFFER[0], has_suggestions: false }],
+      suggestions: {},
+    });
+    assert.ok(!ohne.includes('data-action="show-suggestions"'));
+    assert.match(ohne, /data-action="add-entity"/);
+
+    const mit = renderDiscovery({ entities: TREFFER, suggestions: {} });
+    assert.match(mit, /data-action="show-suggestions"/);
+  });
+
+  it("zeigt den Vorschlag in Bausteinen und die Begruendung als Satz", () => {
+    const html = renderDiscovery({
+      entities: TREFFER,
+      suggestions: {
+        "binary_sensor.fenster": [
+          {
+            key: "window_state",
+            title: "Warnung bei offenem Fenster",
+            type: "warning",
+            kind: "state_is",
+            states: ["on"],
+            duration_seconds: 900,
+            reasons: [{ label: "Geräteklasse", value: "window" }],
+          },
+        ],
+      },
+    });
+
+    assert.match(html, /class="entity-item open"/);
+    assert.match(html, /class="pill warning">Warnung</);
+    assert.match(html, /<span class="chip">Zustand ist <strong>on<\/strong><\/span>/);
+    assert.match(html, /<strong>15 min<\/strong>/);
+    assert.match(html, /<p class="why">Warum dieser Vorschlag: Geräteklasse: window<\/p>/);
+    // Beide Antworten stehen am Vorschlag; die Zeile wiederholt sie nicht.
+    assert.equal((html.match(/data-action="add-entity"/g) || []).length, 1);
+    assert.match(html, /data-action="accept-suggestion"/);
+  });
+
+  it("fuehrt von einer ueberwachten Entity zu ihren Regeln, ohne Entfernen", () => {
+    const html = renderDiscovery({
+      entities: [{ ...TREFFER[0], monitored: true, rule_count: 2 }],
+      suggestions: {},
+    });
+    assert.match(html, /class="link" data-action="show-rules"/);
+    assert.ok(!html.includes('data-action="remove-entity"'));
+    assert.ok(!html.includes('data-action="show-suggestions"'));
+  });
+
+  it("laesst einen Umschalter weg, hinter dem nichts steht", () => {
+    const leer = renderDiscovery({
+      entities: [],
+      suggestions: {},
+      statusCounts: { all: 10, monitored: 2, without_rule: 0, suggested: 0 },
+    });
+    assert.ok(!leer.includes('data-value="suggested"'));
+    assert.ok(!leer.includes('data-value="without_rule"'));
+    assert.match(leer, /data-value="monitored"/);
+
+    // Die gewaehlte Ansicht bleibt, auch wenn sie sich geleert hat.
+    const gewaehlt = renderDiscovery({
+      entities: [],
+      suggestions: {},
+      status: "suggested",
+      statusCounts: { all: 10, monitored: 2, without_rule: 0, suggested: 0 },
+    });
+    assert.match(gewaehlt, /data-value="suggested"\s+aria-pressed="true"/);
+  });
+
+  it("bietet weitere Treffer an, solange das Backend mehr kennt", () => {
+    const mehr = renderDiscovery({ entities: TREFFER, suggestions: {}, statusCounts: { all: 120 } });
+    assert.match(mehr, /data-action="discovery-more"/);
+    assert.match(mehr, /1 von 120/);
+
+    const alles = renderDiscovery({ entities: TREFFER, suggestions: {}, statusCounts: { all: 1 } });
+    assert.ok(!alles.includes('data-action="discovery-more"'));
+
+    // Ohne Zahl (aelteres Backend) kein Knopf ins Leere.
+    const ohne = renderDiscovery({ entities: TREFFER, suggestions: {} });
+    assert.ok(!ohne.includes('data-action="discovery-more"'));
+  });
+
+  it("kennzeichnet Ueberwachte ohne Regel", () => {
+    const html = renderDiscovery({
+      entities: [{ ...TREFFER[0], monitored: true, rule_count: 0 }],
+      suggestions: {},
+    });
+    assert.match(html, /überwacht · keine Regel/);
   });
 });
 
@@ -376,26 +467,58 @@ describe("Regel-Editor", () => {
     assert.equal((html.match(/>Bearbeiten/g) || []).length, 2);
   });
 
-  it("laesst den Knopf an der Regel weg, die gerade offen ist (Issue 3)", () => {
-    // Der Anwender ist bereits in der Bearbeitung; der Knopf verwies auf
-    // genau das, was schon vor ihm steht.
-    const html = renderRules(zustand(EINE_REGEL, { ...EINE_REGEL[0] }));
-
-    assert.doesNotMatch(html, />Bearbeiten/);
-    assert.match(html, /wird bearbeitet/);
-  });
-
-  it("behaelt ihn an den uebrigen Regeln (Issue 3)", () => {
+  it("zeigt beim Bearbeiten den Editor statt der Liste (Issue 3)", () => {
+    // Der Editor ist eine eigene Seite. Einen Bearbeiten-Knopf, der auf das
+    // verweist, was schon offen ist, kann es dort nicht mehr geben.
     const html = renderRules(zustand(ZWEI_REGELN, { ...ZWEI_REGELN[0] }));
 
-    assert.equal((html.match(/>Bearbeiten/g) || []).length, 1);
-    assert.match(html, /data-action="edit-rule" data-rule="rule_2"/);
+    assert.doesNotMatch(html, />Bearbeiten/);
+    assert.match(html, /Regel für Licht A/);
+    assert.match(html, /data-action="save-rule"/);
+    assert.match(html, /data-action="cancel-rule"/);
   });
 
-  it("laesst bei einer neuen Regel alle Knoepfe stehen", () => {
-    // Ein Entwurf ohne rule_id gehoert zu keiner vorhandenen Zeile.
-    const html = renderRules(zustand(ZWEI_REGELN, { entity_id: "light.a", kind: "state_is" }));
-    assert.equal((html.match(/>Bearbeiten/g) || []).length, 2);
+  it("bietet Loeschen nur an einer vorhandenen Regel", () => {
+    const vorhanden = renderRules(zustand(ZWEI_REGELN, { ...ZWEI_REGELN[0] }));
+    assert.match(vorhanden, /data-action="delete-rule"/);
+
+    const neu = renderRules(zustand(ZWEI_REGELN, { entity_id: "light.a", kind: "state_is" }));
+    assert.ok(!neu.includes('data-action="delete-rule"'));
+  });
+
+  it("gliedert den Editor in Ablauf und drei Schritte", () => {
+    const html = renderRules(zustand(EINE_REGEL, { ...EINE_REGEL[0] }));
+
+    assert.match(html, /So arbeitet die Regel/);
+    assert.match(html, /Wann soll gemeldet werden\?/);
+    assert.match(html, /Wie lange muss das anhalten\?/);
+    assert.match(html, /Was soll erscheinen\?/);
+    assert.ok(html.indexOf("So arbeitet die Regel") < html.indexOf("Wann soll gemeldet werden"));
+  });
+
+  it("bietet Zustaende, Wartezeit und Typ zum Anklicken an", () => {
+    const html = renderRules(zustand(EINE_REGEL, { ...EINE_REGEL[0], duration_seconds: 300 }));
+
+    assert.match(html, /data-action="toggle-state"[^>]*data-value="off"[^>]*aria-pressed="true"/);
+    assert.match(html, /data-action="toggle-state"[^>]*data-value="on"[^>]*aria-pressed="false"/);
+    assert.match(html, /data-action="set-duration" data-value="5"\s+aria-pressed="true"/);
+    assert.match(html, /data-action="set-type" data-value="info"\s+aria-pressed="true"/);
+    assert.match(html, /data-action="insert-placeholder"\s+data-value="\{name\}"/);
+  });
+
+  it("nennt Zustaende, wie Home Assistant sie nennt", () => {
+    const html = renderRules({
+      ...zustand(EINE_REGEL, { ...EINE_REGEL[0] }),
+      labels: { "light.a": { on: "An", off: "Aus" } },
+      current: { "light.a": { state: "off", attributes: {} } },
+    });
+    assert.match(html, />Aus</);
+    assert.match(html, /gerade: Aus/);
+  });
+
+  it("bietet die Entity von ihrer Regelseite aus zum Entfernen an", () => {
+    const html = renderRules(zustand(ZWEI_REGELN, null));
+    assert.match(html, /data-action="remove-entity"\s+data-entity="light.a"/);
   });
 
   it("markiert in der Uebersicht nichts als in Bearbeitung", () => {
@@ -433,7 +556,7 @@ describe("Attribut als Wertquelle (Issue 14)", () => {
   it("bietet die Zustaende der Entity nicht an, wenn ein Attribut gewaehlt ist", () => {
     const html = renderRules(zustand(entwurfMitAttribut([])));
 
-    assert.doesNotMatch(html, /<option value="mowing"/);
+    assert.ok(!html.includes('data-value="mowing"'));
     assert.match(html, /data-rule-field="states"[^>]*type="text"|type="text"[^>]*data-rule-field="states"/);
   });
 
@@ -472,7 +595,7 @@ describe("Attribut als Wertquelle (Issue 14)", () => {
       })
     );
 
-    assert.match(html, /<option value="mowing"/);
+    assert.match(html, /data-action="toggle-state"[^>]*data-value="mowing"/);
     assert.doesNotMatch(html, /Aktueller Wert/);
   });
 });
@@ -519,32 +642,57 @@ describe("Seitengroesse der Historie (Issue 5)", () => {
 });
 
 describe("Typauswahl der Discovery (Issue 4)", () => {
-  it("bietet die Helfer an", () => {
-    const html = renderDiscovery({ entities: [], suggestions: {} });
+  const HELFER = {
+    input_boolean: 4,
+    input_number: 3,
+    input_select: 2,
+    input_text: 1,
+    input_datetime: 1,
+    counter: 1,
+    timer: 1,
+    schedule: 1,
+  };
+  const ZAEHLER = { sensor: 51, binary_sensor: 38, light: 22, switch: 17, climate: 6, ...HELFER };
 
-    assert.match(html, /<optgroup label="Helfer">/);
-    for (const domaene of [
-      "input_boolean",
-      "input_number",
-      "input_select",
-      "input_text",
-      "input_datetime",
-      "counter",
-      "timer",
-      "schedule",
-    ]) {
-      assert.match(html, new RegExp(`value="${domaene}"`), `${domaene} fehlt`);
+  it("bietet die Helfer an, sobald alle Typen aufgeklappt sind", () => {
+    const html = renderDiscovery({
+      entities: [],
+      suggestions: {},
+      domainCounts: ZAEHLER,
+      allDomains: true,
+    });
+    for (const domaene of Object.keys(HELFER)) {
+      assert.match(html, new RegExp(`data-domain="${domaene}"`), `${domaene} fehlt`);
     }
+    assert.match(html, />Weniger Typen</);
+  });
+
+  it("zeigt zuerst die haeufigsten und nennt, wie viele noch kommen", () => {
+    const html = renderDiscovery({ entities: [], suggestions: {}, domainCounts: ZAEHLER });
+    assert.equal((html.match(/data-action="set-domain"/g) || []).length, 7);
+    assert.match(html, /data-action="toggle-domains" aria-expanded="false">7 weitere Typen</);
   });
 
   it("behaelt Alle Typen als Voreinstellung", () => {
-    const html = renderDiscovery({ entities: [], suggestions: {} });
-    assert.match(html, /<option value="" selected>Alle Typen/);
+    const html = renderDiscovery({ entities: [], suggestions: {}, domainCounts: ZAEHLER });
+    assert.match(html, /data-domain=""\s+aria-pressed="true">Alle Typen</);
   });
 
-  it("merkt sich die getroffene Wahl", () => {
-    const html = renderDiscovery({ entities: [], suggestions: {}, domain: "counter" });
-    assert.match(html, /<option value="counter" selected>/);
+  it("haelt die getroffene Wahl sichtbar, auch wenn der Typ selten ist", () => {
+    const html = renderDiscovery({
+      entities: [],
+      suggestions: {},
+      domainCounts: ZAEHLER,
+      domain: "counter",
+    });
+    assert.match(html, /data-domain="counter"\s+aria-pressed="true"/);
+  });
+
+  it("bietet Alle Typen genau einmal an", () => {
+    // Auswahlfeld und Pillen standen nebeneinander, beide mit "Alle Typen".
+    const html = renderDiscovery({ entities: [], suggestions: {}, domainCounts: ZAEHLER });
+    assert.equal((html.match(/Alle Typen/g) || []).length, 1);
+    assert.ok(!html.includes('data-discovery="domain"'));
   });
 });
 
@@ -672,10 +820,10 @@ describe("Regel-Editor: weitere Bedingungen", () => {
     const html = renderRules({ ...BASIS, entwurf: leereRegel(BASIS.entityId) });
     assert.match(html, /data-action="add-condition"/);
     // Die Verknuepfung erscheint erst, wenn es etwas zu verknuepfen gibt.
-    assert.ok(!html.includes('data-rule-field="logic"'));
+    assert.ok(!html.includes('data-action="set-logic"'));
   });
 
-  it("zeichnet eine Bedingung samt Entity-Feld, Verneinung und Vorschlagsliste", () => {
+  it("zeichnet eine Bedingung samt Entity-Feld, Verknuepfung und Vorschlagsliste", () => {
     const entwurf = {
       ...leereRegel(BASIS.entityId),
       extra_conditions: [{ ...leereBedingung(), entity_id: "climate.wohnzimmer" }],
@@ -688,17 +836,21 @@ describe("Regel-Editor: weitere Bedingungen", () => {
       },
     });
 
-    assert.match(html, /data-rule-field="logic"/);
-    assert.match(html, /Alle Bedingungen müssen zutreffen/);
+    assert.match(html, /data-action="set-logic" data-value="all"\s+aria-pressed="true"/);
+    assert.match(html, />alle zusammen</);
+    assert.match(html, />eine genügt</);
     assert.match(html, /data-cond-field="entity" data-cond-index="0"/);
     assert.match(html, /value="climate\.wohnzimmer"/);
-    assert.match(html, /data-cond-field="negate"/);
+    // Eine Zustandsbedingung verneint man ueber "ist nicht"; der Schalter
+    // bleibt den Zahlenvergleichen.
+    assert.ok(!html.includes('data-cond-field="negate"'));
+    assert.match(html, /data-action="set-kind" data-value="state_is_not" data-index="0"/);
     assert.match(html, /data-action="remove-condition" data-index="0"/);
     // Vorschlagsliste der Entities, einmal je Formular.
     assert.match(html, /<datalist id="nc-entity-liste">/);
     assert.match(html, /Heizung Wohnzimmer/);
     // Die Zustaende der *Partner*-Entity, nicht die der eigenen.
-    assert.match(html, /<option value="heat"/);
+    assert.match(html, /data-action="toggle-state" data-index="0"[^>]*data-value="heat"/);
   });
 
   it("nimmt fuer eine Bedingung ohne Kennung die Werte der eigenen Entity", () => {
@@ -709,7 +861,7 @@ describe("Regel-Editor: weitere Bedingungen", () => {
     const html = renderRules({ ...BASIS, entwurf });
 
     assert.match(html, /Diese Entity/);
-    assert.match(html, /<option value="on"/);
+    assert.match(html, /data-action="toggle-state" data-index="0"[^>]*data-value="on"/);
   });
 
   it("laesst eine Flanke nicht verneinen", () => {
@@ -1222,10 +1374,11 @@ describe("Discovery: Gliederung und Schnellwahl", () => {
   });
 
   it("kommt ohne Typzaehler aus", () => {
-    // Ein aelteres Backend liefert sie nicht; die volle Auswahl bleibt.
+    // Ein aelteres Backend liefert sie nicht; dann gibt es keine Pillen,
+    // Suche und Umschalter bleiben.
     const html = renderDiscovery({ entities: [], suggestions: {} });
     assert.ok(!html.includes('data-action="set-domain"'));
-    assert.match(html, /data-discovery="domain"/);
+    assert.match(html, /data-discovery="search"/);
   });
 
   it("schaltet zwischen allen, ueberwachten und vorgeschlagenen um", () => {

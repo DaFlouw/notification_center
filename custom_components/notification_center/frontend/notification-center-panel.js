@@ -31,6 +31,18 @@ const SEITEN = ["dashboard", "history", "rules", "discovery"];
 /** Wartezeit, bis eine Eingabe als fertig gilt. */
 const ENTPRELLUNG = 500;
 
+/**
+ * Wie viele Entities die Discovery auf einmal holt und zeigt.
+ *
+ * Eine Anlage hat leicht ueber tausend Entities. Fuenfzig fuellen zwei
+ * Bildschirme und sind sofort da; wer mehr will, holt die naechsten fuenfzig
+ * -- oder grenzt ein, was fast immer der schnellere Weg ist.
+ */
+export const DISCOVERY_SCHRITT = 50;
+
+/** Der Pfad der Integration in den Einstellungen von Home Assistant. */
+const INTEGRATION_PFAD = "/config/integrations/integration/notification_center";
+
 /** Unter diesem Schluessel merkt sich der Browser die Ansicht der Regeln. */
 const ANSICHT_SCHLUESSEL = "notification-center.regelansicht";
 
@@ -51,6 +63,20 @@ function ladeAnsicht() {
   } catch {
     return { group: "room", density: null, collapsed: {} };
   }
+}
+
+/**
+ * Schreibt eine verneinte Zustandsbedingung als ihr Gegenstueck.
+ *
+ * "Nicht: Zustand ist X" und "Zustand ist nicht X" bedeuten dasselbe. Der
+ * Editor kennt deshalb fuer Zustaende nur die zweite Schreibweise und spart
+ * sich den Schalter; fuer Zahlenvergleiche bleibt die Verneinung, wie sie ist.
+ */
+export function ohneVerneinung(bedingung) {
+  if (!bedingung.negate) return bedingung;
+  if (bedingung.kind === "state_is") return { ...bedingung, kind: "state_is_not", negate: false };
+  if (bedingung.kind === "state_is_not") return { ...bedingung, kind: "state_is", negate: false };
+  return bedingung;
 }
 
 function merkeAnsicht(ansicht) {
@@ -87,6 +113,8 @@ class NotificationCenterPanel extends HTMLElement {
     status: "all",
     domainCounts: {},
     statusCounts: {},
+    limit: DISCOVERY_SCHRITT,
+    allDomains: false,
   };
   #rules = {
     entityId: null,
@@ -114,6 +142,9 @@ class NotificationCenterPanel extends HTMLElement {
   set hass(hass) {
     const ersteZuweisung = this.#hass === null;
     this.#hass = hass;
+    // Vom Theme uebernimmt das Panel nur hell oder dunkel; die Farben selbst
+    // stehen fest (siehe styles.js).
+    this.toggleAttribute("dark", Boolean(hass?.themes?.darkMode));
     if (ersteZuweisung) {
       this.#verbinden();
     }
@@ -220,6 +251,7 @@ class NotificationCenterPanel extends HTMLElement {
         domain: this.#discovery.domain || null,
         search: this.#discovery.search || null,
         status: this.#discovery.status,
+        limit: this.#discovery.limit,
       });
       this.#discovery.entities = antwort.entities;
       this.#discovery.domainCounts = antwort.domain_counts || {};
@@ -345,6 +377,7 @@ class NotificationCenterPanel extends HTMLElement {
     }
     if (feld.dataset.discovery === "domain") {
       this.#discovery.domain = feld.value;
+      this.#discovery.limit = DISCOVERY_SCHRITT;
       this.#ladeDiscovery();
     }
   };
@@ -375,6 +408,7 @@ class NotificationCenterPanel extends HTMLElement {
     }
     if (feld.dataset.discovery === "search") {
       this.#discovery.search = feld.value;
+      this.#discovery.limit = DISCOVERY_SCHRITT;
       this.#entprellt(() => this.#ladeDiscovery());
     }
   };
@@ -593,13 +627,73 @@ class NotificationCenterPanel extends HTMLElement {
 
       if (aktion === "set-discovery-status") {
         this.#discovery.status = daten.value;
+        this.#discovery.limit = DISCOVERY_SCHRITT;
         await this.#ladeDiscovery();
         return;
       }
 
       if (aktion === "set-domain") {
         this.#discovery.domain = daten.domain || "";
+        this.#discovery.limit = DISCOVERY_SCHRITT;
         await this.#ladeDiscovery();
+        return;
+      }
+
+      if (aktion === "toggle-domains") {
+        this.#discovery.allDomains = !this.#discovery.allDomains;
+        this.#render();
+        return;
+      }
+
+      if (aktion === "discovery-more") {
+        // Das Backend laesst hoechstens 500 Treffer zu; darueber hilft nur
+        // noch eingrenzen.
+        this.#discovery.limit = Math.min(this.#discovery.limit + DISCOVERY_SCHRITT, 500);
+        await this.#ladeDiscovery();
+        return;
+      }
+
+      if (aktion === "open-integration") {
+        // Navigation innerhalb von Home Assistant, ohne die Seite neu zu
+        // laden: Adresse setzen und dem Frontend Bescheid geben.
+        history.pushState(null, "", INTEGRATION_PFAD);
+        window.dispatchEvent(new CustomEvent("location-changed"));
+        return;
+      }
+
+      // -- Regel-Editor: Schalter statt Auswahlfelder ----------------------
+
+      if (aktion === "set-kind" || aktion === "toggle-state") {
+        const ziel = this.#editorZiel(daten.index);
+        if (!ziel) return;
+        if (aktion === "set-kind") {
+          ziel.kind = daten.value;
+        } else {
+          const werte = new Set(ziel.states || []);
+          if (werte.has(daten.value)) werte.delete(daten.value);
+          else werte.add(daten.value);
+          ziel.states = [...werte];
+        }
+        this.#render();
+        return;
+      }
+
+      if (aktion === "set-logic" || aktion === "set-type" || aktion === "set-duration") {
+        const entwurf = this.#rules.entwurf;
+        if (!entwurf) return;
+        if (aktion === "set-logic") entwurf.logic = daten.value;
+        else if (aktion === "set-type") entwurf.type = daten.value;
+        else entwurf.duration_seconds = Number(daten.value) > 0 ? Number(daten.value) * 60 : null;
+        this.#render();
+        return;
+      }
+
+      if (aktion === "insert-placeholder") {
+        const entwurf = this.#rules.entwurf;
+        if (!entwurf) return;
+        const bisher = entwurf.message_template || "";
+        entwurf.message_template = `${bisher}${bisher && !bisher.endsWith(" ") ? " " : ""}${daten.value}`;
+        this.#render();
         return;
       }
 
@@ -626,10 +720,9 @@ class NotificationCenterPanel extends HTMLElement {
           // die geladene Regel mit, und ein Abbruch waere keiner.
           this.#rules.entwurf = {
             ...regel,
-            extra_conditions: (regel.extra_conditions || []).map((bedingung) => ({
-              ...bedingung,
-              entity_id: bedingung.entity_id || "",
-            })),
+            extra_conditions: (regel.extra_conditions || []).map((bedingung) =>
+              ohneVerneinung({ ...bedingung, entity_id: bedingung.entity_id || "" })
+            ),
           };
           this.#seite = "rule-editor";
           this.#render();
@@ -671,6 +764,8 @@ class NotificationCenterPanel extends HTMLElement {
       }
 
       if (aktion === "back-to-rules") {
+        // Auch aus dem Editor heraus: ein offener Entwurf ist damit verworfen.
+        this.#rules.entwurf = null;
         await this.#ladeRegeluebersicht();
         this.#seite = "rules";
         this.#render();
@@ -749,6 +844,13 @@ class NotificationCenterPanel extends HTMLElement {
       if (aktion === "remove-entity") {
         if (!confirm(t("panel.confirmRemoveEntity"))) return;
         await api.removeEntity(this.#hass, daten.entity);
+        if (this.#seite === "rules" || this.#seite === "rule-editor") {
+          // Von der Seite ihrer Regeln aus entfernt: die Seite gibt es
+          // danach nicht mehr, also zurueck zur Uebersicht.
+          this.#seite = "rules";
+          await this.#ladeRegeluebersicht();
+          return;
+        }
         await this.#ladeDiscovery();
         return;
       }
@@ -931,7 +1033,11 @@ class NotificationCenterPanel extends HTMLElement {
       });
     }
     if (this.#seite === "rule-editor") {
-      return renderRules({ ...this.#rules, active: this.#dashboard.active });
+      return renderRules({
+        ...this.#rules,
+        active: this.#dashboard.active,
+        ...this.#editorUmfeld(),
+      });
     }
     if (this.#seite === "history") return renderHistory(this.#history, locale);
     if (this.#seite === "discovery") return renderDiscovery(this.#discovery);
@@ -944,6 +1050,54 @@ class NotificationCenterPanel extends HTMLElement {
       },
       locale
     );
+  }
+
+  /** Die Bedingung, die eine Schaltflaeche des Editors meint. */
+  #editorZiel(index) {
+    const entwurf = this.#rules.entwurf;
+    if (!entwurf) return null;
+    if (index === undefined || index === "") return entwurf;
+    return entwurf.extra_conditions?.[Number(index)] || null;
+  }
+
+  /**
+   * Was der Editor ueber die beteiligten Entities wissen muss: ihren Wert in
+   * diesem Augenblick, und wie Home Assistant ihre Zustaende nennt.
+   *
+   * Die Namen kommen von Home Assistant selbst -- "offen" statt ``on`` haengt
+   * von Geraeteklasse und Sprache ab, und beides kennt nur das Frontend.
+   */
+  #editorUmfeld() {
+    const entwurf = this.#rules.entwurf;
+    if (!entwurf) return {};
+
+    const eigene = this.#rules.entityId;
+    const beteiligte = new Map([[eigene, this.#rules.states]]);
+    for (const bedingung of entwurf.extra_conditions || []) {
+      if (bedingung.entity_id) {
+        beteiligte.set(
+          bedingung.entity_id,
+          this.#rules.conditionOptions[bedingung.entity_id]?.states || []
+        );
+      }
+    }
+
+    const current = {};
+    const labels = {};
+    for (const [entityId, zustaende] of beteiligte) {
+      const stand = this.#hass?.states?.[entityId];
+      if (!stand) continue;
+      current[entityId] = { state: stand.state, attributes: stand.attributes || {} };
+      labels[entityId] = {};
+      for (const zustand of new Set([...(zustaende || []), stand.state])) {
+        try {
+          labels[entityId][zustand] = this.#hass.formatEntityState?.(stand, zustand) || zustand;
+        } catch {
+          labels[entityId][zustand] = zustand;
+        }
+      }
+    }
+    return { current, labels };
   }
 
   /** Der Reiter, der als gewaehlt gilt; der Editor gehoert zu den Regeln. */
@@ -976,4 +1130,10 @@ class NotificationCenterPanel extends HTMLElement {
   }
 }
 
-customElements.define("notification-center-panel", NotificationCenterPanel);
+// Home Assistant kann das Modul mehr als einmal laden -- als Panel und noch
+// einmal ueber einen zweiten Pfad nach einer Aktualisierung. Ein zweites
+// ``define`` wirft dann einen Fehler ins Protokoll; im Systemtest von
+// 1.5.0-rc1 stand genau der dort. Die Card schuetzt sich laengst ebenso.
+if (!customElements.get("notification-center-panel")) {
+  customElements.define("notification-center-panel", NotificationCenterPanel);
+}

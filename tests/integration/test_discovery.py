@@ -120,6 +120,39 @@ async def test_discovery_zaehlt_je_status(hass: HomeAssistant, runtime) -> None:
     )
 
 
+async def test_ueberwachte_ohne_regel_werden_eigens_gefuehrt(hass: HomeAssistant, runtime) -> None:
+    """Uebernommen, aber ohne Regel: beobachtet, ohne je etwas zu melden.
+
+    Genau diese Entities erklaeren, warum "ueberwacht" mehr zaehlt als es
+    Entities mit Regeln gibt. Sie haben deshalb eine eigene Zahl und eine
+    eigene Ansicht.
+    """
+    runtime.config.add_entity(WatchedEntity(entity_id=TEMPERATUR))
+    runtime.config.add_entity(WatchedEntity(entity_id=FENSTER))
+    runtime.config.add_rule(
+        Rule(
+            rule_id="rule_temp",
+            entity_id=TEMPERATUR,
+            kind=ConditionKind.NUMERIC,
+            operator=NumericOperator.GT,
+            threshold=28.0,
+        )
+    )
+
+    zaehler = runtime.discovery.status_counts()
+    assert zaehler["monitored"] == 2
+    assert zaehler["without_rule"] == 1
+
+    treffer = runtime.discovery.discover_entities(status="without_rule")
+    assert [e["entity_id"] for e in treffer] == [FENSTER]
+    assert treffer[0]["rule_count"] == 0
+
+
+async def test_ohne_ueberwachte_gibt_es_keine_ohne_regel(hass: HomeAssistant, runtime) -> None:
+    assert runtime.discovery.status_counts()["without_rule"] == 0
+    assert runtime.discovery.discover_entities(status="without_rule") == []
+
+
 async def test_statuszaehler_folgen_typ_und_suche(hass: HomeAssistant, runtime) -> None:
     alle = runtime.discovery.status_counts()
     nur_binaer = runtime.discovery.status_counts(domain="binary_sensor")

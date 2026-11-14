@@ -32,7 +32,14 @@ export function renderDashboard(state, locale) {
         ? abschnitte
         : `<div class="card empty"><strong>${t("dashboard.quiet")}</strong></div>`
     }
-    ${version ? `<div class="version">${escapeHtml(t("dashboard.version", { version }))}</div>` : ""}
+    ${
+      version
+        ? `<div class="version">${escapeHtml(t("dashboard.version", { version }))} ·
+             <button class="link quiet" data-action="open-integration">${t(
+               "dashboard.settings"
+             )}</button></div>`
+        : ""
+    }
   `;
 }
 

@@ -156,7 +156,8 @@ class DiscoveryEngine:
         Historie wird bewusst nicht angefasst: eine Suche darf nicht Dutzende
         Datenbankabfragen ausloesen.
 
-        ``status`` grenzt auf ueberwachte Entities (``monitored``) oder auf
+        ``status`` grenzt auf ueberwachte Entities (``monitored``), auf
+        ueberwachte ohne eine einzige Regel (``without_rule``) oder auf
         solche mit einem Vorschlag (``suggested``) ein. Gefiltert wird hier
         und nicht in der Oberflaeche: die Trefferzahl ist begrenzt, und ein
         Filter ueber einer abgeschnittenen Liste wuerde Treffer verschweigen.
@@ -171,7 +172,11 @@ class DiscoveryEngine:
                 continue
             if begriff and begriff not in f"{state.entity_id} {state.name}".lower():
                 continue
-            if status == "monitored" and state.entity_id not in self._config.entities:
+            if status in ("monitored", "without_rule") and (
+                state.entity_id not in self._config.entities
+            ):
+                continue
+            if status == "without_rule" and self._config.rules_for(state.entity_id):
                 continue
 
             eintrag = self._describe(state)
@@ -218,7 +223,7 @@ class DiscoveryEngine:
         Trefferliste -- allein aus Metadaten, ohne Historie.
         """
         begriff = (search or "").strip().lower()
-        zaehler = {"all": 0, "monitored": 0, "suggested": 0}
+        zaehler = {"all": 0, "monitored": 0, "without_rule": 0, "suggested": 0}
 
         for state in (
             self._hass.states.async_all(domain) if domain else self._hass.states.async_all()
@@ -231,6 +236,11 @@ class DiscoveryEngine:
             zaehler["all"] += 1
             if state.entity_id in self._config.entities:
                 zaehler["monitored"] += 1
+                # Uebernommen, aber ohne Regel: beobachtet, ohne je etwas zu
+                # melden. Eigens gezaehlt, weil genau diese Differenz zur
+                # Zahl der Regeln sonst niemand erklaeren kann.
+                if not self._config.rules_for(state.entity_id):
+                    zaehler["without_rule"] += 1
                 continue
 
             metadata = self.metadata_for(state.entity_id)

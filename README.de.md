@@ -84,7 +84,7 @@ Vier Bereiche, erreichbar ueber die Reiter am Kopf.
 
 Zeigt ausschliesslich **aktive** Meldungen. Vier Kacheln oben geben den Ueberblick und sind zugleich der Filter: ein Klick auf *Alarme* laesst nur Alarme stehen, ein zweiter zeigt wieder alles; die vierte fuehrt zu den Ereignissen von heute. Darunter stehen die Meldungen nach Dringlichkeit, jeweils mit Text, Raum, Ausloeseuhrzeit und Laufzeit. Jede Dringlichkeit hat ihre eigene Farbe und ihre eigene Form und ist damit auf einen Blick zu unterscheiden. Eine Meldung mit verknuepfter Entity ist anklickbar und oeffnet deren Detailansicht.
 
-Die Version der Integration steht hier und nur hier, klein am Fuss der Seite.
+Die Version der Integration steht hier und nur hier, klein am Fuss der Seite; daneben fuehrt *Einstellungen* zur Seite der Integration in Home Assistant.
 
 ![Dashboard](docs/img/dashboard.png)
 
@@ -113,9 +113,11 @@ Die Seite ist dafuer gebaut, mit wachsendem Bestand brauchbar zu bleiben:
 
 Darstellung, Gliederung und Eingeklapptes merkt sich der Browser.
 
+Ganz unten steht, sofern es welche gibt, **Uebernommen, aber ohne Regel**: Entities, die beobachtet werden, aber nie etwas melden. Von dort legst du die erste Regel an oder nimmst die Entity wieder heraus.
+
 ![Regeluebersicht](docs/img/regeln.png)
 
-Von hier fuehrt **Bearbeiten** in den Editor. Die Regel, deren Formular gerade offen ist, traegt statt des Knopfes den Vermerk *wird bearbeitet*.
+Von hier fuehrt **Bearbeiten** in den Editor, eine eigene Seite. Oben zeigt er die Regel als Ablauf — die Bedingungen mit ihrem Wert von jetzt, die Wartezeit, die Meldung — und sagt, ob sie in diesem Moment zutrifft. Darunter drei Schritte: *Wann soll gemeldet werden?*, *Wie lange muss das anhalten?*, *Was soll erscheinen?* Zustaende, Wartezeit und Typ waehlst du per Klick; die Zustaende heissen wie in Home Assistant.
 
 ![Regel-Editor](docs/img/editor.png)
 
@@ -124,7 +126,9 @@ Von hier fuehrt **Bearbeiten** in den Editor. Die Regel, deren Formular gerade o
 
 ### Discovery
 
-Findet Entities nach Typ, Name oder Entity-ID und uebernimmt sie in die Ueberwachung. Zu vielen gibt es einen Regelvorschlag samt aufklappbarer Begruendung.
+Findet Entities nach Typ, Name oder Entity-ID und uebernimmt sie in die Ueberwachung. Die Umschalter grenzen auf Ueberwachte, auf Ueberwachte ohne Regel oder auf Entities mit Vorschlag ein; die Typen der eigenen Anlage stehen als Pillen mit ihrer Anzahl darunter. Wo es einen Regelvorschlag gibt — und nur dort —, steht *Vorschlaege ansehen*: die Bedingung in Bausteinen, darunter die Begruendung.
+
+Geladen werden fuenfzig Treffer; *Weitere laden* holt die naechsten. Eine Entity wieder entfernen kannst du auf der Seite ihrer Regeln.
 
 ![Discovery mit Vorschlag](docs/img/discovery.png)
 

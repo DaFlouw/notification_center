@@ -218,7 +218,9 @@ async def ws_get_config(hass, connection, msg, runtime) -> None:
         vol.Optional("domain"): vol.Any(str, None),
         vol.Optional("search"): vol.Any(str, None),
         vol.Optional("limit"): vol.All(int, vol.Range(min=1, max=500)),
-        vol.Optional("status"): vol.Any(vol.In(["all", "monitored", "suggested"]), None),
+        vol.Optional("status"): vol.Any(
+            vol.In(["all", "monitored", "without_rule", "suggested"]), None
+        ),
     }
 )
 @websocket_api.async_response

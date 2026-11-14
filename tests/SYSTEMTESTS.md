@@ -224,7 +224,7 @@ loeschen` und `Entfernen` duerfen dabei folgenlos ausgeloest werden.
 | ID | Fall |
 |----|------|
 | L1 | Die vier Reiter wechseln die Seite und markieren den aktiven |
-| L2 | Der Verweis *Historie* im Dashboard fuehrt zur Historie |
+| L2 | Die Kachel *Ereignisse heute* fuehrt zur Historie |
 | L3 | *Alle Regeln* fuehrt aus dem Editor zurueck und laedt neu |
 | L4 | Eine Meldung mit Entity oeffnet die Detailansicht |
 | L5 | Jede aktive Meldung im Dashboard ist anklickbar |
@@ -241,27 +241,27 @@ loeschen` und `Entfernen` duerfen dabei folgenlos ausgeloest werden.
 | L16 | Aktive Ereignisse tragen kein Loeschkreuz |
 | L17 | *Alle loeschen* fragt nach und bricht auf Abbruch folgenlos ab |
 | L18 | *Alle loeschen* loescht nach Bestaetigung |
-| L19 | *Bearbeiten* oeffnet den Editor mit genau dieser Regel |
+| L19 | *Bearbeiten* oeffnet den Editor mit genau dieser Regel, die Liste weicht |
 | L20 | *Loeschen* fragt nach und bricht auf Abbruch folgenlos ab |
 | L21 | *Loeschen* schickt nach Bestaetigung die richtige Regel |
-| L22 | *Regel erstellen* oeffnet ein leeres Formular |
+| L22 | *Regel erstellen* oeffnet einen leeren Editor, ohne *Regel loeschen* |
 | L23 | Die Bedingung schaltet zwischen Zustands- und Wertfeldern um |
 | L24 | Die Wertquelle laesst sich auf ein Attribut umstellen |
 | L25 | Vergleich und Schwelle wandern als Zahl in die Regel |
-| L26 | Die Mehrfachauswahl der Zustaende landet als Liste in der Regel |
+| L26 | Angeklickte Zustaende landen als Liste in der Regel |
 | L27 | Der Meldungstext zeichnet nicht neu, damit der Fokus bleibt |
-| L28 | Hysterese und Zeitbedingung; Minuten werden zu Sekunden |
+| L28 | Hysterese und Wartezeit; der Knopf *15 min* wird zu 900 Sekunden |
 | L29 | *Speichern* behaelt die Kennung einer bestehenden Regel |
-| L30 | *Abbrechen* schliesst das Formular ohne Kommando |
+| L30 | *Abbrechen* schliesst den Editor ohne Kommando |
 | L31 | *Entity ersetzen* fragt nach und bricht ohne Eingabe ab |
 | L32 | *Entity ersetzen* schickt beide Kennungen, ohne Leerzeichen |
-| L33 | Die Typauswahl der Discovery schickt `domain` mit |
+| L33 | Die Typ-Pille schickt `domain` mit, *Alle Typen* nimmt sie zurueck |
 | L34 | Das Suchfeld der Discovery fragt entprellt ab |
 | L35 | *Uebernehmen* meldet genau diese Entity zur Ueberwachung an |
-| L36 | *Entfernen* fragt nach und schickt danach die Entity |
-| L37 | *Vorschlaege* holt sie, derselbe Knopf klappt sie wieder ein |
+| L36 | *Entity entfernen* steht bei ihren Regeln, fragt nach und schickt die Entity |
+| L37 | *Vorschlaege ansehen* holt sie, derselbe Knopf klappt sie wieder ein |
 | L38 | Ein Vorschlag uebernimmt Entity und Regel in einem Zug |
-| L39 | Die Begruendung eines Vorschlags laesst sich aufklappen |
+| L39 | Ein Vorschlag zeigt Bausteine und nennt seine Begruendung |
 | L40 | *Regeln* fuehrt aus der Discovery in den Editor |
 | L41 | Ein Fehler des Backends wird angezeigt, das Panel bleibt bedienbar |
 | L42 | Ohne Einrichtung und ohne Entities erscheint der Assistent |
@@ -273,6 +273,19 @@ loeschen` und `Entfernen` duerfen dabei folgenlos ausgeloest werden.
 | L48 | Die Seite des Editors zeigt die aktuelle Entity |
 | L49 | Die unveraendert bestaetigte Entity loest kein Ersetzen aus |
 | L50 | Die Ablehnung des Backends erscheint als Fehlermeldung |
+| L55 | Ein Fehlertext wird als Text gezeigt, nicht als Markup |
+| L56 | Deaktivieren schickt die Kennung der gemeinten Meldung mit |
+| L57 | Ein deaktivierter Eintrag der Historie laesst sich fortsetzen |
+| L58 | Eine Kachel des Dashboards filtert, der zweite Klick hebt es auf |
+| L59 | Ein Abschnitt der Regeln laesst sich zu- und wieder aufklappen |
+| L60 | Der Knopf fuer Vorschlaege steht nur, wo welche zu erwarten sind |
+| L61 | *Alle Typen* gibt es genau einmal; seltene Typen klappen dazu |
+| L62 | *Weitere laden* holt die naechsten fuenfzig; ein Filterwechsel beginnt von vorn |
+| L63 | Uebernommene Entities ohne Regel stehen eigens in der Regeluebersicht |
+| L64 | Der Verweis *Einstellungen* fuehrt zur Integration, ohne neu zu laden |
+| L65 | Im Editor: *eine genuegt* und der Typ wandern in die Regel |
+| L66 | Im Editor: ein Platzhalter-Knopf haengt ihn an den Meldungstext |
+| L67 | Das Panel folgt dem Theme nur in hell und dunkel |
 
 **L46 gehoert an die Anlage.** Der Pruefstand zeigt, *was* die Oberflaeche
 abschickt; ob das Backend es annimmt, zeigt nur die laufende Instanz. Die in
@@ -349,10 +362,36 @@ was der Pruefstand nicht sieht -- Theme, echte Daten, die Seitenleiste.
 | Q4 | Regeln: Geschoss zuklappen, Seite neu laden | Bleibt zugeklappt. |
 | Q5 | Regeln: Darstellung *Liste* | Je Raum ein eigenes Feld. |
 | Q6 | Regeln: Suche nach einem Raumnamen | Nur dessen Regeln; der Fokus bleibt im Feld. |
-| Q7 | Regel bearbeiten und speichern | Formular in *Wenn / Dann melden / Erweitert*; die Regel ist danach unveraendert vorhanden. |
+| Q7 | Regel bearbeiten und speichern | Der Editor ist eine eigene Seite: Ablauf, dann drei Schritte. Die Regel ist danach unveraendert vorhanden. |
 | Q8 | Dashboard: *Deaktivieren*, dann Historie: *Wieder aktivieren* | Beides wirkt ohne Neuladen. |
 | Q9 | Schmales Fenster (Handybreite) | Nichts laeuft seitlich aus dem Bild; Reiter und Kacheln brechen um. |
 | Q10 | Version | Steht nur auf dem Dashboard, klein am Fuss. |
+| Q11 | Farben mit dem eigenen Theme | Blau, nicht die Akzentfarbe des Themes; kuehler Grund, weisse Karten -- wie in `docs/UI-KONZEPT.md`. |
+| Q12 | Editor: Zustaende einer Entity | Als Knoepfe, benannt wie in Home Assistant (*offen* statt `on`); im Ablauf steht der Wert von jetzt. |
+| Q13 | Dashboard: *Einstellungen* | Oeffnet die Seite der Integration, ohne die Oberflaeche neu zu laden. |
+| Q14 | Discovery: Zahlen | *Ueberwacht* minus *Ohne Regel* ergibt die Zahl der Entities mit Regeln; *Weitere laden* zeigt fuenfzig mehr. |
+| Q15 | Protokoll nach dem Laden des Panels | Kein Fehler *the name "notification-center-panel" has already been used*. |
+
+## R -- Aussehen nach dem Konzept
+
+Farben, Masse und Schrift, gemessen am gezeichneten Element. Die Sollwerte
+stehen in `docs/UI-KONZEPT.md`, Abschnitt 7, und pruefbar in
+`tests/panel/konzept.js`; der Pruefstand faehrt jede Ansicht an und vergleicht
+`getComputedStyle` damit -- einmal hell, einmal dunkel.
+
+| ID | Bereich | Messpunkte |
+|----|---------|------------|
+| H1 -- H6 | Kopf und Navigation | Grund, Marke, Schiene, Reiter, Zahl |
+| H7 -- H18 | Dashboard | Kacheln, Symbolfelder, Karten, Zeilen, Knopf, Versionszeile |
+| H19 -- H25 | Historie | Suchfeld, Zeitraum, Pillen, deaktivierter Eintrag |
+| H26 -- H41 | Regeln | Umschalter, Filter, ruhige und meldende Regel, Bausteine, Verweise |
+| H42 -- H52 | Discovery | Status, Typ-Pillen, Kennzeichen, Knoepfe, offener Vorschlag |
+| H53 -- H70 | Regel-Editor | Ablauf, Schritte, Bedingungen, Auswahlknoepfe, Typwahl |
+| H71 | Dashboard | Kennzeichen der Systemnachricht |
+
+Dazu laeuft in der CI `tests/frontend/konzept.test.js`: die Palette im
+Konzept, in `konzept.js` und im Stylesheet muss dieselbe sein, und das
+Stylesheet darf an keiner Farbe des Themes haengen.
 
 ---
 
@@ -434,3 +473,41 @@ angelegten Wegwerf-Entities.
 Die Bedienelemente (Abschnitt L) laufen im Pruefstand: **49 von 49
 bestanden**, darunter die drei neuen Faelle zur Anzeige der aktuellen Entity
 und der Fall, dass die Ablehnung des Backends dem Anwender gezeigt wird.
+
+---
+
+## Durchlauf vom 14.11.2026, Version 1.5.0-rc1
+
+Gegen die laufende Instanz, mit eigens angelegten Helfern (`NC Test …`) und
+Testregeln; danach vollstaendig aufgeraeumt und `get_config` gegen den
+Ausgangsstand verglichen.
+
+| Abschnitt | Ausgefuehrt | Ergebnis |
+|-----------|-------------|----------|
+| A | A3 | bestanden |
+| C | C3 -- C7, C11 | bestanden |
+| D | D1 -- D6 | bestanden |
+| E | E1 -- E3, E6, E7 | bestanden |
+| F | F1 -- F5, F7 | bestanden |
+| G | G1, G3, G4 | bestanden |
+| H | H1 -- H3, H5, H6 | bestanden |
+| I | I1, I3, I5 | bestanden |
+| J | J1, J2 | bestanden |
+| M | M1 -- M9 | bestanden |
+| N | N1 -- N8 | bestanden |
+| O | O1 -- O7 | bestanden |
+| P | P1 -- P5 | bestanden |
+
+Nicht ausgefuehrt: die zeitgebundenen Faelle (C9, C10, F6, J4), B5 -- B8, E4,
+E5, F8, H4, H7, H8, I2, I4, J3 sowie K und Q, die den Browser an der Anlage
+brauchen.
+
+Ein Befund am Rand: im Protokoll stand *Failed to execute 'define' on
+'CustomElementRegistry': the name "notification-center-panel" has already
+been used*. Home Assistant hatte das Modul zweimal geladen. Behoben in rc2
+(Fall Q15).
+
+## Pruefstand vom 14.11.2026, Version 1.5.0-rc2
+
+Abschnitte L und R im Pruefstand: **133 von 133 bestanden** -- 62
+Bedienungsfaelle und 71 Messpunkte, jeder hell und dunkel gemessen.

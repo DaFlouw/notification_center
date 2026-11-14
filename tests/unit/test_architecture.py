@@ -83,16 +83,6 @@ def _supported_domains() -> set[str]:
     raise AssertionError("SUPPORTED_DOMAINS nicht in discovery/engine.py gefunden")
 
 
-def _domains_der_typauswahl() -> set[str]:
-    """Die Domaenen, die das Auswahlfeld der Discovery anbietet."""
-    pfad = _PACKAGE / "frontend" / "views" / "discovery.js"
-    quelle = pfad.read_text(encoding="utf-8")
-
-    anfang = quelle.index("const TYP_GRUPPEN")
-    ende = quelle.index("export function renderDiscovery")
-    return set(re.findall(r'^\s*"([a-z_]+)",\s*$', quelle[anfang:ende], re.MULTILINE))
-
-
 def _uebersetzte_domaenen(sprache: str) -> set[str]:
     """Die Domaenen, fuer die es eine Beschriftung gibt."""
     pfad = _PACKAGE / "frontend" / "translations" / f"{sprache}.js"
@@ -100,34 +90,35 @@ def _uebersetzte_domaenen(sprache: str) -> set[str]:
     return set(re.findall(r'"discovery\.domain\.([a-z_]+)"', quelle))
 
 
-def test_jede_domaene_der_typauswahl_ist_uebersetzt() -> None:
-    """Ohne Beschriftung stuende im Auswahlfeld der nackte Schluessel.
+def test_jede_ueberwachbare_domaene_ist_uebersetzt() -> None:
+    """Ohne Beschriftung stuende auf der Pille der nackte Schluessel.
 
-    Der Rueckfall der Uebersetzung zeigt den Schluessel selbst, damit eine
-    Luecke auffaellt. Hier faellt sie schon vorher auf.
+    Die Typauswahl der Discovery entsteht aus dem, was das Backend zaehlt --
+    eine eigene Liste im Frontend gibt es nicht mehr, und damit auch nichts,
+    was auseinanderlaufen koennte. Geblieben ist die eine Bedingung: jede
+    Domaene, die das Backend anbietet, braucht in jeder Sprache einen Namen.
     """
-    auswahl = _domains_der_typauswahl()
+    backend = _supported_domains()
 
-    for sprache in ("en", "de"):
-        fehlend = auswahl - _uebersetzte_domaenen(sprache)
+    for sprache in ("en", "de", "es"):
+        fehlend = backend - _uebersetzte_domaenen(sprache)
         assert not fehlend, f"{sprache}: keine Beschriftung fuer {sorted(fehlend)}"
 
 
-def test_typauswahl_deckt_alle_ueberwachbaren_domaenen_ab() -> None:
-    """Backend und Auswahlfeld muessen dieselben Domaenen kennen.
+def test_keine_zwei_domaenen_heissen_gleich() -> None:
+    """Die Typen stehen als Pillen nebeneinander, ohne Gruppe darueber.
 
-    Die beiden Listen liegen in verschiedenen Sprachen und sind schon
-    auseinandergelaufen: die Helferdomaenen fehlten im Auswahlfeld vollstaendig,
-    mehrere Geraetetypen ebenfalls. Wer eine Domaene ergaenzt, muss beide
-    Stellen anfassen -- dieser Test sagt es ihm.
+    Solange Geraete und Helfer in einem Auswahlfeld unter eigenen
+    Ueberschriften standen, durften ``switch`` und ``input_boolean`` beide
+    "Schalter" heissen. Als Pillen stuenden zwei gleiche nebeneinander.
     """
-    backend = _supported_domains()
-    auswahl = _domains_der_typauswahl()
-
-    assert auswahl == backend, (
-        f"Nur im Backend: {sorted(backend - auswahl)}; "
-        f"nur im Auswahlfeld: {sorted(auswahl - backend)}"
-    )
+    for sprache in ("en", "de", "es"):
+        pfad = _PACKAGE / "frontend" / "translations" / f"{sprache}.js"
+        namen = re.findall(
+            r'"discovery\.domain\.[a-z_]+":\s*"([^"]+)"', pfad.read_text(encoding="utf-8")
+        )
+        doppelt = sorted({name for name in namen if namen.count(name) > 1})
+        assert not doppelt, f"{sprache}: mehrfach vergeben: {doppelt}"
 
 
 def _json_schluessel(daten, praefix: str = "") -> set[str]:
