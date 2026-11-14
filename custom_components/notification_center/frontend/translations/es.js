@@ -272,4 +272,7 @@ export default {
   "discovery.entityCount_one": "{count} entidad",
   "discovery.entityCount_other": "{count} entidades",
   "discovery.adoptWithRule": "Añadir con esta regla",
+  "rules.showMore_one": "Mostrar {count} más en {room}",
+  "rules.showMore_other": "Mostrar {count} más en {room}",
+  "discovery.adoptWithoutRule": "Añadir sin regla",
 };

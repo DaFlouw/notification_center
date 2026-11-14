@@ -205,6 +205,42 @@ class DiscoveryEngine:
 
         return zaehler
 
+    def status_counts(
+        self, *, domain: str | None = None, search: str | None = None
+    ) -> dict[str, int]:
+        """Wie viele Entities es insgesamt, ueberwacht und mit Vorschlag gibt.
+
+        Fuer die Umschalter der Discovery, und wie die Typzaehler ueber den
+        ganzen Bestand statt ueber die begrenzte Trefferliste. Typ und Suche
+        gelten mit: die Zahl sagt, was ein Klick auf den Umschalter zeigt.
+
+        Ob es einen Vorschlag gibt, entscheidet dieselbe Pruefung wie in der
+        Trefferliste -- allein aus Metadaten, ohne Historie.
+        """
+        begriff = (search or "").strip().lower()
+        zaehler = {"all": 0, "monitored": 0, "suggested": 0}
+
+        for state in (
+            self._hass.states.async_all(domain) if domain else self._hass.states.async_all()
+        ):
+            if state.domain not in SUPPORTED_DOMAINS:
+                continue
+            if begriff and begriff not in f"{state.entity_id} {state.name}".lower():
+                continue
+
+            zaehler["all"] += 1
+            if state.entity_id in self._config.entities:
+                zaehler["monitored"] += 1
+                continue
+
+            metadata = self.metadata_for(state.entity_id)
+            if metadata is not None and _ohne_unsichere(
+                build_suggestions(metadata, sprache=self._sprache), False
+            ):
+                zaehler["suggested"] += 1
+
+        return zaehler
+
     def _describe(self, state: State) -> dict[str, Any]:
         metadata = self.metadata_for(state.entity_id)
         ueberwacht = state.entity_id in self._config.entities

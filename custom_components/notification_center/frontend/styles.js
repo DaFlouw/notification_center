@@ -570,6 +570,7 @@ sheet.replaceSync(`
   }
 
   .room-cluster + .room-cluster { margin-top: 4px; }
+  .btn.more { align-self: flex-start; margin: 4px 0 2px 6px; border-color: transparent; color: var(--nc-muted); }
   .room-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 6px 12px 4px; font-size: 14px; }
   .room-cluster .rule-line { background: var(--nc-surface); border-radius: 12px; }
   .room-cluster .rule-line.reporting.alarm { background: var(--nc-alarm-soft); }

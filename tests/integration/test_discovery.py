@@ -108,6 +108,27 @@ async def test_discovery_zaehlt_je_typ_ueber_den_ganzen_bestand(
     assert sum(gesucht.values()) == 1
 
 
+async def test_discovery_zaehlt_je_status(hass: HomeAssistant, runtime) -> None:
+    """Die Zahl am Umschalter sagt, was ein Klick darauf zeigt."""
+    runtime.config.add_entity(WatchedEntity(entity_id=TEMPERATUR))
+
+    zaehler = runtime.discovery.status_counts()
+    assert zaehler["all"] == len(runtime.discovery.discover_entities(limit=500))
+    assert zaehler["monitored"] == 1
+    assert zaehler["suggested"] == len(
+        runtime.discovery.discover_entities(status="suggested", limit=500)
+    )
+
+
+async def test_statuszaehler_folgen_typ_und_suche(hass: HomeAssistant, runtime) -> None:
+    alle = runtime.discovery.status_counts()
+    nur_binaer = runtime.discovery.status_counts(domain="binary_sensor")
+    gesucht = runtime.discovery.status_counts(search="waschmaschine")
+
+    assert nur_binaer["all"] < alle["all"]
+    assert gesucht["all"] == 1
+
+
 async def test_discovery_uebergeht_ungeeignete_domains(hass: HomeAssistant, runtime) -> None:
     hass.states.async_set("automation.irgendwas", "on")
     await hass.async_block_till_done()
