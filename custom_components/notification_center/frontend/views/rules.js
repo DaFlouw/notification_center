@@ -91,6 +91,17 @@ const TYP_REIHENFOLGE = ["alarm", "warning", "info"];
 export const LISTE_AB = 24;
 
 /**
+ * Wie viele Regeln ein Raum der dichten Liste zunaechst zeigt.
+ *
+ * Gekuerzt wird erst, wenn dadurch mindestens drei Zeilen wegfallen: fuer
+ * eine oder zwei lohnt der Knopf nicht, er waere selbst eine Zeile. Was
+ * gerade meldet, steht immer da -- eine Kuerzung darf nichts verbergen, das
+ * Aufmerksamkeit braucht.
+ */
+export const ZEILEN_JE_RAUM = 6;
+export const KUERZEN_AB = ZEILEN_JE_RAUM + 3;
+
+/**
  * Uebersicht aller Regeln.
  *
  * Gebaut fuer zwei Groessenordnungen. Ein Dutzend Regeln steht als
@@ -119,6 +130,7 @@ export function renderRuleOverview(state) {
     group = "room",
     density = null,
     collapsed = {},
+    expandedRooms = [],
   } = state;
 
   if (loading) return `<div class="loading">${t("common.loading")}</div>`;
@@ -147,7 +159,13 @@ export function renderRuleOverview(state) {
   );
 
   const abschnitte = gliedere(sichtbar, platzierung, group);
-  const zustand = { collapsed, viele: rules.length > LISTE_AB };
+  const zustand = {
+    collapsed,
+    viele: rules.length > LISTE_AB,
+    // Wer sucht oder filtert, will die Treffer sehen und nicht aufklappen.
+    ungekuerzt: Boolean(String(search).trim()) || filter !== "all",
+    offeneRaeume: new Set(expandedRooms),
+  };
   const alleZu = abschnitte.length > 0 && abschnitte.every((a) => istZu(a, zustand, meldend));
 
   return `
@@ -275,7 +293,7 @@ function abschnittHtml(abschnitt, zustand, dicht, platzierung, namen, meldend) {
               : ""
         }
       </button>
-      ${zu ? "" : dicht ? listenAnsicht(abschnitt, platzierung, namen, meldend) : kartenAnsicht(abschnitt, platzierung, namen, meldend)}
+      ${zu ? "" : dicht ? listenAnsicht(abschnitt, zustand, platzierung, namen, meldend) : kartenAnsicht(abschnitt, platzierung, namen, meldend)}
     </section>
   `;
 }
@@ -303,13 +321,19 @@ function kartenAnsicht(abschnitt, platzierung, namen, meldend) {
  * Das Feld ist die Klammer. Ohne sie waeren dreissig Zeilen eine Wand, in
  * der man den Raumwechsel nur an einer Zwischenueberschrift erkennt.
  */
-function listenAnsicht(abschnitt, platzierung, namen, meldend) {
+function listenAnsicht(abschnitt, zustand, platzierung, namen, meldend) {
   return `
     <div class="card rows">
       ${abschnitt.karten
         .map((karte) => {
           const regeln = karte.entities.flatMap(([, eintraege]) => eintraege);
           const melden = meldetIn(regeln, meldend);
+          const raumSchluessel = `${abschnitt.schluessel}|${karte.titel}`;
+          const { gezeigt, verborgen } = kuerzeRaum(
+            regeln,
+            meldend,
+            zustand.ungekuerzt || zustand.offeneRaeume.has(raumSchluessel)
+          );
           const dringlichster = TYP_REIHENFOLGE.find((typ) =>
             regeln.some((regel) => regel.type === typ && meldend.has(regel.rule_id))
           );
@@ -327,16 +351,40 @@ function listenAnsicht(abschnitt, platzierung, namen, meldend) {
                 }
               </div>
               <ul class="rule-lines tight">
-                ${regeln
+                ${gezeigt
                   .map((regel) => regelLinie(regel, platzierung, namen, meldend.get(regel.rule_id)))
                   .join("")}
               </ul>
+              ${
+                verborgen
+                  ? `<button class="btn more" data-action="show-all-room"
+                             data-key="${escapeHtml(raumSchluessel)}">${t("rules.showMore", {
+                               count: verborgen,
+                               room: karte.titel,
+                             })}</button>`
+                  : ""
+              }
             </div>
           `;
         })
         .join("")}
     </div>
   `;
+}
+
+/**
+ * Kuerzt die Regeln eines Raums auf die ersten Zeilen.
+ *
+ * Meldende Regeln bleiben in jedem Fall stehen, auch jenseits der Grenze;
+ * die Reihenfolge wird dabei nicht veraendert.
+ */
+export function kuerzeRaum(regeln, meldend, ungekuerzt = false) {
+  if (ungekuerzt || regeln.length < KUERZEN_AB) return { gezeigt: regeln, verborgen: 0 };
+
+  const gezeigt = regeln.filter(
+    (regel, stelle) => stelle < ZEILEN_JE_RAUM || meldend.has(regel.rule_id)
+  );
+  return { gezeigt, verborgen: regeln.length - gezeigt.length };
 }
 
 /** Eine Regel als einzelne Zeile, fuer die dichte Liste und die Anheftung. */

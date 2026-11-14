@@ -80,6 +80,7 @@ export function renderDiscovery(state) {
     suggestions = {},
     status = "all",
     domainCounts = {},
+    statusCounts = {},
   } = state;
 
   return `
@@ -92,7 +93,11 @@ export function renderDiscovery(state) {
           ${STATUS.map(
             (wert) =>
               `<button data-action="set-discovery-status" data-value="${wert}"
-                       aria-pressed="${status === wert}">${t(`discovery.status.${wert}`)}</button>`
+                       aria-pressed="${status === wert}">${t(`discovery.status.${wert}`)}${
+                         // Ein aelteres Backend liefert die Zahlen nicht; dann
+                         // steht nur das Wort da.
+                         Number.isFinite(statusCounts[wert]) ? ` ${statusCounts[wert]}` : ""
+                       }</button>`
           ).join("")}
         </div>
 
@@ -233,12 +238,12 @@ function entityZeile(eintrag, vorschlaege) {
         }
       </div>
 
-      ${vorschlaege ? vorschlagsBlock(eintrag.entity_id, vorschlaege) : ""}
+      ${vorschlaege ? vorschlagsBlock(eintrag, vorschlaege) : ""}
     </li>
   `;
 }
 
-function vorschlagsBlock(entityId, vorschlaege) {
+function vorschlagsBlock(eintrag, vorschlaege) {
   if (!vorschlaege.length) {
     return `<div class="suggestions">
       <div class="entity-meta">${t("discovery.noSuggestions")}</div>
@@ -248,12 +253,13 @@ function vorschlagsBlock(entityId, vorschlaege) {
   return `
     <div class="suggestions">
       <div class="entity-meta">${t("discovery.suggestionCount", { count: vorschlaege.length })}</div>
-      ${vorschlaege.map((vorschlag) => vorschlagZeile(entityId, vorschlag)).join("")}
+      ${vorschlaege.map((vorschlag) => vorschlagZeile(eintrag, vorschlag)).join("")}
     </div>
   `;
 }
 
-function vorschlagZeile(entityId, vorschlag) {
+function vorschlagZeile(eintrag, vorschlag) {
+  const entityId = eintrag.entity_id;
   return `
     <div class="suggestion">
       <div class="suggestion-head">
@@ -266,6 +272,14 @@ function vorschlagZeile(entityId, vorschlag) {
         <button class="btn primary" data-action="accept-suggestion"
                 data-entity="${escapeHtml(entityId)}"
                 data-suggestion="${escapeHtml(vorschlag.key)}">${t("discovery.adoptWithRule")}</button>
+        <!--
+          Die zweite Antwort auf einen Vorschlag: die Entity will ich, die
+          Regel nicht. Sie steht hier, wo die Entscheidung faellt, und nicht
+          nur in der Zeile darueber.
+        -->
+        <button class="btn" data-action="add-entity"
+                data-entity="${escapeHtml(entityId)}"
+                data-name="${escapeHtml(eintrag.name)}">${t("discovery.adoptWithoutRule")}</button>
       </div>
     </div>
   `;

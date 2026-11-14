@@ -108,7 +108,7 @@ Die Seite ist dafuer gebaut, mit wachsendem Bestand brauchbar zu bleiben:
 
 - Was gerade meldet, steht angeheftet ganz oben.
 - Geschosse lassen sich einklappen und sagen zugeklappt, wie viele Regeln sie fuehren und ob eine davon meldet. Ab mehr als 24 Regeln starten Geschosse zugeklappt, in denen nichts meldet.
-- Die dichte Liste zeigt eine Zeile je Regel, jeden Raum als eigenes Feld; ab mehr als 24 Regeln ist sie die Vorgabe und jederzeit umschaltbar.
+- Die dichte Liste zeigt eine Zeile je Regel, jeden Raum als eigenes Feld; ab mehr als 24 Regeln ist sie die Vorgabe und jederzeit umschaltbar. Ein Raum mit neun oder mehr Regeln zeigt die ersten sechs und bietet den Rest hinter *n weitere zeigen* an; was gerade meldet, wird nie verborgen, und waehrend einer Suche oder eines Filters wird nichts gekuerzt.
 - Die Suche erfasst Entity, Raum, Bedingung und Meldungstext; Filter grenzen auf einen Typ, auf verknuepfte oder auf abgeschaltete Regeln ein. Die Gliederung nach Typ statt nach Geschoss ist einen Klick entfernt.
 
 Darstellung, Gliederung und Eingeklapptes merkt sich der Browser.

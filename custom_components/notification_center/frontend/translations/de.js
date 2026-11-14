@@ -269,4 +269,7 @@ export default {
   "discovery.entityCount_one": "{count} Entity",
   "discovery.entityCount_other": "{count} Entities",
   "discovery.adoptWithRule": "Mit dieser Regel übernehmen",
+  "rules.showMore_one": "{count} weitere in {room} zeigen",
+  "rules.showMore_other": "{count} weitere in {room} zeigen",
+  "discovery.adoptWithoutRule": "Ohne Regel übernehmen",
 };

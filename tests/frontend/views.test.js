@@ -20,9 +20,12 @@ import { escapeHtml, formatDuration, sourceBadge, typeLabel } from "../../custom
 import { renderDashboard } from "../../custom_components/notification_center/frontend/views/dashboard.js";
 import { renderDiscovery } from "../../custom_components/notification_center/frontend/views/discovery.js";
 import {
+  KUERZEN_AB,
   LISTE_AB,
+  ZEILEN_JE_RAUM,
   beschreibung,
   entwurfZuRegel,
+  kuerzeRaum,
   leereBedingung,
   leereRegel,
   renderRuleOverview,
@@ -1228,5 +1231,107 @@ describe("Discovery: Gliederung und Schnellwahl", () => {
   it("schaltet zwischen allen, ueberwachten und vorgeschlagenen um", () => {
     const html = renderDiscovery({ entities: [], suggestions: {}, status: "monitored" });
     assert.match(html, /data-value="monitored"\s+aria-pressed="true"/);
+  });
+});
+
+describe("Dichte Liste: lange Raeume kuerzen", () => {
+  const regeln = (anzahl) =>
+    Array.from({ length: anzahl }, (_, i) => ({ ...RULES[0], rule_id: `r_${i}` }));
+
+  it("laesst kurze Raeume vollstaendig", () => {
+    // Bis knapp unter der Grenze lohnt der Knopf nicht: er waere selbst eine Zeile.
+    const { gezeigt, verborgen } = kuerzeRaum(regeln(KUERZEN_AB - 1), new Map());
+    assert.equal(gezeigt.length, KUERZEN_AB - 1);
+    assert.equal(verborgen, 0);
+  });
+
+  it("kuerzt lange Raeume auf die ersten Zeilen", () => {
+    const { gezeigt, verborgen } = kuerzeRaum(regeln(KUERZEN_AB + 3), new Map());
+    assert.equal(gezeigt.length, ZEILEN_JE_RAUM);
+    assert.equal(verborgen, KUERZEN_AB + 3 - ZEILEN_JE_RAUM);
+  });
+
+  it("verbirgt nie, was gerade meldet", () => {
+    const alle = regeln(KUERZEN_AB + 3);
+    const letzte = alle[alle.length - 1];
+    const meldend = new Map([[letzte.rule_id, { rule_id: letzte.rule_id }]]);
+    const { gezeigt, verborgen } = kuerzeRaum(alle, meldend);
+    assert.ok(gezeigt.includes(letzte));
+    assert.equal(gezeigt.length + verborgen, alle.length);
+  });
+
+  it("bietet an, den Rest zu zeigen, und nennt Zahl und Raum", () => {
+    const html = renderRuleOverview({
+      entities: ENTITIES,
+      rules: regeln(KUERZEN_AB + 3),
+      density: "list",
+      collapsed: { "*": false },
+    });
+    assert.match(html, /data-action="show-all-room"/);
+    assert.match(html, new RegExp(`${KUERZEN_AB + 3 - ZEILEN_JE_RAUM} weitere in Küche zeigen`));
+    assert.equal((html.match(/data-action="edit-rule"/g) || []).length, ZEILEN_JE_RAUM);
+  });
+
+  it("zeigt einen aufgeklappten Raum ganz", () => {
+    const html = renderRuleOverview({
+      entities: ENTITIES,
+      rules: regeln(KUERZEN_AB + 3),
+      density: "list",
+      collapsed: { "*": false },
+      expandedRooms: ["room:Erdgeschoss|Küche"],
+    });
+    assert.ok(!html.includes('data-action="show-all-room"'));
+    assert.equal((html.match(/data-action="edit-rule"/g) || []).length, KUERZEN_AB + 3);
+  });
+
+  it("kuerzt nicht, waehrend gesucht oder gefiltert wird", () => {
+    // Wer sucht, will die Treffer sehen und nicht aufklappen.
+    const html = renderRuleOverview({
+      entities: ENTITIES,
+      rules: regeln(KUERZEN_AB + 3),
+      density: "list",
+      collapsed: { "*": false },
+      search: "arbeitsplatte",
+    });
+    assert.ok(!html.includes('data-action="show-all-room"'));
+  });
+});
+
+describe("Discovery: Zahlen und der zweite Knopf am Vorschlag", () => {
+  it("schreibt die Anzahl an die Umschalter", () => {
+    const html = renderDiscovery({
+      entities: [],
+      suggestions: {},
+      statusCounts: { all: 142, monitored: 10, suggested: 7 },
+    });
+    assert.match(html, />Alle 142</);
+    assert.match(html, />Überwacht 10</);
+    assert.match(html, />Mit Vorschlag 7</);
+  });
+
+  it("kommt ohne die Zahlen aus", () => {
+    const html = renderDiscovery({ entities: [], suggestions: {} });
+    assert.match(html, />Überwacht</);
+  });
+
+  it("bietet am Vorschlag beide Antworten an", () => {
+    const eintrag = {
+      entity_id: "sensor.bad_temperatur",
+      name: "Temperatur Bad",
+      domain: "sensor",
+      state: "22",
+      area_name: "Bad",
+      monitored: false,
+      rule_count: 0,
+      has_suggestions: true,
+    };
+    const html = renderDiscovery({
+      entities: [eintrag],
+      suggestions: {
+        "sensor.bad_temperatur": [{ key: "v1", title: "Warnung über 26 °C", type: "warning" }],
+      },
+    });
+    assert.match(html, /data-action="accept-suggestion"[^>]*data-suggestion="v1"[^>]*>Mit dieser Regel übernehmen/s);
+    assert.match(html, /class="suggestion"[\s\S]*data-action="add-entity"[^>]*>Ohne Regel übernehmen/);
   });
 });

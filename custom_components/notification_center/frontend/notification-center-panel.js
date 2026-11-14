@@ -86,6 +86,7 @@ class NotificationCenterPanel extends HTMLElement {
     suggestions: {},
     status: "all",
     domainCounts: {},
+    statusCounts: {},
   };
   #rules = {
     entityId: null,
@@ -99,7 +100,7 @@ class NotificationCenterPanel extends HTMLElement {
     conditionOptions: {},
   };
   #ruleOverview = { entities: [], rules: [], loading: false, names: {} };
-  #regelAnsicht = { search: "", filter: "all", ...ladeAnsicht() };
+  #regelAnsicht = { search: "", filter: "all", expandedRooms: [], ...ladeAnsicht() };
   #setupErledigt = true;
   #backendZuAlt = false;
   #fehler = null;
@@ -222,6 +223,7 @@ class NotificationCenterPanel extends HTMLElement {
       });
       this.#discovery.entities = antwort.entities;
       this.#discovery.domainCounts = antwort.domain_counts || {};
+      this.#discovery.statusCounts = antwort.status_counts || {};
       this.#fehler = null;
     } catch (fehler) {
       this.#fehler = fehler.message || String(fehler);
@@ -568,6 +570,14 @@ class NotificationCenterPanel extends HTMLElement {
           [daten.key]: offen === "true",
         };
         merkeAnsicht(this.#regelAnsicht);
+        this.#render();
+        return;
+      }
+
+      if (aktion === "show-all-room") {
+        // Nicht gemerkt: beim naechsten Oeffnen der Seite ist der Raum
+        // wieder kurz. Aufgeklappt wird fuer einen Blick, nicht fuer immer.
+        this.#regelAnsicht.expandedRooms = [...this.#regelAnsicht.expandedRooms, daten.key];
         this.#render();
         return;
       }

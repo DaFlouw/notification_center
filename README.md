@@ -108,7 +108,7 @@ The page is built to stay usable as the number of rules grows:
 
 - What is reporting right now is pinned to the top.
 - Floors fold away and say, while folded, how many rules they hold and whether one of them is reporting. With more than 24 rules, floors with nothing to report start folded.
-- The dense list shows one line per rule, with every room as its own field; it becomes the default above 24 rules and can be switched at any time.
+- The dense list shows one line per rule, with every room as its own field; it becomes the default above 24 rules and can be switched at any time. A room with nine or more rules shows its first six and offers the rest behind *Show n more*; whatever is reporting is never hidden, and nothing is cut while you search or filter.
 - Search covers entity, room, condition and message text; filters narrow by type, to combined rules or to switched-off ones. Grouping by type instead of by floor is one click away.
 
 View, grouping and what is folded are remembered per browser.

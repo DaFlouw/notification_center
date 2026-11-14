@@ -237,6 +237,9 @@ async def ws_discover(hass, connection, msg, runtime) -> None:
             {
                 "entities": ergebnis,
                 "domain_counts": runtime.discovery.domain_counts(msg.get("search")),
+                "status_counts": runtime.discovery.status_counts(
+                    domain=msg.get("domain"), search=msg.get("search")
+                ),
             }
         ),
     )
