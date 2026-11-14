@@ -1,6 +1,6 @@
 # Gestaltungskonzept des Panels
 
-Stand: 1.5.0-rc2. Dieses Dokument beschreibt, wie das Panel aussieht und warum.
+Stand: 1.5.0. Dieses Dokument beschreibt, wie das Panel aussieht und warum.
 Es ist verbindlich: weicht die Umsetzung ab, ist die Umsetzung falsch oder
 dieses Dokument wird geändert – nicht stillschweigend eines von beiden.
 
