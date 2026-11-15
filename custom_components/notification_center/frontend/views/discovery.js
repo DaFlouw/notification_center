@@ -274,7 +274,7 @@ function vorschlagZeile(eintrag, vorschlag) {
           Die zweite Antwort auf einen Vorschlag: die Entity will ich, die
           Regel nicht. Sie steht hier, wo die Entscheidung faellt.
         -->
-        <button class="btn" data-action="add-entity" data-stay="1"
+        <button class="btn" data-action="add-entity"
                 data-entity="${escapeHtml(entityId)}"
                 data-name="${escapeHtml(eintrag.name)}">${t("discovery.adoptWithoutRule")}</button>
       </div>

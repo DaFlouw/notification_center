@@ -230,7 +230,9 @@ aktuelle Wert, dann:
   Entity von der Seite ihrer Regeln aus, nicht hier.
 - **nicht überwacht** – »Übernehmen«, umrandet. Der Klick übernimmt die
   Entity und führt gleich in den Editor ihrer ersten Regel: ohne Regel meldet
-  sie nichts, und das soll kein zweiter Schritt sein, den man erraten muss. Davor, violett, »Vorschläge
+  sie nichts, und das soll kein zweiter Schritt sein, den man erraten muss.
+  Dasselbe gilt für »Ohne Regel übernehmen« am Vorschlag – gemeint ist »ohne
+  diese Regel«. Davor, violett, »Vorschläge
   ansehen« – **nur, wenn es welche gibt.**
 
 Ein geöffneter Vorschlag tönt die ganze Zeile violett. Darin je Vorschlag

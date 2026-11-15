@@ -1049,6 +1049,25 @@ const FAELLE = [
       }
     },
   },
+  {
+    id: "L68",
+    titel: "'Ohne Regel uebernehmen' am Vorschlag fuehrt ebenfalls in den Editor",
+    async fn() {
+      await seite("discovery");
+      await klick('[data-action="show-suggestions"]');
+      const knopf = element('.suggestion [data-action="add-entity"]');
+      const kennung = knopf.dataset.entity;
+      const ab = marke();
+      knopf.click();
+      await bisSichtbar(".editor-head");
+      gleich(letztes(ab, "add_entities").nachricht.entity_ids, [kennung], "entity_ids");
+      gleich(anzahl(ab, "save_rule"), 0, "es wurde eine Regel angelegt");
+      pruefe(element(".editor-head .mono").textContent.includes(kennung), "Editor einer anderen Entity");
+      await klick('[data-action="cancel-rule"]');
+      await seite("discovery");
+      pruefe(!SR().querySelector(".entity-item.open"), "der Vorschlag steht noch offen");
+    },
+  },
 
   // -- Deaktivieren -------------------------------------------------------
   {

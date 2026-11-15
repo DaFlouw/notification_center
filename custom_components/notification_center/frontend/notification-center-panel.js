@@ -851,12 +851,9 @@ class NotificationCenterPanel extends HTMLElement {
 
       if (aktion === "add-entity") {
         await api.addEntities(this.#hass, [daten.entity]);
-        // "Ohne Regel uebernehmen" am Vorschlag meint, was es sagt.
-        if (daten.stay) {
-          delete this.#discovery.suggestions[daten.entity];
-          await this.#ladeDiscovery();
-          return;
-        }
+        // Auch "Ohne Regel uebernehmen" am Vorschlag: gemeint ist "ohne
+        // *diese* Regel", nicht "ohne jede".
+        delete this.#discovery.suggestions[daten.entity];
         // Gleich weiter in den Editor: eine uebernommene Entity ohne Regel
         // meldet nichts. Frueher blieb man in der Liste stehen, die Zeile
         // sprang um, und dass noch ein zweiter Schritt fehlt, sagte niemand.

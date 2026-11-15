@@ -367,8 +367,8 @@ describe("Discovery", () => {
     assert.match(html, /<p class="why">Warum dieser Vorschlag: Geräteklasse: window<\/p>/);
     // Beide Antworten stehen am Vorschlag; die Zeile wiederholt sie nicht.
     assert.equal((html.match(/data-action="add-entity"/g) || []).length, 1);
-    // "Ohne Regel" bleibt in der Liste, statt in den Editor zu fuehren.
-    assert.match(html, /data-action="add-entity" data-stay="1"/);
+    // Auch "Ohne Regel uebernehmen" fuehrt in den Editor: kein Sonderweg.
+    assert.ok(!html.includes("data-stay"));
     assert.match(html, /data-action="accept-suggestion"/);
   });
 
