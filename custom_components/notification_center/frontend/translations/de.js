@@ -322,4 +322,5 @@ export default {
   "discovery.moreTypes": "{count} weitere Typen",
   "discovery.fewerTypes": "Weniger Typen",
   "rules.removeEntity": "Entity entfernen",
+  "editor.manyStates": "{count} bekannte Zustände – beim Tippen kommen Vorschläge; mehrere mit Komma trennen",
 };

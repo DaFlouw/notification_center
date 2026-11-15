@@ -105,3 +105,33 @@ def test_freie_werte_ergeben_keine_auswahl() -> None:
     """
     assert available_states(domain="input_text", current_state="Paketbote") == []
     assert available_states(domain="input_datetime", current_state="2026-08-28 07:00:00") == []
+
+
+def test_messwerte_sind_keine_zustaende() -> None:
+    """Ein Sensor, der misst, bekommt keine Auswahl aus seinen Messwerten.
+
+    Aus der Historie einer Woche kamen hunderte Werte zurueck, und der Editor
+    zeichnete fuer jeden einen Knopf.
+    """
+    zustaende = available_states(
+        domain="sensor",
+        current_state="4.16",
+        attributes={"unit_of_measurement": "%"},
+        observed=["4.81", "4,11", "10", "-3.5", "1e3"],
+    )
+    assert zustaende == []
+
+
+def test_text_zwischen_messwerten_bleibt() -> None:
+    zustaende = available_states(
+        domain="sensor", current_state="21.5", observed=["20.9", "Salting", "21.0"]
+    )
+    assert zustaende == ["Salting"]
+
+
+def test_zahlen_aus_den_optionen_der_entity_bleiben() -> None:
+    """Was die Entity selbst als Auswahl nennt, ist ein Zustand, auch als Zahl."""
+    zustaende = available_states(
+        domain="select", current_state="2", attributes={"options": ["1", "2", "3"]}
+    )
+    assert zustaende == ["1", "2", "3"]

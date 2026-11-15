@@ -128,7 +128,7 @@ At the very bottom, if there are any, sits **Adopted, but without a rule**: enti
 
 Finds entities by type, name or entity ID and takes them into monitoring. The toggles narrow the list to monitored entities, to monitored ones without a rule, or to entities with a suggestion; the types present in your installation sit below as pills with their counts. Where there is a rule suggestion — and only there — you find *View suggestions*: the condition in building blocks, with the reason underneath.
 
-Fifty hits are loaded; *Load more* fetches the next ones. To remove an entity again, go to the page of its rules.
+*Adopt* leads straight into the editor for the first rule. Fifty hits are loaded; *Load more* fetches the next ones. To remove an entity again, go to the page of its rules.
 
 ![Discovery with a suggestion](docs/img/discovery.png)
 

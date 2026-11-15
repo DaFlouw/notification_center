@@ -389,6 +389,8 @@ function bedingungsKarte(bedingung, index, umfeld) {
  * statt tippen. Fuer ein Attribut passt das nicht -- welche Werte es annehmen
  * kann, weiss das Backend nicht (Issue 14) --, deshalb dort ein Textfeld.
  */
+export const KNOEPFE_BIS = 8;
+
 function wertfeld(bedingung, info, umfeld, kennung, feld, nr, stelle) {
   if (bedingung.kind === "numeric") {
     return `
@@ -412,6 +414,28 @@ function wertfeld(bedingung, info, umfeld, kennung, feld, nr, stelle) {
                    placeholder="${escapeHtml(attributWert(bedingung, info) ?? t("rules.statePlaceholder"))}"
                    aria-label="${t("common.state")}"
                    value="${escapeHtml((bedingung.states || []).join(", "))}">`;
+  }
+
+  // Knoepfe sind fuer eine Handvoll Zustaende gut. Eine Entity mit vielen --
+  // eine Auswahl mit dreissig Programmen -- bekommt ein Textfeld, das beim
+  // Tippen vorschlaegt; sonst steht statt einer Frage eine Wand da.
+  if (zustaende.length > KNOEPFE_BIS) {
+    const liste = `nc-zustaende-${stelle ? nr.replace(/\D/g, "") : "x"}`;
+    return `<input type="text" list="${liste}" ${feld}="states" ${nr}
+                   placeholder="${t("rules.statePlaceholder")}"
+                   aria-label="${t("common.state")}"
+                   value="${escapeHtml((bedingung.states || []).join(", "))}">
+            <datalist id="${liste}">
+              ${zustaende
+                .map(
+                  (zustand) =>
+                    `<option value="${escapeHtml(zustand)}">${escapeHtml(
+                      zustandsName(kennung, zustand, umfeld)
+                    )}</option>`
+                )
+                .join("")}
+            </datalist>
+            <span class="row-sub">${t("editor.manyStates", { count: zustaende.length })}</span>`;
   }
 
   return `

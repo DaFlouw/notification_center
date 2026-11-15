@@ -79,6 +79,17 @@ export function ohneVerneinung(bedingung) {
   return bedingung;
 }
 
+/**
+ * Ob eine Entity misst, statt einen Zustand zu haben.
+ *
+ * Erkannt am Wert selbst: eine Zahl. Geraeteklasse oder Einheit taugen dafuer
+ * nicht -- ein Helfer ohne Einheit misst genauso.
+ */
+export function istMesswert(stand) {
+  if (!stand || stand.state === "" || stand.state == null) return false;
+  return Number.isFinite(Number(stand.state));
+}
+
 function merkeAnsicht(ansicht) {
   try {
     localStorage.setItem(
@@ -703,7 +714,10 @@ class NotificationCenterPanel extends HTMLElement {
       }
 
       if (aktion === "new-rule") {
-        this.#rules.entwurf = leereRegel(this.#rules.entityId);
+        this.#rules.entwurf = leereRegel(
+          this.#rules.entityId,
+          istMesswert(this.#hass?.states?.[this.#rules.entityId])
+        );
         this.#render();
         return;
       }
@@ -837,7 +851,25 @@ class NotificationCenterPanel extends HTMLElement {
 
       if (aktion === "add-entity") {
         await api.addEntities(this.#hass, [daten.entity]);
-        await this.#ladeDiscovery();
+        // "Ohne Regel uebernehmen" am Vorschlag meint, was es sagt.
+        if (daten.stay) {
+          delete this.#discovery.suggestions[daten.entity];
+          await this.#ladeDiscovery();
+          return;
+        }
+        // Gleich weiter in den Editor: eine uebernommene Entity ohne Regel
+        // meldet nichts. Frueher blieb man in der Liste stehen, die Zeile
+        // sprang um, und dass noch ein zweiter Schritt fehlt, sagte niemand.
+        // Wer hier abbricht, findet die Entity auf der Seite ihrer Regeln
+        // und in der Uebersicht unter "ohne Regel".
+        await this.#ladeRegeln(daten.entity, daten.name);
+        if (this.#seite === "rule-editor") {
+          this.#rules.entwurf = leereRegel(
+            daten.entity,
+            istMesswert(this.#hass?.states?.[daten.entity])
+          );
+          this.#render();
+        }
         return;
       }
 

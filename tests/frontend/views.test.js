@@ -367,6 +367,8 @@ describe("Discovery", () => {
     assert.match(html, /<p class="why">Warum dieser Vorschlag: Geräteklasse: window<\/p>/);
     // Beide Antworten stehen am Vorschlag; die Zeile wiederholt sie nicht.
     assert.equal((html.match(/data-action="add-entity"/g) || []).length, 1);
+    // "Ohne Regel" bleibt in der Liste, statt in den Editor zu fuehren.
+    assert.match(html, /data-action="add-entity" data-stay="1"/);
     assert.match(html, /data-action="accept-suggestion"/);
   });
 
@@ -1488,3 +1490,39 @@ describe("Discovery: Zahlen und der zweite Knopf am Vorschlag", () => {
     assert.match(html, /class="suggestion"[\s\S]*data-action="add-entity"[^>]*>Ohne Regel übernehmen/);
   });
 });
+
+describe("Regel-Editor: viele Zustaende und Messwerte", () => {
+  const basis = (states, entwurf) => ({
+    entityId: "select.programm",
+    entityName: "Programm",
+    rules: [],
+    entwurf,
+    states,
+    attributes: [],
+  });
+  const VIELE = Array.from({ length: 30 }, (_, stelle) => `programm_${stelle}`);
+
+  it("zeichnet bis zu einer Handvoll Zustaende als Knoepfe", () => {
+    const html = renderRules(basis(["a", "b", "c"], leereRegel("select.programm")));
+    assert.equal((html.match(/data-action="toggle-state"/g) || []).length, 3);
+  });
+
+  it("bietet viele Zustaende als Textfeld mit Vorschlaegen an", () => {
+    const html = renderRules(basis(VIELE, leereRegel("select.programm")));
+
+    assert.ok(!html.includes('data-action="toggle-state"'));
+    assert.match(html, /<input type="text" list="nc-zustaende-x" data-rule-field="states"/);
+    assert.equal((html.match(/<option value="programm_/g) || []).length, 30);
+    assert.match(html, /30 bekannte Zustände/);
+  });
+
+  it("beginnt bei einer messenden Entity mit dem Zahlenvergleich", () => {
+    assert.equal(leereRegel("sensor.a", true).kind, "numeric");
+    assert.equal(leereRegel("sensor.a").kind, "state_is");
+
+    const html = renderRules(basis([], leereRegel("sensor.a", true)));
+    assert.match(html, /data-action="set-kind" data-value="numeric"\s+aria-pressed="true"/);
+    assert.match(html, /data-rule-field="threshold"/);
+  });
+});
+
