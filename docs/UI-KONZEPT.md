@@ -1,6 +1,6 @@
 # Gestaltungskonzept des Panels
 
-Stand: 1.5.0. Dieses Dokument beschreibt, wie das Panel aussieht und warum.
+Stand: 1.5.1. Dieses Dokument beschreibt, wie das Panel aussieht und warum.
 Es ist verbindlich: weicht die Umsetzung ab, ist die Umsetzung falsch oder
 dieses Dokument wird geändert – nicht stillschweigend eines von beiden.
 
@@ -228,7 +228,9 @@ aktuelle Wert, dann:
 - **überwacht** – das Kennzeichen »überwacht · n Regeln« (oder, in Gelb,
   »überwacht · keine Regel«) und der Verweis »Regeln«. Entfernt wird eine
   Entity von der Seite ihrer Regeln aus, nicht hier.
-- **nicht überwacht** – »Übernehmen«, umrandet. Davor, violett, »Vorschläge
+- **nicht überwacht** – »Übernehmen«, umrandet. Der Klick übernimmt die
+  Entity und führt gleich in den Editor ihrer ersten Regel: ohne Regel meldet
+  sie nichts, und das soll kein zweiter Schritt sein, den man erraten muss. Davor, violett, »Vorschläge
   ansehen« – **nur, wenn es welche gibt.**
 
 Ein geöffneter Vorschlag tönt die ganze Zeile violett. Darin je Vorschlag

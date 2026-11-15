@@ -257,7 +257,7 @@ loeschen` und `Entfernen` duerfen dabei folgenlos ausgeloest werden.
 | L32 | *Entity ersetzen* schickt beide Kennungen, ohne Leerzeichen |
 | L33 | Die Typ-Pille schickt `domain` mit, *Alle Typen* nimmt sie zurueck |
 | L34 | Das Suchfeld der Discovery fragt entprellt ab |
-| L35 | *Uebernehmen* meldet genau diese Entity zur Ueberwachung an |
+| L35 | *Uebernehmen* meldet die Entity an und fuehrt in den Editor ihrer ersten Regel |
 | L36 | *Entity entfernen* steht bei ihren Regeln, fragt nach und schickt die Entity |
 | L37 | *Vorschlaege ansehen* holt sie, derselbe Knopf klappt sie wieder ein |
 | L38 | Ein Vorschlag uebernimmt Entity und Regel in einem Zug |

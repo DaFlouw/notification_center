@@ -128,7 +128,7 @@ Von hier fuehrt **Bearbeiten** in den Editor, eine eigene Seite. Oben zeigt er d
 
 Findet Entities nach Typ, Name oder Entity-ID und uebernimmt sie in die Ueberwachung. Die Umschalter grenzen auf Ueberwachte, auf Ueberwachte ohne Regel oder auf Entities mit Vorschlag ein; die Typen der eigenen Anlage stehen als Pillen mit ihrer Anzahl darunter. Wo es einen Regelvorschlag gibt — und nur dort —, steht *Vorschlaege ansehen*: die Bedingung in Bausteinen, darunter die Begruendung.
 
-Geladen werden fuenfzig Treffer; *Weitere laden* holt die naechsten. Eine Entity wieder entfernen kannst du auf der Seite ihrer Regeln.
+*Uebernehmen* fuehrt gleich in den Editor der ersten Regel. Geladen werden fuenfzig Treffer; *Weitere laden* holt die naechsten. Eine Entity wieder entfernen kannst du auf der Seite ihrer Regeln.
 
 ![Discovery mit Vorschlag](docs/img/discovery.png)
 

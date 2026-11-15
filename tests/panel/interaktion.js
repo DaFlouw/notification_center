@@ -749,7 +749,7 @@ const FAELLE = [
   },
   {
     id: "L35",
-    titel: "'Uebernehmen' meldet genau diese Entity zur Ueberwachung an",
+    titel: "'Uebernehmen' meldet die Entity an und fuehrt in den Editor ihrer ersten Regel",
     async fn() {
       await seite("discovery");
       const knopf = element('[data-action="add-entity"]');
@@ -757,8 +757,13 @@ const FAELLE = [
       const ab = marke();
       knopf.click();
       await ruhe();
+      await bisSichtbar(".editor-head");
       gleich(letztes(ab, "add_entities").nachricht.entity_ids, [kennung], "entity_ids");
-      pruefe(letztes(ab, "discover"), "die Liste wurde nicht neu geladen");
+      pruefe(element(".editor-head .mono").textContent.includes(kennung), "Editor einer anderen Entity");
+      pruefe(!SR().querySelector('[data-action="delete-rule"]'), "es ist keine neue Regel");
+      const ab2 = marke();
+      await klick('[data-action="save-rule"]');
+      gleich(letztes(ab2, "save_rule").nachricht.rule.entity_id, kennung, "entity_id der Regel");
     },
   },
   {
