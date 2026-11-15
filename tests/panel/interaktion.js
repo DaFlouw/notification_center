@@ -1075,14 +1075,17 @@ const FAELLE = [
       const masse = [];
       for (const name of ["history", "rules", "discovery"]) {
         await seite(name);
+        // Gemessen ab der Oberkante des Panels, nicht des Fensters: wie weit
+        // gerade gerollt ist, hat mit dem Aufbau nichts zu tun.
+        const oben = P().getBoundingClientRect().top;
         const leiste = element(".filterbar").getBoundingClientRect();
         const suche = element(".filterbar .search").getBoundingClientRect();
         masse.push([
-          Math.round(leiste.top),
+          Math.round(leiste.top - oben),
           Math.round(leiste.height),
           Math.round(suche.left),
           Math.round(suche.width),
-          Math.round(element(".bar-bottom").getBoundingClientRect().top),
+          Math.round(element(".bar-bottom").getBoundingClientRect().top - oben),
         ]);
       }
       // Schmal brechen die Leisten um, und dann haengt die Hoehe vom Inhalt
@@ -1091,6 +1094,22 @@ const FAELLE = [
       const teil = (m) => (breit ? m : [m[0], m[2], m[3]]);
       gleich(teil(masse[1]), teil(masse[0]), "Regeln gegen Historie (oben, Hoehe, Suchfeld links, Breite, Zeile 2)");
       gleich(teil(masse[2]), teil(masse[0]), "Discovery gegen Historie");
+    },
+  },
+  {
+    id: "L70",
+    titel: "Der Seitengrund fuellt das Fenster, auch wenn ein Filter fast alles ausblendet",
+    async fn() {
+      await seite("dashboard");
+      await klick('[data-action="filter-dashboard"][data-type="alarm"]');
+      try {
+        pruefe(
+          P().getBoundingClientRect().height >= window.innerHeight,
+          "der Grund endet ueber dem unteren Fensterrand"
+        );
+      } finally {
+        await klick('[data-action="filter-dashboard"][data-type="alarm"]');
+      }
     },
   },
 

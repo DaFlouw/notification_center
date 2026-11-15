@@ -288,6 +288,7 @@ loeschen` und `Entfernen` duerfen dabei folgenlos ausgeloest werden.
 | L67 | Das Panel folgt dem Theme nur in hell und dunkel |
 | L68 | *Ohne Regel uebernehmen* am Vorschlag fuehrt ebenfalls in den Editor |
 | L69 | Die Filterleiste steht auf allen drei Seiten an derselben Stelle |
+| L70 | Der Seitengrund fuellt das Fenster, auch wenn ein Filter fast alles ausblendet |
 
 **L46 gehoert an die Anlage.** Der Pruefstand zeigt, *was* die Oberflaeche
 abschickt; ob das Backend es annimmt, zeigt nur die laufende Instanz. Die in
