@@ -18,7 +18,7 @@ import { before, describe, it } from "node:test";
 import { setzeSprache } from "../../custom_components/notification_center/frontend/i18n.js";
 import { escapeHtml, formatDuration, sourceBadge, typeLabel } from "../../custom_components/notification_center/frontend/format.js";
 import { renderDashboard } from "../../custom_components/notification_center/frontend/views/dashboard.js";
-import { renderDiscovery } from "../../custom_components/notification_center/frontend/views/discovery.js";
+import { renderDiscovery, typPillen } from "../../custom_components/notification_center/frontend/views/discovery.js";
 import {
   KUERZEN_AB,
   LISTE_AB,
@@ -1523,6 +1523,80 @@ describe("Regel-Editor: viele Zustaende und Messwerte", () => {
     const html = renderRules(basis([], leereRegel("sensor.a", true)));
     assert.match(html, /data-action="set-kind" data-value="numeric"\s+aria-pressed="true"/);
     assert.match(html, /data-rule-field="threshold"/);
+  });
+});
+
+describe("Filterleiste: gleich auf allen drei Seiten", () => {
+  const leisten = () => [
+    renderHistory({ events: [], total: 0, filter: { ...LEERER_FILTER } }, "de"),
+    renderRuleOverview({ entities: ENTITIES, rules: RULES }),
+    renderDiscovery({ entities: [], suggestions: {}, domainCounts: { sensor: 5 }, statusCounts: { all: 5 } }),
+  ];
+
+  it("hat ueberall dieselben vier Plaetze", () => {
+    for (const html of leisten()) {
+      assert.match(html, /class="card pad filterbar"/);
+      const top = html.indexOf('class="bar-top"');
+      const side = html.indexOf('class="bar-side"');
+      const filters = html.indexOf('class="bar-filters"');
+      const meta = html.indexOf('class="bar-meta"');
+      assert.ok(top > 0 && top < side && side < filters && filters < meta, "Reihenfolge der Plaetze");
+      // Das Suchfeld ist das erste Kind der ersten Zeile.
+      assert.match(html, /class="bar-top">\s*<label class="search">/);
+    }
+  });
+
+  it("nennt rechts unten ueberall die Anzahl", () => {
+    for (const html of leisten()) {
+      assert.match(html, /class="bar-meta">\s*<span>\d+ von \d+<\/span>/);
+    }
+  });
+
+  it("fuehrt die Nebenaktion als leisen Knopf an derselben Stelle", () => {
+    const [historie, regeln] = leisten();
+    assert.match(historie, /class="btn quiet danger" data-action="clear-history"/);
+    assert.match(regeln, /class="btn quiet" data-action="collapse-all-rules"/);
+  });
+
+  it("kennt nur noch eine Art Umschalter", () => {
+    for (const html of leisten()) assert.ok(!html.includes("segmented view"));
+  });
+});
+
+describe("Typ-Pillen der Discovery springen nicht", () => {
+  const anfang = typPillen(null, { sensor: 1155, light: 83, switch: 153 });
+
+  it("ordnet beim ersten Mal nach Haeufigkeit", () => {
+    assert.deepEqual(anfang.order, ["sensor", "switch", "light"]);
+    assert.deepEqual(anfang.widths, { sensor: 4, switch: 3, light: 2 });
+  });
+
+  it("behaelt Reihenfolge und Breite, wenn die Zahlen sich aendern", () => {
+    // Beim Suchen: Licht ueberholt Sensor, Schalter faellt auf null.
+    const danach = typPillen(anfang, { sensor: 2, light: 40 });
+    assert.deepEqual(danach.order, ["sensor", "switch", "light"]);
+    assert.deepEqual(danach.widths, { sensor: 4, switch: 3, light: 2 });
+  });
+
+  it("haengt einen neuen Typ hinten an", () => {
+    const danach = typPillen(anfang, { sensor: 2, climate: 15 });
+    assert.deepEqual(danach.order, ["sensor", "switch", "light", "climate"]);
+  });
+
+  it("zeichnet in dieser Reihenfolge, mit fester Zahlenbreite und ohne Luecke", () => {
+    const html = renderDiscovery({
+      entities: [],
+      suggestions: {},
+      domainCounts: { sensor: 2, light: 40 },
+      domainOrder: anfang.order,
+      domainWidths: anfang.widths,
+    });
+    const stelle = (domaene) => html.indexOf(`data-domain="${domaene}"`);
+    assert.ok(stelle("sensor") < stelle("switch") && stelle("switch") < stelle("light"));
+    assert.match(html, /<span class="num" style="min-width: 4ch">2<\/span>/);
+    // Ein Typ ohne Treffer bleibt stehen, blass.
+    assert.match(html, /class="btn filter plain none" data-action="set-domain" data-domain="switch"/);
+    assert.match(html, /<span class="num" style="min-width: 3ch">0<\/span>/);
   });
 });
 

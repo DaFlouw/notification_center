@@ -5,7 +5,7 @@ Es ist verbindlich: weicht die Umsetzung ab, ist die Umsetzung falsch oder
 dieses Dokument wird geändert – nicht stillschweigend eines von beiden.
 
 Dafür sorgen zwei Tests. `tests/frontend/konzept.test.js` vergleicht die
-Palette hier mit `styles.js` und läuft bei jedem Push. Die Fälle H1 bis H71 des
+Palette hier mit `styles.js` und läuft bei jedem Push. Die Fälle H1 bis H75 des
 Prüfstands (`tests/panel/index.html`) messen im Browser an den gezeichneten
 Elementen nach, hell und dunkel. Beide lesen dieselbe Quelle,
 `tests/panel/konzept.js`; die beiden Tabellen unten werden daraus erzeugt
@@ -121,9 +121,15 @@ bleibt in beiden Modi weiß.
   alles Übrige. Violett (`special-chip`) nur für Vorschläge.
 - **Verweis** – blau ohne Unterstreichung, für Wege zu einer anderen Ansicht
   (»Regeln«, »Bearbeiten«).
-- **Umschalter** – zwei Spielarten. *Was* man sieht (Zeitraum, Status, Alle):
-  die Wahl dunkel gefüllt. *Wie* man es sieht (Karten oder Liste, nach Raum
-  oder Typ): die Wahl nur weiß angehoben.
+- **Umschalter** – die Wahl ist dunkel gefüllt, überall. Dasselbe gilt für
+  »Alle …« unter den Filterpillen.
+- **Filterleiste** – Historie, Regeln und Discovery tragen dieselbe, damit
+  beim Seitenwechsel nichts springt. Zeile 1: links das Suchfeld, immer genau
+  die halbe Breite; rechts, rechtsbündig, die Umschalter. Zeile 2: links die
+  Filter, rechts »n von m« und die eine Nebenaktion als leiser Textknopf.
+  Alles in Zeile 2 ist 36 px hoch. Eine Pille mit Zahl behält Platz und
+  Breite, auch wenn die Zahl sich beim Suchen ändert; ein Typ ohne Treffer
+  bleibt blass stehen, statt zu verschwinden.
 - **Suchfeld** – Pille mit Lupe auf `subtle`, ohne Rahmen.
 - **Symbole** – Leuchte für Alarm, Dreieck für Warnung, Kreis mit i für Info.
 
@@ -158,11 +164,12 @@ aktivieren«. Laufende Einträge lassen sich nicht löschen.
 Die Filterkarte der Umsetzung gilt, nicht die des ersten Entwurfs:
 
 - Suchfeld über Regel, Entity und Raum;
-- Darstellung »Karten | Liste« und Gliederung »Nach Raum | Nach Typ« als leise
-  Umschalter, daneben »Alle einklappen«;
+- Darstellung »Karten | Liste« und Gliederung »Nach Raum | Nach Typ« als
+  Umschalter rechts in Zeile 1;
 - darunter die Filter als Pillen in der Farbe dessen, was sie zeigen: Alle,
   Alarm, Warnung, Info, Verknüpft, Abgeschaltet – jeweils mit Anzahl, und nur,
-  wenn es etwas zu zeigen gibt.
+  wenn es etwas zu zeigen gibt; rechts daneben »n von m« und »Alle
+  einklappen«.
 
 Darunter:
 
@@ -284,7 +291,7 @@ mit ihrem Namen aus der Palette da und wird hell und dunkel geprüft.
 | H23 | Historie | Pille Info | background-color: `info-chip` · color: `info-ink` |
 | H24 | Historie | deaktivierter Eintrag | outline-style: `dashed` · outline-color: `dashed` |
 | H25 | Historie | Knopf Wieder aktivieren | background-color: `accent-chip` · color: `accent-ink` |
-| H26 | Regeln | gewählte Darstellung | background-color: `surface` · color: `text` |
+| H26 | Regeln | gewählte Darstellung | background-color: `selected` · color: `on-selected` · min-height: `36px` |
 | H27 | Regeln | Filter Alle, gewählt | background-color: `selected` · color: `on-selected` · min-height: `36px` |
 | H28 | Regeln | Filter Alarm | background-color: `alarm-chip` · color: `alarm-ink` |
 | H29 | Regeln | Filter Warnung | background-color: `warning-chip` · color: `warning-ink` |
@@ -301,7 +308,7 @@ mit ihrem Namen aus der Palette da und wird hell und dunkel geprüft.
 | H40 | Regeln | angeheftete Zeile, Alarm | background-color: `alarm-soft` |
 | H41 | Regeln | Punkt Alarm | background-color: `alarm` · width: `10px` |
 | H42 | Discovery | gewählter Status | background-color: `selected` · color: `on-selected` |
-| H43 | Discovery | Typ, gewählt | background-color: `accent-chip` · color: `accent-ink` · min-height: `36px` |
+| H43 | Discovery | Typ, gewählt | background-color: `selected` · color: `on-selected` · min-height: `36px` |
 | H44 | Discovery | Typ, nicht gewählt | background-color: `surface` · border-top-color: `control` · color: `text` · font-weight: `400` |
 | H45 | Discovery | Kennzeichen überwacht | background-color: `ok-chip` · color: `ok-ink` |
 | H46 | Discovery | Wert der Entity | background-color: `subtle` · font-weight: `500` |
@@ -330,6 +337,10 @@ mit ihrem Namen aus der Palette da und wird hell und dunkel geprüft.
 | H69 | Regel-Editor | Platzhalter-Knopf | background-color: `subtle` · min-height: `32px` · font-size: `13px` |
 | H70 | Regel-Editor | Knopf Regel löschen | color: `alarm-ink` · background-color: `rgba(0, 0, 0, 0)` |
 | H71 | Dashboard | Kennzeichen Systemnachricht | background-color: `special-pill` · color: `special-ink` · font-size: `11px` |
+| H72 | Historie | Auswahlfeld der Leiste | min-height: `36px` · border-top-color: `control` |
+| H73 | Historie | Nebenaktion Alle löschen | min-height: `36px` · background-color: `rgba(0, 0, 0, 0)` · color: `alarm-ink` |
+| H74 | Regeln | Nebenaktion Alle einklappen | min-height: `36px` · background-color: `rgba(0, 0, 0, 0)` · color: `link` |
+| H75 | Discovery | Anzahl in der Leiste | color: `muted` · font-size: `13px` · min-height: `36px` |
 <!-- MASSE:ENDE -->
 
 ## 8 Änderungen gegenüber dem ersten Entwurf

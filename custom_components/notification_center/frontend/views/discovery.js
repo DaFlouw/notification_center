@@ -29,17 +29,20 @@ export function renderDiscovery(state) {
     domainCounts = {},
     statusCounts = {},
     allDomains = false,
+    domainOrder = null,
+    domainWidths = {},
   } = state;
 
   return `
-    <section class="card pad" aria-label="${t("discovery.filterLabel")}">
-      <div class="filters">
-<label class="search">
+    <section class="card pad filterbar" aria-label="${t("discovery.filterLabel")}">
+      <div class="bar-top">
+        <label class="search">
           ${icon("search", 18)}
           <input type="search" data-discovery="search" placeholder="${t("discovery.searchPlaceholder")}"
                  value="${escapeHtml(search)}" aria-label="${t("history.search")}">
         </label>
 
+        <div class="bar-side">
         <div class="segmented" role="group" aria-label="${t("discovery.statusLabel")}">
           ${STATUS.filter(
             // Ein Umschalter, hinter dem nichts steht, ist nur Laerm. Die
@@ -58,9 +61,20 @@ export function renderDiscovery(state) {
             )
             .join("")}
         </div>
+        </div>
       </div>
 
-      ${schnellwahl(domainCounts, domain, allDomains)}
+      <div class="bar-bottom">
+        ${schnellwahl(domainCounts, domain, allDomains, domainOrder, domainWidths)}
+        ${
+          Number.isFinite(statusCounts[status])
+            ? `<div class="bar-meta"><span>${t("history.shownOfTotal", {
+                shown: entities.length,
+                total: statusCounts[status],
+              })}</span></div>`
+            : ""
+        }
+      </div>
     </section>
 
     ${loading ? `<div class="loading">${t("common.loading")}</div>` : ""}
@@ -117,11 +131,17 @@ function weitere(gezeigt, gesamt) {
  * keiner wusste, welches gilt. Gezeigt werden zuerst die haeufigsten; der
  * Rest klappt auf Wunsch dazu. Was es hier nicht gibt, wird nicht angeboten.
  */
-function schnellwahl(domainCounts, domain, alle) {
-  const vorhanden = Object.entries(domainCounts || {})
-    .filter(([, anzahl]) => anzahl > 0)
-    .sort(([, a], [, b]) => b - a);
-  if (!vorhanden.length) return "";
+function schnellwahl(domainCounts, domain, alle, reihenfolge = null, breiten = {}) {
+  const zahlen = domainCounts || {};
+  // Die Reihenfolge kommt vom Panel und bleibt stehen, solange man auf der
+  // Seite ist. Nach Haeufigkeit *jetzt* zu sortieren hiesse: bei jedem
+  // getippten Buchstaben wuerfeln die Pillen neu.
+  const vorhanden = reihenfolge
+    ? reihenfolge.map((domaene) => [domaene, zahlen[domaene] || 0])
+    : Object.entries(zahlen)
+        .filter(([, anzahl]) => anzahl > 0)
+        .sort(([, a], [, b]) => b - a);
+  if (!vorhanden.length) return `<div class="bar-filters"></div>`;
 
   const sichtbar = alle ? vorhanden : vorhanden.slice(0, SCHNELLWAHL);
   // Der gewaehlte Typ bleibt sichtbar, auch wenn er zu den seltenen gehoert.
@@ -130,21 +150,25 @@ function schnellwahl(domainCounts, domain, alle) {
   const uebrig = vorhanden.length - sichtbar.length;
 
   return `
-    <div class="filters tight" role="group" aria-label="${t("discovery.entityType")}">
+    <div class="bar-filters" role="group" aria-label="${t("discovery.entityType")}">
       <button class="btn filter plain" data-action="set-domain" data-domain=""
               aria-pressed="${domain === ""}">${t("discovery.allTypes")}</button>
       ${sichtbar
         .map(
           ([domaene, anzahl]) =>
-            `<button class="btn filter plain" data-action="set-domain" data-domain="${escapeHtml(domaene)}"
+            // Die Zahl haelt die Breite ihrer groessten Fassung: sinkt sie
+            // beim Suchen von 1155 auf 3, bleibt die Pille, wo sie ist.
+            `<button class="btn filter plain${anzahl ? "" : " none"}" data-action="set-domain" data-domain="${escapeHtml(domaene)}"
                      aria-pressed="${domain === domaene}">${escapeHtml(
                        t(`discovery.domain.${domaene}`)
-                     )} <span class="row-sub">${anzahl}</span></button>`
+                     )} <span class="num" style="min-width: ${
+                       Number(breiten[domaene]) || String(anzahl).length
+                     }ch">${anzahl}</span></button>`
         )
         .join("")}
       ${
         uebrig > 0 || alle
-          ? `<button class="link" data-action="toggle-domains" aria-expanded="${Boolean(alle)}">${
+          ? `<button class="btn quiet" data-action="toggle-domains" aria-expanded="${Boolean(alle)}">${
               alle ? t("discovery.fewerTypes") : t("discovery.moreTypes", { count: uebrig })
             }</button>`
           : ""
@@ -153,7 +177,30 @@ function schnellwahl(domainCounts, domain, alle) {
   `;
 }
 
-/** Gruppiert nach Bereich; was keinem zugeordnet ist, steht am Ende. */
+/**
+ * Schreibt die Reihenfolge und die Zahlenbreiten der Typ-Pillen fort.
+ *
+ * ``bisher`` ist der Stand vor dieser Antwort. Beim ersten Mal entsteht die
+ * Reihenfolge aus der Haeufigkeit; danach kommen neue Typen nur noch hinten
+ * dazu, und keine Pille wechselt mehr den Platz. Die Breite einer Zahl
+ * waechst mit, schrumpft aber nie.
+ */
+export function typPillen(bisher, domainCounts) {
+  const zahlen = domainCounts || {};
+  const order = [...(bisher?.order || [])];
+  const neu = Object.entries(zahlen)
+    .filter(([domaene, anzahl]) => anzahl > 0 && !order.includes(domaene))
+    .sort(([, a], [, b]) => b - a)
+    .map(([domaene]) => domaene);
+  order.push(...neu);
+
+  const widths = { ...(bisher?.widths || {}) };
+  for (const domaene of order) {
+    widths[domaene] = Math.max(widths[domaene] || 1, String(zahlen[domaene] || 0).length);
+  }
+  return { order, widths };
+}
+
 function nachBereich(entities) {
   const ohne = t("rules.noArea");
   const gruppen = new Map();

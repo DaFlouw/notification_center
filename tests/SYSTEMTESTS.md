@@ -287,6 +287,7 @@ loeschen` und `Entfernen` duerfen dabei folgenlos ausgeloest werden.
 | L66 | Im Editor: ein Platzhalter-Knopf haengt ihn an den Meldungstext |
 | L67 | Das Panel folgt dem Theme nur in hell und dunkel |
 | L68 | *Ohne Regel uebernehmen* am Vorschlag fuehrt ebenfalls in den Editor |
+| L69 | Die Filterleiste steht auf allen drei Seiten an derselben Stelle |
 
 **L46 gehoert an die Anlage.** Der Pruefstand zeigt, *was* die Oberflaeche
 abschickt; ob das Backend es annimmt, zeigt nur die laufende Instanz. Die in
@@ -389,6 +390,7 @@ stehen in `docs/UI-KONZEPT.md`, Abschnitt 7, und pruefbar in
 | H42 -- H52 | Discovery | Status, Typ-Pillen, Kennzeichen, Knoepfe, offener Vorschlag |
 | H53 -- H70 | Regel-Editor | Ablauf, Schritte, Bedingungen, Auswahlknoepfe, Typwahl |
 | H71 | Dashboard | Kennzeichen der Systemnachricht |
+| H72 -- H75 | Filterleiste | Auswahlfeld, Nebenaktion, Anzahl |
 
 Dazu laeuft in der CI `tests/frontend/konzept.test.js`: die Palette im
 Konzept, in `konzept.js` und im Stylesheet muss dieselbe sein, und das

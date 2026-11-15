@@ -39,24 +39,27 @@ export function renderHistory(state, locale) {
   const bereichsnamen = Object.fromEntries(areas.map((bereich) => [bereich.area_id, bereich.name]));
 
   return `
-    <section class="card pad" aria-label="${t("history.filterLabel")}">
-      <div class="filters">
+    <section class="card pad filterbar" aria-label="${t("history.filterLabel")}">
+      <div class="bar-top">
         <label class="search">
           ${icon("search", 18)}
           <input type="search" data-filter="suche" placeholder="${t("history.search")}"
                  value="${escapeHtml(filter.search)}" aria-label="${t("history.search")}">
         </label>
 
-        <div class="segmented" role="group" aria-label="${t("history.period")}">
-          ${ZEITRAEUME.map(
-            (z) =>
-              `<button data-action="set-period" data-value="${z.wert}"
-                       aria-pressed="${filter.zeitraum === z.wert}">${t(z.schluessel)}</button>`
-          ).join("")}
+        <div class="bar-side">
+          <div class="segmented" role="group" aria-label="${t("history.period")}">
+            ${ZEITRAEUME.map(
+              (z) =>
+                `<button data-action="set-period" data-value="${z.wert}"
+                         aria-pressed="${filter.zeitraum === z.wert}">${t(z.schluessel)}</button>`
+            ).join("")}
+          </div>
         </div>
       </div>
 
-      <div class="filters">
+      <div class="bar-bottom">
+        <div class="bar-filters">
         <select data-filter="typ" aria-label="${t("history.type")}">
           <option value="">${t("history.allTypes")}</option>
           <option value="info" ${filter.types[0] === "info" ? "selected" : ""}>${t("type.info")}</option>
@@ -92,9 +95,11 @@ export function renderHistory(state, locale) {
           ).join("")}
         </select>
 
-        <span class="spacer"></span>
-        <span class="row-sub">${t("history.shownOfTotal", { shown: events.length, total })}</span>
-        <button class="btn danger" data-action="clear-history">${t("history.clearAll")}</button>
+        </div>
+        <div class="bar-meta">
+          <span>${t("history.shownOfTotal", { shown: events.length, total })}</span>
+          <button class="btn quiet danger" data-action="clear-history">${t("history.clearAll")}</button>
+        </div>
       </div>
     </section>
 

@@ -163,44 +163,50 @@ export function renderRuleOverview(state) {
   const alleZu = abschnitte.length > 0 && abschnitte.every((a) => istZu(a, zustand, meldend));
 
   return `
-    <section class="card pad" aria-label="${t("rules.filterLabel")}">
-      <div class="filters">
+    <section class="card pad filterbar" aria-label="${t("rules.filterLabel")}">
+      <div class="bar-top">
         <label class="search">
           ${icon("search", 18)}
           <input type="search" data-rule-search placeholder="${t("rules.searchPlaceholder")}"
                  value="${escapeHtml(search)}" aria-label="${t("rules.searchPlaceholder")}">
         </label>
 
-        <div class="segmented view" role="group" aria-label="${t("rules.densityLabel")}">
-          <button data-action="set-rule-density" data-value="cards"
-                  aria-pressed="${!dicht}">${t("rules.densityCards")}</button>
-          <button data-action="set-rule-density" data-value="list"
-                  aria-pressed="${dicht}">${t("rules.densityList")}</button>
-        </div>
+        <div class="bar-side">
+          <div class="segmented" role="group" aria-label="${t("rules.densityLabel")}">
+            <button data-action="set-rule-density" data-value="cards"
+                    aria-pressed="${!dicht}">${t("rules.densityCards")}</button>
+            <button data-action="set-rule-density" data-value="list"
+                    aria-pressed="${dicht}">${t("rules.densityList")}</button>
+          </div>
 
-        <div class="segmented view" role="group" aria-label="${t("rules.groupLabel")}">
-          <button data-action="set-rule-group" data-value="room"
-                  aria-pressed="${group !== "type"}">${t("rules.groupRoom")}</button>
-          <button data-action="set-rule-group" data-value="type"
-                  aria-pressed="${group === "type"}">${t("rules.groupType")}</button>
+          <div class="segmented" role="group" aria-label="${t("rules.groupLabel")}">
+            <button data-action="set-rule-group" data-value="room"
+                    aria-pressed="${group !== "type"}">${t("rules.groupRoom")}</button>
+            <button data-action="set-rule-group" data-value="type"
+                    aria-pressed="${group === "type"}">${t("rules.groupType")}</button>
+          </div>
         </div>
-
-        <button class="btn" data-action="collapse-all-rules"
-                data-value="${alleZu ? "open" : "close"}">${
-                  alleZu ? t("rules.expandAll") : t("rules.collapseAll")
-                }</button>
       </div>
 
-      <div class="filters" role="group" aria-label="${t("rules.filterLabel")}">
-        ${REGEL_FILTER.filter((wert) => wert === "all" || anzahl[wert] > 0)
-          .map(
-            (wert) =>
-              `<button class="btn filter ${wert}" data-action="set-rule-filter" data-value="${wert}"
-                       aria-pressed="${filter === wert}">${t(`rules.filter.${wert}`, {
-                         count: anzahl[wert],
-                       })}</button>`
-          )
-          .join("")}
+      <div class="bar-bottom">
+        <div class="bar-filters" role="group" aria-label="${t("rules.filterLabel")}">
+          ${REGEL_FILTER.filter((wert) => wert === "all" || anzahl[wert] > 0)
+            .map(
+              (wert) =>
+                `<button class="btn filter ${wert}" data-action="set-rule-filter" data-value="${wert}"
+                         aria-pressed="${filter === wert}">${t(`rules.filter.${wert}`, {
+                           count: anzahl[wert],
+                         })}</button>`
+            )
+            .join("")}
+        </div>
+        <div class="bar-meta">
+          <span>${t("history.shownOfTotal", { shown: sichtbar.length, total: rules.length })}</span>
+          <button class="btn quiet" data-action="collapse-all-rules"
+                  data-value="${alleZu ? "open" : "close"}">${
+                    alleZu ? t("rules.expandAll") : t("rules.collapseAll")
+                  }</button>
+        </div>
       </div>
     </section>
 

@@ -521,12 +521,33 @@ sheet.replaceSync(`
     white-space: nowrap;
   }
 
+  /* Eine Art zu waehlen, ueberall: dunkel gefuellt. */
   .segmented button[aria-pressed="true"] { background: var(--nc-selected); color: var(--nc-on-selected); }
 
-  /* Die leise Spielart fuer die Darstellung -- Karten oder Liste, nach Raum
-     oder Typ. Sie aendert, wie man sieht, nicht was; deshalb hebt sie die
-     Wahl nur an, statt sie zu schwaerzen. */
-  .segmented.view button[aria-pressed="true"] { background: var(--nc-surface); color: var(--nc-text); }
+  /* -- Filterleiste --------------------------------------------------- */
+
+  /* Historie, Regeln und Discovery tragen dieselbe Leiste: gleiche Plaetze,
+     gleiche Hoehen. Beim Seitenwechsel aendert sich nur der Inhalt.
+
+     Zeile 1: das Suchfeld, immer genau die halbe Breite, daneben
+     rechtsbuendig die Umschalter. Zeile 2: links die Filter, rechts die
+     Anzahl und die eine Nebenaktion -- alles 36 px hoch. */
+  .bar-top { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: center; gap: 12px; }
+  .bar-top .search { min-width: 0; }
+  .bar-side { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; }
+  .bar-bottom { display: flex; align-items: flex-start; gap: 12px; min-height: 36px; }
+  .bar-filters { display: flex; flex: 1; flex-wrap: wrap; align-items: center; gap: 6px; min-width: 0; }
+  .bar-filters select { min-height: 36px; }
+  .bar-meta { display: flex; flex: none; align-items: center; gap: 4px; min-height: 36px; color: var(--nc-muted); font-size: 13px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+  /* Die Nebenaktion der Leiste: ein leiser Textknopf. */
+  .btn.quiet { min-height: 36px; padding: 0 14px; border-color: transparent; background: transparent; color: var(--nc-link); }
+  .btn.quiet.danger { color: var(--nc-alarm-ink); }
+
+  /* Die Zahl an einer Pille: feste Breite, damit die Pille nicht springt,
+     wenn sich die Zahl beim Suchen aendert. */
+  .btn.filter .num { display: inline-block; color: var(--nc-muted); font-variant-numeric: tabular-nums; text-align: left; }
+  .btn.filter.none { opacity: 0.5; }
 
   /* -- Eingaben ------------------------------------------------------- */
 
@@ -692,11 +713,13 @@ sheet.replaceSync(`
   .btn.filter.plain, .btn.filter.disabled { border-color: var(--nc-control); background: var(--nc-surface); font-weight: 400; }
   .btn.filter.plain[aria-pressed="true"] {
     border-color: transparent;
-    background: var(--nc-accent-chip);
-    color: var(--nc-accent-ink);
+    background: var(--nc-selected);
+    color: var(--nc-on-selected);
     font-weight: 500;
     outline: none;
+    opacity: 1;
   }
+  .btn.filter.plain[aria-pressed="true"] .num { color: inherit; }
   .btn.filter.alarm { background: var(--nc-alarm-chip); color: var(--nc-alarm-ink); }
   .btn.filter.warning { background: var(--nc-warning-chip); color: var(--nc-warning-ink); }
   .btn.filter.info { background: var(--nc-info-chip); color: var(--nc-info-ink); }
@@ -903,6 +926,12 @@ sheet.replaceSync(`
 
   @media (prefers-reduced-motion: reduce) {
     .toggle .chevron { transition: none; }
+  }
+
+  @media (max-width: 760px) {
+    .bar-top { grid-template-columns: minmax(0, 1fr); }
+    .bar-side { justify-content: flex-start; }
+    .bar-bottom { flex-wrap: wrap; }
   }
 
   @media (max-width: 600px) {
