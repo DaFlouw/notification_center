@@ -20,10 +20,12 @@ import { renderEditor } from "./editor.js";
 
 const OPERATOREN = ["gt", "gte", "lt", "lte", "eq"];
 
-export function leereRegel(entityId) {
+export function leereRegel(entityId, numerisch = false) {
   return {
     entity_id: entityId,
-    kind: "state_is",
+    // Eine Entity, die misst, beginnt beim Zahlenvergleich: "groesser als"
+    // ist dort die Frage, nicht "ist genau".
+    kind: numerisch ? "numeric" : "state_is",
     type: "warning",
     states: [],
     operator: "gt",

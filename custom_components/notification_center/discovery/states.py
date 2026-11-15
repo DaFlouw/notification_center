@@ -129,9 +129,24 @@ def available_states(
     # 2. Der Katalog der Domaene.
     hinzu(DOMAIN_STATES.get(domain, ()))
 
-    # 3. Beobachtetes, das die ersten beiden Quellen nicht kennen.
+    # 3. Beobachtetes, das die ersten beiden Quellen nicht kennen -- aber
+    #    keine Zahlen. Ein Sensor, der Prozent oder Grad misst, hat in einer
+    #    Woche hunderte verschiedene Werte gezeigt; als Auswahl waeren sie
+    #    eine Wand aus Knoepfen, und "ist genau 4,81 %" will niemand. Fuer
+    #    Messwerte gibt es den Zahlenvergleich. Zahlen, die die Entity selbst
+    #    als Auswahl nennt (Stufe "1", "2", "3"), kommen aus Quelle 1 und
+    #    bleiben.
     if current_state is not None:
-        hinzu([current_state])
-    hinzu(observed)
+        hinzu(wert for wert in [current_state] if not _ist_zahl(wert))
+    hinzu(wert for wert in observed if not _ist_zahl(wert))
 
     return ergebnis
+
+
+def _ist_zahl(wert: Any) -> bool:
+    """Ob ein beobachteter Zustand ein Messwert ist."""
+    try:
+        float(str(wert).replace(",", "."))
+    except ValueError:
+        return False
+    return True

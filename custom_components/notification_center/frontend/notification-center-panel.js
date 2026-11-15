@@ -79,6 +79,17 @@ export function ohneVerneinung(bedingung) {
   return bedingung;
 }
 
+/**
+ * Ob eine Entity misst, statt einen Zustand zu haben.
+ *
+ * Erkannt am Wert selbst: eine Zahl. Geraeteklasse oder Einheit taugen dafuer
+ * nicht -- ein Helfer ohne Einheit misst genauso.
+ */
+export function istMesswert(stand) {
+  if (!stand || stand.state === "" || stand.state == null) return false;
+  return Number.isFinite(Number(stand.state));
+}
+
 function merkeAnsicht(ansicht) {
   try {
     localStorage.setItem(
@@ -703,7 +714,10 @@ class NotificationCenterPanel extends HTMLElement {
       }
 
       if (aktion === "new-rule") {
-        this.#rules.entwurf = leereRegel(this.#rules.entityId);
+        this.#rules.entwurf = leereRegel(
+          this.#rules.entityId,
+          istMesswert(this.#hass?.states?.[this.#rules.entityId])
+        );
         this.#render();
         return;
       }

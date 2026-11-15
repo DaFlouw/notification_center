@@ -325,4 +325,5 @@ export default {
   "discovery.moreTypes": "{count} tipos más",
   "discovery.fewerTypes": "Menos tipos",
   "rules.removeEntity": "Quitar entidad",
+  "editor.manyStates": "{count} estados conocidos: escribe para ver sugerencias; separa varios con comas",
 };
