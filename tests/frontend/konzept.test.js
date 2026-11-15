@@ -93,6 +93,13 @@ describe("Konzept: Palette", () => {
     }
   });
 
+  it("zieht den Grund ueber die ganze Fensterhoehe", () => {
+    // Mit ``min-height: 100%`` endete er kurz unter dem Inhalt.
+    const host = STYLES.slice(STYLES.indexOf("  :host {"), STYLES.indexOf("  :host([dark])"));
+    assert.match(host, /min-height: 100vh;/);
+    assert.match(host, /background: var\(--nc-ground\);/);
+  });
+
   it("setzt das Attribut fuer den Dunkelmodus aus dem Theme", () => {
     const panel = lies(`${FRONTEND}notification-center-panel.js`);
     assert.match(panel, /toggleAttribute\("dark", Boolean\(hass\?\.themes\?\.darkMode\)\)/);

@@ -82,7 +82,11 @@ sheet.replaceSync(`
     --nc-radius-row: 14px;
 
     display: block;
-    min-height: 100%;
+    /* Die ganze Hoehe des Fensters, nicht nur die des Inhalts: sonst endet
+       der Grund kurz unter der letzten Karte und springt mit jedem Filter.
+       Prozent taugt hier nicht -- das umgebende Element hat keine Hoehe. */
+    box-sizing: border-box;
+    min-height: 100vh;
     background: var(--nc-ground);
     color: var(--nc-text);
     font-family: Roboto, system-ui, sans-serif;
