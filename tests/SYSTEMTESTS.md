@@ -286,6 +286,7 @@ loeschen` und `Entfernen` duerfen dabei folgenlos ausgeloest werden.
 | L65 | Im Editor: *eine genuegt* und der Typ wandern in die Regel |
 | L66 | Im Editor: ein Platzhalter-Knopf haengt ihn an den Meldungstext |
 | L67 | Das Panel folgt dem Theme nur in hell und dunkel |
+| L68 | *Ohne Regel uebernehmen* am Vorschlag fuehrt ebenfalls in den Editor |
 
 **L46 gehoert an die Anlage.** Der Pruefstand zeigt, *was* die Oberflaeche
 abschickt; ob das Backend es annimmt, zeigt nur die laufende Instanz. Die in
