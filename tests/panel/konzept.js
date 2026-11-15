@@ -153,8 +153,8 @@ export const MASSE = [
     soll: { "background-color": "accent-chip", color: "accent-ink" } },
 
   // -- Regeln -------------------------------------------------------------
-  { id: "H26", seite: "rules", was: "gewählte Darstellung", auswahl: '.segmented.view button[aria-pressed="true"]',
-    soll: { "background-color": "surface", color: "text" } },
+  { id: "H26", seite: "rules", was: "gewählte Darstellung", auswahl: '.segmented button[aria-pressed="true"]',
+    soll: { "background-color": "selected", color: "on-selected", "min-height": "36px" } },
   { id: "H27", seite: "rules", was: "Filter Alle, gewählt", auswahl: '.btn.filter.all[aria-pressed="true"]',
     soll: { "background-color": "selected", color: "on-selected", "min-height": "36px" } },
   { id: "H28", seite: "rules", was: "Filter Alarm", auswahl: ".btn.filter.alarm",
@@ -190,7 +190,7 @@ export const MASSE = [
   { id: "H42", seite: "discovery", was: "gewählter Status", auswahl: '[data-action="set-discovery-status"][aria-pressed="true"]',
     soll: { "background-color": "selected", color: "on-selected" } },
   { id: "H43", seite: "discovery", was: "Typ, gewählt", auswahl: '.btn.filter.plain[aria-pressed="true"]',
-    soll: { "background-color": "accent-chip", color: "accent-ink", "min-height": "36px" } },
+    soll: { "background-color": "selected", color: "on-selected", "min-height": "36px" } },
   { id: "H44", seite: "discovery", was: "Typ, nicht gewählt", auswahl: '.btn.filter.plain[aria-pressed="false"]',
     soll: { "background-color": "surface", "border-top-color": "control", color: "text", "font-weight": "400" } },
   { id: "H45", seite: "discovery", was: "Kennzeichen überwacht", auswahl: ".badge.monitored",
@@ -251,4 +251,14 @@ export const MASSE = [
   // -- Nachtrag -------------------------------------------------------------
   { id: "H71", seite: "dashboard", was: "Kennzeichen Systemnachricht", auswahl: ".badge.source",
     soll: { "background-color": "special-pill", color: "special-ink", "font-size": "11px" } },
+
+  // -- Filterleiste: auf allen drei Seiten dieselbe --------------------------
+  { id: "H72", seite: "history", was: "Auswahlfeld der Leiste", auswahl: ".bar-filters select",
+    soll: { "min-height": "36px", "border-top-color": "control" } },
+  { id: "H73", seite: "history", was: "Nebenaktion Alle löschen", auswahl: ".bar-meta .btn.quiet",
+    soll: { "min-height": "36px", "background-color": "rgba(0, 0, 0, 0)", color: "alarm-ink" } },
+  { id: "H74", seite: "rules", was: "Nebenaktion Alle einklappen", auswahl: ".bar-meta .btn.quiet",
+    soll: { "min-height": "36px", "background-color": "rgba(0, 0, 0, 0)", color: "link" } },
+  { id: "H75", seite: "discovery", was: "Anzahl in der Leiste", auswahl: ".bar-meta",
+    soll: { color: "muted", "font-size": "13px", "min-height": "36px" } },
 ];

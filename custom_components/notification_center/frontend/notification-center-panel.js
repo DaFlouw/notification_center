@@ -16,7 +16,7 @@ import { icon } from "./icons.js";
 import { adoptStyles } from "./styles.js";
 import { renderDashboard } from "./views/dashboard.js";
 import { LEERER_FILTER, buildQuery, renderHistory } from "./views/history.js";
-import { renderDiscovery } from "./views/discovery.js";
+import { renderDiscovery, typPillen } from "./views/discovery.js";
 import {
   entwurfZuRegel,
   leereBedingung,
@@ -109,6 +109,7 @@ class NotificationCenterPanel extends HTMLElement {
   #hass = null;
   #unsubscribe = null;
   #tick = null;
+  #alterRand = "";
   #seite = "dashboard";
 
   #dashboard = { active: [], counts: {}, paused: false };
@@ -126,6 +127,8 @@ class NotificationCenterPanel extends HTMLElement {
     statusCounts: {},
     limit: DISCOVERY_SCHRITT,
     allDomains: false,
+    domainOrder: [],
+    domainWidths: {},
   };
   #rules = {
     entityId: null,
@@ -166,6 +169,14 @@ class NotificationCenterPanel extends HTMLElement {
   }
 
   connectedCallback() {
+    // Platz fuer den Rollbalken freihalten, solange das Panel zu sehen ist.
+    // Sonst rutscht der zentrierte Inhalt um die Breite des Balkens, sobald
+    // man von einer langen Seite auf eine kurze wechselt. Beim Verlassen
+    // wird der alte Wert wiederhergestellt.
+    const wurzel = document.documentElement;
+    this.#alterRand = wurzel.style.scrollbarGutter;
+    wurzel.style.scrollbarGutter = "stable";
+
     this.shadowRoot.addEventListener("click", this.#onClick);
     this.shadowRoot.addEventListener("change", this.#onChange);
     this.shadowRoot.addEventListener("input", this.#onInput);
@@ -181,6 +192,8 @@ class NotificationCenterPanel extends HTMLElement {
   }
 
   disconnectedCallback() {
+    document.documentElement.style.scrollbarGutter = this.#alterRand || "";
+
     this.shadowRoot.removeEventListener("click", this.#onClick);
     this.shadowRoot.removeEventListener("change", this.#onChange);
     this.shadowRoot.removeEventListener("input", this.#onInput);
@@ -266,6 +279,14 @@ class NotificationCenterPanel extends HTMLElement {
       });
       this.#discovery.entities = antwort.entities;
       this.#discovery.domainCounts = antwort.domain_counts || {};
+      // Platz und Breite der Typ-Pillen bleiben stehen, auch wenn sich die
+      // Zahlen beim Suchen aendern.
+      const pillen = typPillen(
+        { order: this.#discovery.domainOrder, widths: this.#discovery.domainWidths },
+        this.#discovery.domainCounts
+      );
+      this.#discovery.domainOrder = pillen.order;
+      this.#discovery.domainWidths = pillen.widths;
       this.#discovery.statusCounts = antwort.status_counts || {};
       this.#fehler = null;
     } catch (fehler) {

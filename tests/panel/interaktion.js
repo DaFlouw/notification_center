@@ -1068,6 +1068,31 @@ const FAELLE = [
       pruefe(!SR().querySelector(".entity-item.open"), "der Vorschlag steht noch offen");
     },
   },
+  {
+    id: "L69",
+    titel: "Die Filterleiste steht auf allen drei Seiten an derselben Stelle",
+    async fn() {
+      const masse = [];
+      for (const name of ["history", "rules", "discovery"]) {
+        await seite(name);
+        const leiste = element(".filterbar").getBoundingClientRect();
+        const suche = element(".filterbar .search").getBoundingClientRect();
+        masse.push([
+          Math.round(leiste.top),
+          Math.round(leiste.height),
+          Math.round(suche.left),
+          Math.round(suche.width),
+          Math.round(element(".bar-bottom").getBoundingClientRect().top),
+        ]);
+      }
+      // Schmal brechen die Leisten um, und dann haengt die Hoehe vom Inhalt
+      // ab. Gleich hoch sein muessen sie dort, wo alles in zwei Zeilen passt.
+      const breit = P().getBoundingClientRect().width >= 1000;
+      const teil = (m) => (breit ? m : [m[0], m[2], m[3]]);
+      gleich(teil(masse[1]), teil(masse[0]), "Regeln gegen Historie (oben, Hoehe, Suchfeld links, Breite, Zeile 2)");
+      gleich(teil(masse[2]), teil(masse[0]), "Discovery gegen Historie");
+    },
+  },
 
   // -- Deaktivieren -------------------------------------------------------
   {
